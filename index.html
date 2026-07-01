@@ -1,0 +1,861 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Cima Eco-Granel · Sistema Financiero</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Work+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  :root{
+    --cream:#F7F2E6; --paper:#FCFAF4; --forest:#2F4A3D; --forest-dark:#20342A;
+    --terracotta:#C1652E; --terracotta-dark:#A34F1F; --olive:#8C8460; --sand:#E6DCC3;
+    --ink:#2A2721; --ink-soft:#5C5648; --error:#B23A2E; --ok:#3B6D11; --warn:#993C1D;
+    --radius:14px; --shadow:0 2px 10px rgba(42,39,33,0.08);
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--cream);color:var(--ink);font-family:'Work Sans',sans-serif;-webkit-tap-highlight-color:transparent;}
+  .app{max-width:1200px;margin:0 auto;min-height:100vh;background:var(--paper);display:flex;}
+  .sidebar{display:none;width:190px;flex-shrink:0;background:var(--forest-dark);padding:20px 14px;}
+  .sidebar h1{font-family:'Fraunces',serif;color:#fff;font-size:15px;margin:0 0 20px;}
+  .sidebar .grupo{font-size:10px;text-transform:uppercase;letter-spacing:0.5px;color:#9CAE9F;margin:14px 0 6px;}
+  .sidebar .item{padding:8px 9px;border-radius:7px;color:#D8E0D4;font-size:13px;cursor:pointer;margin-bottom:2px;display:flex;justify-content:space-between;}
+  .sidebar .item:hover{background:rgba(255,255,255,0.08);}
+  .sidebar .item.activo{background:var(--forest);color:#fff;}
+  .sidebar .badge{background:var(--terracotta);color:#fff;border-radius:8px;padding:0 6px;font-size:10px;}
+  .main{flex:1;min-width:0;display:flex;flex-direction:column;}
+  .mobile-shell{max-width:480px;width:100%;margin:0 auto;display:flex;flex-direction:column;flex:1;}
+  .screen{display:none;flex-direction:column;flex:1;padding:22px 20px 90px;}
+  .screen.active{display:flex;}
+  @media(min-width:900px){
+    .sidebar{display:block;}
+    .mobile-shell{max-width:none;}
+    .screen.desktop-wide.active{padding:28px 32px;}
+  }
+  .grain-divider{display:flex;gap:6px;justify-content:center;margin:16px 0;}
+  .grain-divider span{width:5px;height:5px;border-radius:50%;background:var(--olive);opacity:.55;}
+  .grain-divider span:nth-child(3n){background:var(--terracotta);opacity:.7;}
+  h1,h2,h3{font-family:'Fraunces',serif;margin:0;color:var(--forest-dark);font-weight:600;}
+  .brand{text-align:center;margin-bottom:6px;}
+  .brand h1{font-size:24px;}
+  .brand p{margin:4px 0 0;color:var(--ink-soft);font-size:12px;text-transform:uppercase;letter-spacing:.5px;}
+  .user-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:8px;}
+  .user-card{background:var(--sand);border:none;border-radius:var(--radius);padding:16px 10px;display:flex;flex-direction:column;align-items:center;gap:8px;cursor:pointer;}
+  .avatar{width:48px;height:48px;border-radius:50%;background:var(--forest);color:#fff;display:flex;align-items:center;justify-content:center;font-family:'Fraunces',serif;font-size:18px;font-weight:600;}
+  .user-card span{font-size:13px;font-weight:600;color:var(--forest-dark);}
+  .user-card small{font-size:10px;color:var(--ink-soft);}
+  .pin-pad{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:18px;}
+  .pin-pad button{padding:16px 0;border:none;border-radius:12px;background:var(--sand);font-family:'JetBrains Mono',monospace;font-size:19px;font-weight:600;color:var(--forest-dark);}
+  .pin-dots{display:flex;justify-content:center;gap:12px;margin:16px 0;}
+  .pin-dots div{width:13px;height:13px;border-radius:50%;border:2px solid var(--forest);}
+  .pin-dots div.filled{background:var(--forest);}
+  .back-link{background:none;border:none;color:var(--ink-soft);font-size:13px;padding:0;margin-bottom:12px;text-align:left;cursor:pointer;}
+  .greeting{margin-bottom:16px;}
+  .greeting small{color:var(--ink-soft);font-size:12px;}
+  .menu-card{display:flex;align-items:center;gap:12px;background:var(--forest);color:#fff;border:none;border-radius:var(--radius);padding:16px;margin-bottom:10px;text-align:left;box-shadow:var(--shadow);width:100%;}
+  .menu-card .icon{font-size:20px;width:22px;text-align:center;}
+  .menu-card .txt strong{display:block;font-size:14px;font-family:'Fraunces',serif;}
+  .menu-card .txt span{font-size:11px;opacity:.8;}
+  .menu-card.alt{background:var(--terracotta);}
+  .menu-card.flat{background:#fff;color:var(--forest-dark);border:1.5px solid var(--sand);box-shadow:none;}
+  .menu-card.flat .txt span{color:var(--ink-soft);opacity:1;}
+  .menu-grupo-titulo{font-size:10px;text-transform:uppercase;letter-spacing:0.5px;color:var(--ink-soft);margin:14px 0 6px;}
+  .menu-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+  .menu-item-flat{background:#fff;border:1px solid var(--sand);border-radius:12px;padding:14px;display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;cursor:pointer;}
+  .logout{margin-top:auto;padding-top:16px;text-align:center;}
+  .logout button{background:none;border:none;color:var(--ink-soft);font-size:12px;text-decoration:underline;}
+  label{display:block;font-size:12px;font-weight:600;color:var(--forest-dark);margin:14px 0 5px;}
+  input,select,textarea{width:100%;padding:12px;border:1.5px solid var(--sand);border-radius:10px;font-size:15px;background:#fff;color:var(--ink);font-family:'Work Sans',sans-serif;}
+  input:focus,select:focus{outline:none;border-color:var(--terracotta);}
+  .field-money{position:relative;}
+  .field-money span{position:absolute;left:12px;top:12px;color:var(--ink-soft);font-family:'JetBrains Mono',monospace;}
+  .field-money input{padding-left:24px;}
+  .toggle-group{display:flex;gap:8px;}
+  .toggle-group button{flex:1;padding:10px;border:1.5px solid var(--sand);border-radius:9px;background:#fff;font-weight:600;color:var(--ink-soft);font-size:13px;}
+  .toggle-group button.selected{background:var(--forest);color:#fff;border-color:var(--forest);}
+  .check-row{margin-top:8px;padding:10px 12px;border-radius:10px;display:flex;justify-content:space-between;align-items:center;font-size:12px;font-weight:600;}
+  .check-ok{background:#EAF3DE;color:var(--ok);}
+  .check-warn{background:#FBEAF0;color:var(--warn);}
+  .submit-bar{position:sticky;bottom:0;background:var(--paper);padding:14px 0 4px;margin-top:20px;border-top:1px solid var(--sand);}
+  .btn-primary{width:100%;padding:14px;border:none;border-radius:11px;background:var(--forest);color:#fff;font-size:15px;font-weight:600;}
+  .btn-primary:disabled{background:var(--olive);opacity:.6;}
+  .btn-secondary{width:100%;padding:12px;border:1.5px solid var(--sand);border-radius:11px;background:#fff;color:var(--ink-soft);font-size:14px;font-weight:600;}
+  .error-msg{color:var(--error);font-size:12px;margin-top:8px;min-height:14px;}
+  .banner{background:var(--terracotta);color:#fff;font-size:11px;text-align:center;padding:7px 10px;}
+  .dropzone{border:2px dashed var(--sand);border-radius:14px;padding:40px 16px;text-align:center;color:var(--ink-soft);font-size:13px;cursor:pointer;background:#fff;}
+  .dropzone.dragover{border-color:var(--terracotta);background:#FAECE7;}
+  .table-simple{width:100%;border-collapse:collapse;font-size:12px;}
+  .table-simple th{text-align:left;padding:8px 6px;color:var(--ink-soft);font-weight:600;border-bottom:1.5px solid var(--sand);font-size:11px;}
+  .table-simple td{padding:7px 6px;border-bottom:1px solid var(--sand);}
+  .card{background:#fff;border:1px solid var(--sand);border-radius:12px;padding:14px;margin-bottom:10px;}
+  .pill{display:inline-block;padding:2px 9px;border-radius:20px;font-size:10px;font-weight:600;}
+  .pill-menor{background:var(--sand);color:var(--ink-soft);}
+  .pill-alerta{background:#FAEEDA;color:#854F0B;}
+  .pill-critica{background:#FCEBEB;color:var(--error);}
+  .desktop-grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+  @media(max-width:899px){.desktop-grid2{display:block;}}
+  .confirm-screen{align-items:center;justify-content:center;text-align:center;gap:10px;}
+  .confirm-check{width:68px;height:68px;border-radius:50%;background:var(--forest);display:flex;align-items:center;justify-content:center;font-size:32px;color:#fff;}
+</style>
+</head>
+<body>
+<div class="app" id="app">
+
+  <div class="sidebar" id="sidebar" style="display:none;">
+    <h1>Cima &amp; Vegan Corner</h1>
+    <div class="grupo">Registro</div>
+    <div class="item" onclick="irA('screen-cierre')">Cierre de caja</div>
+    <div class="item" onclick="irA('screen-venta-vegan')">Venta Vegan Corner</div>
+    <div class="item" onclick="prepararCompra(); irA('screen-compra')">Compra / gasto</div>
+    <div class="item" onclick="irA('screen-importar')">Importar reportes</div>
+    <div class="grupo">Reportes</div>
+    <div class="item" onclick="abrirEstadoResultados()">Estado de resultados</div>
+    <div class="item" onclick="abrirF29()">F29</div>
+    <div class="item" onclick="abrirAlertas()">Alertas <span class="badge" id="sidebar-alertas-badge"></span></div>
+    <div class="grupo">Configuraciones</div>
+    <div class="item" onclick="abrirCreditos()">Créditos</div>
+    <div class="item" onclick="abrirPermisos()">Usuarios y permisos</div>
+  </div>
+
+  <div class="main">
+  <div class="mobile-shell">
+
+  <div id="banner-demo" class="banner" style="display:none;">Modo demostración — conecta CONFIG.API_URL para guardar datos reales</div>
+
+  <div class="screen active" id="screen-select-user">
+    <div class="brand"><h1>Cima Eco-Granel</h1><p>Vegan Corner · Sistema financiero</p></div>
+    <div class="grain-divider"><span></span><span></span><span></span><span></span><span></span></div>
+    <div class="user-grid" id="user-grid"></div>
+  </div>
+
+  <div class="screen" id="screen-pin">
+    <button class="back-link" onclick="irA('screen-select-user')">← Elegir otra persona</button>
+    <div class="brand"><div class="avatar" id="pin-avatar" style="margin:0 auto 10px;"></div><h2 id="pin-nombre"></h2><p style="color:var(--ink-soft);font-size:12px;">Ingresa tu PIN</p></div>
+    <div class="pin-dots" id="pin-dots"></div>
+    <div class="pin-pad" id="pin-pad"></div>
+    <div class="error-msg" id="pin-error"></div>
+  </div>
+
+  <div class="screen" id="screen-home">
+    <div class="greeting"><small>Hola,</small><h1 id="home-nombre" style="font-size:22px;"></h1></div>
+    <div id="home-menu"></div>
+    <div class="logout"><button onclick="cerrarSesion()">Cerrar sesión</button></div>
+  </div>
+
+  <!-- CIERRE DE CAJA -->
+  <div class="screen" id="screen-cierre">
+    <button class="back-link" onclick="irA('screen-home')">← Volver</button>
+    <h2>Cierre de caja · Cima Eco-Granel</h2>
+    <div class="grain-divider"><span></span><span></span><span></span></div>
+    <label>Fecha</label><input type="date" id="cc-fecha">
+    <label>Saldo inicial</label><div class="field-money"><span>$</span><input type="number" id="cc-saldo"></div>
+    <p style="font-size:11px;color:var(--ink-soft);margin:14px 0 4px;">Del Reporte Z de Aronium</p>
+    <label>Ventas efectivo (Aronium)</label><div class="field-money"><span>$</span><input type="number" id="cc-ef-aronium"></div>
+    <label>Débito (Aronium)</label><div class="field-money"><span>$</span><input type="number" id="cc-debito"></div>
+    <label>Crédito (Aronium)</label><div class="field-money"><span>$</span><input type="number" id="cc-credito"></div>
+    <label>Transferencia (Aronium)</label><div class="field-money"><span>$</span><input type="number" id="cc-transferencia"></div>
+    <label>Pedidos Ya (Aronium)</label><div class="field-money"><span>$</span><input type="number" id="cc-pya-aronium"></div>
+    <p style="font-size:11px;color:var(--ink-soft);margin:14px 0 4px;">Fuentes independientes para cuadrar</p>
+    <label>Efectivo contado físicamente</label><div class="field-money"><span>$</span><input type="number" id="cc-ef-contado"></div>
+    <label>Voucher Transbank (débito+crédito)</label><div class="field-money"><span>$</span><input type="number" id="cc-voucher-tb"></div>
+    <label>Total POS PedidosYa</label><div class="field-money"><span>$</span><input type="number" id="cc-pos-pya"></div>
+    <label>Retiro (fondo día siguiente)</label><div class="field-money"><span>$</span><input type="number" id="cc-retiro"></div>
+    <div class="error-msg" id="cc-error"></div>
+    <div class="submit-bar"><button class="btn-primary" onclick="enviarCierreCaja()">Guardar y cuadrar caja</button></div>
+  </div>
+
+  <!-- VENTA VEGAN CORNER -->
+  <div class="screen" id="screen-venta-vegan">
+    <button class="back-link" onclick="irA('screen-home')">← Volver</button>
+    <h2>Venta · Vegan Corner</h2>
+    <div class="grain-divider"><span></span><span></span><span></span></div>
+    <label>Fecha</label><input type="date" id="vv-fecha">
+    <label>Cliente</label><select id="vv-cliente"></select>
+    <label>N° de orden</label><input type="text" id="vv-orden">
+    <label>¿Con factura?</label>
+    <div class="toggle-group" id="vv-factura-group">
+      <button type="button" onclick="seleccionarToggle('vv-factura-group',this,'SI')">Sí</button>
+      <button type="button" onclick="seleccionarToggle('vv-factura-group',this,'NO')">No</button>
+    </div>
+    <label>Monto recibido</label><div class="field-money"><span>$</span><input type="number" id="vv-monto"></div>
+    <label>Medio de pago</label>
+    <select id="vv-medio"><option>Efectivo</option><option>Transferencia</option><option>Débito</option><option>Crédito</option></select>
+    <div class="error-msg" id="vv-error"></div>
+    <div class="submit-bar"><button class="btn-primary" onclick="enviarVentaVegan()">Guardar venta</button></div>
+  </div>
+
+  <!-- COMPRA / GASTO -->
+  <div class="screen" id="screen-compra">
+    <button class="back-link" onclick="irA('screen-home')">← Volver</button>
+    <h2>Compra / gasto</h2>
+    <div class="grain-divider"><span></span><span></span><span></span></div>
+    <label>Negocio</label><select id="co-negocio"></select>
+    <label>Categoría</label><select id="co-naturaleza"></select>
+    <label>Proveedor</label><select id="co-proveedor" onchange="if(this.value==='__nuevo__') abrirModalProveedor();"></select>
+    <label>Tipo de documento</label>
+    <select id="co-tipo-doc"><option>Factura</option><option>Boleta</option><option>Nota de Crédito</option><option>Sin documento</option><option>Otro</option></select>
+    <label>N° de documento</label><input type="text" id="co-ndoc">
+    <label>Monto</label><div class="field-money"><span>$</span><input type="number" id="co-monto"></div>
+    <label>Medio de pago</label>
+    <select id="co-medio-pago"><option>Efectivo</option><option>Transferencia</option><option>Débito</option><option>Crédito</option><option>Cheque</option></select>
+    <label>Descripción</label><input type="text" id="co-desc">
+    <label>Estado</label>
+    <div class="toggle-group" id="co-estado-group">
+      <button type="button" onclick="seleccionarToggle('co-estado-group',this,'Pagado')">Pagado</button>
+      <button type="button" onclick="seleccionarToggle('co-estado-group',this,'Pendiente de pago')">Pendiente</button>
+    </div>
+    <div class="error-msg" id="co-error"></div>
+    <div class="submit-bar"><button class="btn-primary" onclick="enviarCompra()">Guardar compra/gasto</button></div>
+  </div>
+
+  <!-- MODAL PROVEEDOR -->
+  <div class="screen" id="screen-modal-proveedor">
+    <div style="min-height:400px;background:rgba(42,39,33,0.5);display:flex;align-items:center;justify-content:center;padding:20px;flex:1;">
+      <div style="background:var(--paper);border-radius:16px;padding:20px 18px;width:100%;max-width:380px;">
+        <p style="font-family:'Fraunces',serif;font-size:16px;font-weight:600;color:var(--forest-dark);margin:0 0 4px;">Nuevo proveedor</p>
+        <p style="font-size:11px;color:var(--ink-soft);margin:0 0 10px;">Solo Admin puede crear proveedores</p>
+        <label>Nombre *</label><input type="text" id="np-nombre">
+        <label>RUT *</label><input type="text" id="np-rut" placeholder="76.123.456-7">
+        <label>Alias *</label><input type="text" id="np-alias">
+        <label style="color:var(--ink-soft);">Dirección (opcional)</label><input type="text" id="np-direccion">
+        <label style="color:var(--ink-soft);">Contacto (opcional)</label><input type="text" id="np-contacto">
+        <div class="error-msg" id="np-error"></div>
+        <div style="display:flex;gap:8px;margin-top:14px;">
+          <button class="btn-secondary" onclick="irA('screen-compra')">Cancelar</button>
+          <button class="btn-primary" onclick="crearProveedorNuevo()">Crear</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- IMPORTAR REPORTES -->
+  <div class="screen desktop-wide" id="screen-importar">
+    <button class="back-link" onclick="irA('screen-home')">← Volver</button>
+    <h2>Importar reportes</h2>
+    <div class="grain-divider"><span></span><span></span><span></span></div>
+    <p style="font-size:12px;color:var(--ink-soft);">Arrastra el archivo de Aronium, PedidosYa o Transbank — el sistema detecta solo qué tipo de reporte es.</p>
+    <div class="dropzone" id="dropzone">Arrastra el archivo aquí, o toca para elegir<input type="file" id="file-input" style="display:none;" accept=".csv,.xls,.xlsx"></div>
+    <div id="import-preview"></div>
+    <div class="error-msg" id="import-error"></div>
+  </div>
+
+  <!-- CREDITOS -->
+  <div class="screen desktop-wide" id="screen-creditos">
+    <button class="back-link" onclick="irA('screen-home')">← Volver</button>
+    <div style="display:flex;justify-content:space-between;align-items:center;">
+      <h2>Créditos y financiamientos</h2>
+      <button class="btn-secondary" style="width:auto;padding:8px 14px;font-size:12px;" onclick="irA('screen-credito-nuevo')">+ Nuevo</button>
+    </div>
+    <div class="grain-divider"><span></span><span></span><span></span></div>
+    <div id="lista-creditos"></div>
+  </div>
+
+  <div class="screen" id="screen-credito-nuevo">
+    <button class="back-link" onclick="irA('screen-creditos')">← Volver</button>
+    <h2>Nuevo crédito</h2>
+    <div class="grain-divider"><span></span><span></span><span></span></div>
+    <label>Acreedor</label><input type="text" id="nc-acreedor">
+    <label>N° operación (opcional)</label><input type="text" id="nc-noperacion">
+    <label>Monto inicial</label><div class="field-money"><span>$</span><input type="number" id="nc-monto"></div>
+    <label>Periodicidad</label><select id="nc-periodicidad"><option>Semanal</option><option>Mensual</option></select>
+    <label>Modo de cálculo</label>
+    <div class="toggle-group" id="nc-modo-group">
+      <button type="button" onclick="setModoCredito('Calculado', this)">Calculado</button>
+      <button type="button" onclick="setModoCredito('Reportado', this)">Reportado</button>
+    </div>
+    <div id="nc-campos-calculado">
+      <label>Cuota fija</label><div class="field-money"><span>$</span><input type="number" id="nc-cuota"></div>
+      <label>Tasa por período (%)</label><input type="number" step="0.01" id="nc-tasa">
+    </div>
+    <div id="nc-campos-reportado" style="display:none;">
+      <label>N° cuotas totales</label><input type="number" id="nc-cuotas-totales">
+      <label>N° cuotas pagadas</label><input type="number" id="nc-cuotas-pagadas">
+      <label>Saldo vigente</label><div class="field-money"><span>$</span><input type="number" id="nc-saldo-vigente"></div>
+      <label>Próximo vencimiento</label><input type="date" id="nc-prox-venc">
+    </div>
+    <label>Atribución del gasto</label>
+    <select id="nc-atribucion">
+      <option>100% Cima Eco-Granel</option><option>100% Vegan Corner</option>
+      <option>Proporcional según ingresos</option><option>Corporativo</option>
+    </select>
+    <div class="error-msg" id="nc-error"></div>
+    <div class="submit-bar"><button class="btn-primary" onclick="guardarCredito()">Guardar crédito</button></div>
+  </div>
+
+  <!-- PERMISOS -->
+  <div class="screen desktop-wide" id="screen-permisos">
+    <button class="back-link" onclick="irA('screen-home')">← Volver</button>
+    <h2>Usuarios y permisos</h2>
+    <div class="grain-divider"><span></span><span></span><span></span></div>
+    <div id="tabla-permisos"></div>
+    <div class="submit-bar"><button class="btn-primary" onclick="guardarPermisos()">Guardar cambios</button></div>
+  </div>
+
+  <!-- ESTADO DE RESULTADOS -->
+  <div class="screen desktop-wide" id="screen-estado-resultados">
+    <button class="back-link" onclick="irA('screen-home')">← Volver</button>
+    <h2>Estado de resultados</h2>
+    <div class="grain-divider"><span></span><span></span><span></span></div>
+    <div class="toggle-group" style="margin-bottom:14px;" id="er-negocio-group">
+      <button type="button" onclick="cambiarNegocioER('Cima Eco-Granel', this)">Cima</button>
+      <button type="button" onclick="cambiarNegocioER('Vegan Corner', this)">Vegan Corner</button>
+    </div>
+    <div id="er-contenido"></div>
+  </div>
+
+  <!-- F29 -->
+  <div class="screen desktop-wide" id="screen-f29">
+    <button class="back-link" onclick="irA('screen-home')">← Volver</button>
+    <h2>F29 estimado</h2>
+    <div class="grain-divider"><span></span><span></span><span></span></div>
+    <div id="f29-contenido"></div>
+    <p style="font-size:11px;color:var(--ink-soft);">Cálculo de apoyo — la declaración se presenta en sii.cl</p>
+  </div>
+
+  <!-- ALERTAS -->
+  <div class="screen desktop-wide" id="screen-alertas">
+    <button class="back-link" onclick="irA('screen-home')">← Volver</button>
+    <h2>Alertas</h2>
+    <div class="grain-divider"><span></span><span></span><span></span></div>
+    <div id="lista-alertas"></div>
+  </div>
+
+  <div class="screen confirm-screen" id="screen-confirm">
+    <div class="confirm-check">✓</div>
+    <h2 id="confirm-title">Registro guardado</h2>
+    <p id="confirm-msg" style="color:var(--ink-soft);font-size:13px;max-width:280px;"></p>
+    <div id="confirm-detalle" style="width:100%;"></div>
+    <div class="submit-bar" style="width:100%;"><button class="btn-primary" onclick="irA('screen-home')">Volver al inicio</button></div>
+  </div>
+
+  </div>
+  </div>
+</div>
+
+<script>
+const CONFIG = {
+  API_URL: https://script.google.com/macros/s/AKfycbyMw5bun6svTAXXAiCEQciGmwVT6m-oRwucAliICc28_uh3w4BbfV5OvwHnRamL5j8/exec,
+  NEGOCIOS: ['Cima Eco-Granel','Vegan Corner','Ambos','Personal']
+};
+const modoDemo = CONFIG.API_URL.indexOf('PEGA_AQUI') !== -1;
+if (modoDemo) document.getElementById('banner-demo').style.display = 'block';
+
+let sesion = { nombre:null, rol:null, negocio:null };
+let pinBuffer = ''; let usuarioSeleccionado = null;
+let cacheProveedores = []; let cacheClientes = []; let cacheCategorias = [];
+let modoCreditoActual = 'Calculado';
+let archivoParseado = null;
+let negocioER = 'Cima Eco-Granel';
+
+const USUARIOS_DEMO = [
+  {nombre:'Osmar Meza', rol:'Admin', negocio:'Ambos'},
+  {nombre:'Rocío Romo', rol:'Manager', negocio:'Cima Eco-Granel'},
+  {nombre:'Rosa Merino', rol:'Manager', negocio:'Vegan Corner'},
+  {nombre:'Lucas Ramos', rol:'Staff', negocio:'Cima Eco-Granel'},
+  {nombre:'Cecilia Yevenes', rol:'Staff', negocio:'Cima Eco-Granel'},
+  {nombre:'Katherine Bustamante', rol:'Staff', negocio:'Vegan Corner'}
+];
+
+function irA(id){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  document.querySelectorAll('.sidebar .item').forEach(i=>i.classList.remove('activo'));
+}
+
+async function llamarAPI(accion, extra){
+  if (modoDemo){
+    await new Promise(r=>setTimeout(r,300));
+    return simularAPI(accion, extra);
+  }
+  const res = await fetch(CONFIG.API_URL, { method:'POST', headers:{'Content-Type':'text/plain;charset=utf-8'}, body: JSON.stringify(Object.assign({accion:accion}, extra)) });
+  return res.json();
+}
+
+function simularAPI(accion, extra){
+  if (accion === 'login') return { ok:true, usuario:{ nombre: extra.nombre, rol: usuarioSeleccionado.rol, negocio: usuarioSeleccionado.negocio } };
+  if (accion === 'listarProveedores') return { ok:true, proveedores:[{nombre:'Shen',alias:'Shen'},{nombre:'Rabanal',alias:'Rabanal'}] };
+  if (accion === 'listarClientes') return { ok:true, clientes:[{nombre:'Dulce Luna'},{nombre:'Almacén Central'}] };
+  if (accion === 'listarCategorias') return { ok:true, categorias:[{naturaleza:'Compra mercadería'},{naturaleza:'Sueldos'},{naturaleza:'Gastos de administración'}] };
+  if (accion === 'listarCreditos') return { ok:true, creditos:[] };
+  if (accion === 'listarPermisos') return { ok:true, permisos:[] };
+  if (accion === 'listarAlertas') return { ok:true, alertas:[] };
+  if (accion === 'registrarCierreCaja') return { ok:true, chequeos:{efectivo:{diferencia:0,severidad:'Menor'},tarjetas:{diferencia:0,severidad:'Menor'},pedidosYa:{diferencia:0,severidad:'Menor'}}, tolerancia:500 };
+  return { ok:true, mensaje:'(demo) guardado' };
+}
+
+function iniciales(n){ return n.split(' ').map(p=>p[0]).slice(0,2).join('').toUpperCase(); }
+
+function pintarUsuarios(){
+  const grid = document.getElementById('user-grid'); grid.innerHTML='';
+  USUARIOS_DEMO.forEach(u=>{
+    const btn = document.createElement('button'); btn.className='user-card';
+    btn.innerHTML = '<div class="avatar">'+iniciales(u.nombre)+'</div><span>'+u.nombre+'</span><small>'+u.rol+'</small>';
+    btn.onclick = ()=>seleccionarUsuario(u);
+    grid.appendChild(btn);
+  });
+}
+function seleccionarUsuario(u){
+  usuarioSeleccionado = u; pinBuffer='';
+  document.getElementById('pin-avatar').textContent = iniciales(u.nombre);
+  document.getElementById('pin-nombre').textContent = u.nombre;
+  document.getElementById('pin-error').textContent='';
+  pintarPinDots(); pintarPinPad(); irA('screen-pin');
+}
+function pintarPinDots(){
+  const c = document.getElementById('pin-dots'); c.innerHTML='';
+  for(let i=0;i<4;i++){ const d=document.createElement('div'); if(i<pinBuffer.length) d.classList.add('filled'); c.appendChild(d); }
+}
+function pintarPinPad(){
+  const pad = document.getElementById('pin-pad'); pad.innerHTML='';
+  ['1','2','3','4','5','6','7','8','9','←','0','OK'].forEach(t=>{
+    const b=document.createElement('button'); b.textContent=t; b.onclick=()=>tocarTecla(t); pad.appendChild(b);
+  });
+}
+async function tocarTecla(t){
+  if(t==='←'){ pinBuffer=pinBuffer.slice(0,-1); pintarPinDots(); return; }
+  if(t==='OK') return intentarLogin();
+  if(pinBuffer.length<4){ pinBuffer+=t; pintarPinDots(); }
+  if(pinBuffer.length===4) await intentarLogin();
+}
+async function intentarLogin(){
+  const r = await llamarAPI('login', {nombre:usuarioSeleccionado.nombre, pin:pinBuffer});
+  if(r.ok){ sesion=r.usuario; entrarAHome(); } else { document.getElementById('pin-error').textContent=r.error||'PIN incorrecto'; pinBuffer=''; pintarPinDots(); }
+}
+function cerrarSesion(){ sesion={nombre:null,rol:null,negocio:null}; irA('screen-select-user'); }
+
+let permisosSesion = {};
+
+function tienePermisoLocal(accion){ return !!permisosSesion[accion]; }
+
+async function entrarAHome(){
+  document.getElementById('home-nombre').textContent = sesion.nombre;
+  const rp = await llamarAPI('listarPermisos', {});
+  permisosSesion = {};
+  (rp.permisos||[]).filter(p=>p.nombre===sesion.nombre).forEach(p=>{ permisosSesion[p.accion]=p.permitido; });
+
+  const sidebar = document.getElementById('sidebar');
+  sidebar.style.display = (tienePermisoLocal('VerDashboardCompleto') || tienePermisoLocal('VerResumenPropio') || tienePermisoLocal('ConfigurarSistema')) ? '' : 'none';
+
+  const menu = document.getElementById('home-menu'); menu.innerHTML='';
+  const puedeCima = sesion.rol==='Admin' || sesion.negocio==='Cima Eco-Granel';
+  const puedeVegan = sesion.rol==='Admin' || sesion.negocio==='Vegan Corner';
+  menu.insertAdjacentHTML('beforeend', '<div class="menu-grupo-titulo">Registro rápido</div>');
+  if (puedeCima) menu.appendChild(crearMenuCard('💵','Cierre de caja','Registrar ventas del día',()=>{document.getElementById('cc-fecha').valueAsDate=new Date();irA('screen-cierre');}));
+  if (puedeVegan) menu.appendChild(crearMenuCard('🥐','Venta Vegan Corner','Registrar despacho/orden',()=>{document.getElementById('vv-fecha').valueAsDate=new Date();cargarClientes();irA('screen-venta-vegan');},'alt'));
+  menu.appendChild(crearMenuCard('🧾','Compra / gasto','Registrar egreso o factura',()=>{prepararCompra();irA('screen-compra');},'flat'));
+  if (tienePermisoLocal('VerDashboardCompleto') || tienePermisoLocal('VerResumenPropio')){
+    menu.appendChild(crearMenuCard('📤','Importar reportes','Aronium, PedidosYa, Transbank',()=>irA('screen-importar'),'flat'));
+  }
+  cargarAlertasBadge();
+  irA('screen-home');
+}
+function crearMenuCard(icon,titulo,sub,onClick,clase){
+  const b=document.createElement('button'); b.className='menu-card'+(clase?' '+clase:'');
+  b.innerHTML='<div class="icon">'+icon+'</div><div class="txt"><strong>'+titulo+'</strong><span>'+sub+'</span></div>';
+  b.onclick=onClick; return b;
+}
+
+function seleccionarToggle(groupId,btn,valor){
+  const g=document.getElementById(groupId); [...g.children].forEach(c=>c.classList.remove('selected'));
+  btn.classList.add('selected'); g.dataset.valor=valor;
+}
+
+/* ===== CIERRE DE CAJA ===== */
+async function enviarCierreCaja(){
+  const data = {
+    fecha: document.getElementById('cc-fecha').value,
+    saldoInicial: document.getElementById('cc-saldo').value||0,
+    ventasEfectivoAronium: document.getElementById('cc-ef-aronium').value||0,
+    debito: document.getElementById('cc-debito').value||0,
+    credito: document.getElementById('cc-credito').value||0,
+    transferencia: document.getElementById('cc-transferencia').value||0,
+    pedidosYaAronium: document.getElementById('cc-pya-aronium').value||0,
+    efectivoContado: document.getElementById('cc-ef-contado').value||0,
+    voucherTransbank: document.getElementById('cc-voucher-tb').value||0,
+    totalPosPedidosYa: document.getElementById('cc-pos-pya').value||0,
+    retiro: document.getElementById('cc-retiro').value||0,
+    responsable: sesion.nombre
+  };
+  if(!data.fecha){ document.getElementById('cc-error').textContent='Selecciona la fecha'; return; }
+  const r = await llamarAPI('registrarCierreCaja',{data});
+  if(r.ok){
+    let html = '';
+    ['efectivo','tarjetas','pedidosYa'].forEach(k=>{
+      const ch = r.chequeos[k];
+      const label = k==='efectivo'?'Efectivo':k==='tarjetas'?'Tarjetas':'Pedidos Ya';
+      const ok = ch.severidad==='Menor';
+      html += '<div class="check-row '+(ok?'check-ok':'check-warn')+'">'+label+(ok?' cuadra':' diferencia $'+Math.abs(ch.diferencia))+'<span>'+(ok?'✓':ch.severidad)+'</span></div>';
+    });
+    document.getElementById('confirm-title').textContent='Cierre guardado';
+    document.getElementById('confirm-msg').textContent='Resultado de la cuadratura:';
+    document.getElementById('confirm-detalle').innerHTML = html;
+    irA('screen-confirm');
+  } else { document.getElementById('cc-error').textContent = r.error||'Error al guardar'; }
+}
+
+/* ===== VENTA VEGAN CORNER ===== */
+async function cargarClientes(){
+  if(cacheClientes.length) return pintarClientes();
+  const r = await llamarAPI('listarClientes',{});
+  cacheClientes = (r.clientes&&r.clientes.length)?r.clientes:[{nombre:'Dulce Luna'},{nombre:'Almacén Central'},{nombre:'La Astilla'},{nombre:'Casa de la Masa'},{nombre:'Anfer'}];
+  pintarClientes();
+}
+function pintarClientes(){ document.getElementById('vv-cliente').innerHTML = cacheClientes.map(c=>'<option>'+c.nombre+'</option>').join('')+'<option>Otro</option>'; }
+async function enviarVentaVegan(){
+  const fg = document.getElementById('vv-factura-group');
+  const data = { fecha:document.getElementById('vv-fecha').value, cliente:document.getElementById('vv-cliente').value, nOrden:document.getElementById('vv-orden').value, factura:fg.dataset.valor||'NO', montoRecibido:document.getElementById('vv-monto').value||0, medioPago:document.getElementById('vv-medio').value };
+  if(!data.fecha||!data.montoRecibido){ document.getElementById('vv-error').textContent='Completa fecha y monto'; return; }
+  const r = await llamarAPI('registrarVentaVegan',{data});
+  if(r.ok){ document.getElementById('confirm-title').textContent='Venta guardada'; document.getElementById('confirm-msg').textContent='Venta Vegan Corner registrada correctamente.'; document.getElementById('confirm-detalle').innerHTML=''; irA('screen-confirm'); }
+  else document.getElementById('vv-error').textContent=r.error||'Error al guardar';
+}
+
+/* ===== COMPRA / GASTO ===== */
+function prepararCompra(){
+  const selNeg = document.getElementById('co-negocio');
+  if(sesion.rol==='Staff'){ selNeg.innerHTML='<option>'+sesion.negocio+'</option>'; selNeg.disabled=true; }
+  else { selNeg.disabled=false; selNeg.innerHTML = CONFIG.NEGOCIOS.map(n=>'<option>'+n+'</option>').join(''); }
+  cargarCategorias(); cargarProveedores();
+}
+async function cargarCategorias(){
+  if(!cacheCategorias.length){ const r = await llamarAPI('listarCategorias',{}); cacheCategorias = r.categorias||[]; }
+  document.getElementById('co-naturaleza').innerHTML = cacheCategorias.map(c=>'<option>'+c.naturaleza+'</option>').join('');
+}
+async function cargarProveedores(){
+  const r = await llamarAPI('listarProveedores',{});
+  cacheProveedores = (r.proveedores&&r.proveedores.length)?r.proveedores:[];
+  document.getElementById('co-proveedor').innerHTML = cacheProveedores.map(p=>'<option>'+(p.alias||p.nombre)+'</option>').join('')+'<option value="__nuevo__">+ Proveedor nuevo</option>';
+}
+function abrirModalProveedor(){ irA('screen-modal-proveedor'); }
+async function crearProveedorNuevo(){
+  const d = { nombre:document.getElementById('np-nombre').value, rut:document.getElementById('np-rut').value, alias:document.getElementById('np-alias').value, direccion:document.getElementById('np-direccion').value, contacto:document.getElementById('np-contacto').value };
+  if(!d.nombre||!d.rut||!d.alias){ document.getElementById('np-error').textContent='Nombre, RUT y Alias son obligatorios'; return; }
+  const r = await llamarAPI('crearProveedor',{data:d});
+  if(r.ok){ cacheProveedores=[]; await cargarProveedores(); irA('screen-compra'); }
+  else document.getElementById('np-error').textContent=r.error||'Error al crear';
+}
+async function enviarCompra(){
+  const eg = document.getElementById('co-estado-group');
+  const data = { negocio:document.getElementById('co-negocio').value, naturaleza:document.getElementById('co-naturaleza').value, proveedor:document.getElementById('co-proveedor').value, tipoDocumento:document.getElementById('co-tipo-doc').value, nDocumento:document.getElementById('co-ndoc').value, monto:document.getElementById('co-monto').value||0, medioPago:document.getElementById('co-medio-pago').value, descripcion:document.getElementById('co-desc').value, estado:eg.dataset.valor||'Pagado' };
+  if(!data.monto||data.monto<=0){ document.getElementById('co-error').textContent='Ingresa un monto válido'; return; }
+  const r = await llamarAPI('registrarCompra',{data});
+  if(r.ok){ document.getElementById('confirm-title').textContent='Compra guardada'; document.getElementById('confirm-msg').textContent='Compra/gasto registrado correctamente.'; document.getElementById('confirm-detalle').innerHTML=''; irA('screen-confirm'); }
+  else document.getElementById('co-error').textContent=r.error||'Error al guardar';
+}
+
+/* ===== IMPORTAR REPORTES (drag & drop + parseo) ===== */
+const dropzone = document.getElementById('dropzone');
+dropzone.addEventListener('click', ()=>document.getElementById('file-input').click());
+dropzone.addEventListener('dragover', e=>{ e.preventDefault(); dropzone.classList.add('dragover'); });
+dropzone.addEventListener('dragleave', ()=>dropzone.classList.remove('dragover'));
+dropzone.addEventListener('drop', e=>{ e.preventDefault(); dropzone.classList.remove('dragover'); if(e.dataTransfer.files.length) procesarArchivo(e.dataTransfer.files[0]); });
+document.getElementById('file-input').addEventListener('change', e=>{ if(e.target.files.length) procesarArchivo(e.target.files[0]); });
+
+async function procesarArchivo(file){
+  document.getElementById('import-error').textContent='';
+  document.getElementById('import-preview').innerHTML='<p style="font-size:12px;color:var(--ink-soft);">Leyendo archivo...</p>';
+  try{
+    const ext = file.name.split('.').pop().toLowerCase();
+    let rows;
+    if(ext==='csv'){
+      const buf = await file.arrayBuffer();
+      const texto = new TextDecoder('iso-8859-1').decode(buf);
+      rows = texto.split(/\r?\n/).map(l=>l.split(';').map(c=>c.trim().replace(/^"|"$/g,'')));
+    } else {
+      const buf = await file.arrayBuffer();
+      const wb = XLSX.read(buf, {type:'array'});
+      rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], {header:1, defval:'', raw:false});
+    }
+    archivoParseado = detectarYParsear(rows);
+    if(archivoParseado.error){ document.getElementById('import-error').textContent = archivoParseado.error; document.getElementById('import-preview').innerHTML=''; return; }
+    await mostrarPreviewImport(archivoParseado);
+  } catch(err){ document.getElementById('import-error').textContent = 'No se pudo leer el archivo: '+err.message; }
+}
+
+function filaTexto(r){ return (r||[]).join(' ').toUpperCase(); }
+function numCL(s){ return Number(String(s||'0').replace(/\./g,'').replace(',','.'))||0; }
+function encontrarColumna(header, textos){
+  for(let i=0;i<header.length;i++){ const h=String(header[i]).toUpperCase(); if(textos.some(t=>h.indexOf(t)!==-1)) return i; }
+  return -1;
+}
+
+function detectarYParsear(rows){
+  const muestra = rows.slice(0,12).map(filaTexto).join(' ');
+  if(muestra.indexOf('VENTAS POR PRODUCTO')!==-1) return parseAroniumProductos(rows);
+  if(muestra.indexOf('VENTAS SEG') !== -1 && muestra.indexOf('MEDIOS')!==-1) return parseAroniumMedios(rows);
+  if(muestra.indexOf('NÚMERO DEL PEDIDO')!==-1 || muestra.indexOf('NUMERO DEL PEDIDO')!==-1) return parsePedidosYa(rows);
+  if(muestra.indexOf('FECHA DE ABONO')!==-1) return parseTransbank(rows);
+  return { error: 'No se pudo identificar el tipo de reporte. Verifica que sea un export de Aronium, PedidosYa o Transbank.' };
+}
+
+function extraerPeriodo(rows, regexEtiqueta){
+  for(const r of rows.slice(0,10)){
+    const t = filaTexto(r);
+    if(regexEtiqueta.test(t)){
+      const full = (r||[]).join(' ');
+      const m = full.match(/(\d{2}[\/\-]\d{2}[\/\-]\d{4})\s*-\s*(\d{2}[\/\-]\d{2}[\/\-]\d{4})/);
+      if(m) return { desde: m[1], hasta: m[2] };
+    }
+  }
+  return { desde:'', hasta:'' };
+}
+
+function parseAroniumProductos(rows){
+  const periodo = extraerPeriodo(rows, /PERIODO/);
+  let headerIdx = -1;
+  for(let i=0;i<rows.length;i++){ if(filaTexto(rows[i]).indexOf('CÓDIGO')!==-1 || filaTexto(rows[i]).indexOf('CODIGO')!==-1){ headerIdx=i; break; } }
+  const productos = [];
+  let total = 0;
+  if(headerIdx>=0){
+    const header = rows[headerIdx];
+    const idxCod = encontrarColumna(header,['CÓDIGO','CODIGO']);
+    const idxProd = encontrarColumna(header,['PRODUCTO']);
+    const idxCant = encontrarColumna(header,['CANTIDAD']);
+    const idxTotal = encontrarColumna(header,['TOTAL']);
+    for(let i=headerIdx+1;i<rows.length;i++){
+      const r = rows[i];
+      if(!r || !r[idxCod]) continue;
+      if(!/^\d+$/.test(String(r[idxCod]).trim())) continue;
+      const codigo = String(r[idxCod]).trim();
+      const nombre = String(r[idxProd]).trim();
+      const cantidad = numCL(r[idxCant]);
+      const totalLinea = numCL(r[idxTotal]);
+      productos.push({codigo,nombre,cantidad,total:totalLinea});
+      total += totalLinea;
+    }
+  }
+  return { tipo:'aronium_productos', desde:periodo.desde, hasta:periodo.hasta, productos, totalDia: total };
+}
+
+function parseAroniumMedios(rows){
+  const periodo = extraerPeriodo(rows, /PERIODO/);
+  let headerIdx = -1;
+  for(let i=0;i<rows.length;i++){ if(filaTexto(rows[i]).indexOf('FECHA')!==-1 && filaTexto(rows[i]).indexOf('CR')!==-1){ headerIdx=i; break; } }
+  const dias = [];
+  if(headerIdx>=0){
+    const header = rows[headerIdx];
+    const idxFecha = encontrarColumna(header,['FECHA']);
+    const idxCred = encontrarColumna(header,['CRÉDITO','CREDITO']);
+    const idxDeb = encontrarColumna(header,['DÉBITO','DEBITO']);
+    const idxEf = encontrarColumna(header,['EFECTIVO']);
+    const idxPya = encontrarColumna(header,['PEDIDOS YA','PEDIDOSYA']);
+    const idxTrans = encontrarColumna(header,['TRANSFERENCIA']);
+    const idxTot = encontrarColumna(header,['TOTAL']);
+    for(let i=headerIdx+1;i<rows.length;i++){
+      const r = rows[i];
+      if(!r || !r[idxFecha]) break;
+      if(!/\d{2}-\d{2}-\d{4}/.test(String(r[idxFecha]))) break;
+      dias.push({ fecha:r[idxFecha], credito:numCL(r[idxCred]), debito:numCL(r[idxDeb]), efectivo:numCL(r[idxEf]), pedidosYa:numCL(r[idxPya]), transferencia:numCL(r[idxTrans]), total:numCL(r[idxTot]) });
+    }
+  }
+  return { tipo:'aronium_medios', desde:periodo.desde, hasta:periodo.hasta, dias };
+}
+
+function parsePedidosYa(rows){
+  let headerIdx = -1;
+  for(let i=0;i<rows.length;i++){ if(filaTexto(rows[i]).indexOf('NÚMERO DEL PEDIDO')!==-1 || filaTexto(rows[i]).indexOf('NUMERO DEL PEDIDO')!==-1){ headerIdx=i; break; } }
+  if(headerIdx<0) return { error:'No se encontró el encabezado de pedidos' };
+  const header = rows[headerIdx].map(h=>String(h).trim());
+  const idxTotalUsuario = encontrarColumna(header, ['TOTAL PAGADO POR EL USUARIO']);
+  const idxComision = encontrarColumna(header, ['COMISIÓN POR PEDIDO','COMISION POR PEDIDO']);
+  const idxReintegro = encontrarColumna(header, ['DESCUENTO POR RETIRO EN EL LOCAL']);
+  const idxFecha = encontrarColumna(header, ['FECHA DEL PEDIDO']);
+  const numMiles = s => Number(String(s||'0').replace(/,/g,'')) || 0;
+  let bruto=0, comision=0, reintegro=0, fechaMin=null, fechaMax=null;
+  for(let i=headerIdx+1;i<rows.length;i++){
+    const r = rows[i];
+    if(!r || !r[idxTotalUsuario] || filaTexto(r).indexOf('TOTALES')!==-1) continue;
+    bruto += numMiles(r[idxTotalUsuario]);
+    comision += numMiles(r[idxComision]);
+    reintegro += numMiles(r[idxReintegro]);
+    const f = r[idxFecha];
+    if(f){ if(!fechaMin||f<fechaMin) fechaMin=f; if(!fechaMax||f>fechaMax) fechaMax=f; }
+  }
+  return { tipo:'pedidosya', desde:fechaMin||'', hasta:fechaMax||'', bruto, comision, reintegro };
+}
+
+function parseTransbank(rows){
+  let headerIdx = -1;
+  for(let i=rows.length-1;i>=0;i--){ if(filaTexto(rows[i]).indexOf('FECHA DE ABONO')!==-1 && filaTexto(rows[i]).indexOf('CUENTA')!==-1){ headerIdx=i; break; } }
+  if(headerIdx<0){ for(let i=0;i<rows.length;i++){ if(filaTexto(rows[i]).indexOf('FECHA DE ABONO')!==-1){ headerIdx=i; break; } } }
+  let bruto=0, gastoTransbank=0, neto=0, fechaMin=null, fechaMax=null;
+  if(headerIdx>=0){
+    const header = rows[headerIdx];
+    const idxFecha = encontrarColumna(header, ['FECHA DE ABONO']);
+    const idxVentas = encontrarColumna(header, ['TOTAL VENTAS']);
+    const idxDescontado = encontrarColumna(header, ['TOTAL MONTOS DESCONTADOS']);
+    const idxAbono = encontrarColumna(header, ['TOTAL ABONO']);
+    for(let i=headerIdx+1;i<rows.length;i++){
+      const r = rows[i];
+      if(!r || !r[idxFecha]) break;
+      const fecha = String(r[idxFecha]);
+      if(!/\d{2}\/\d{2}\/\d{4}/.test(fecha)) break;
+      bruto += numCL(r[idxVentas]); gastoTransbank += numCL(r[idxDescontado]); neto += numCL(r[idxAbono]);
+      if(!fechaMin||fecha<fechaMin) fechaMin=fecha; if(!fechaMax||fecha>fechaMax) fechaMax=fecha;
+    }
+  }
+  return { tipo:'transbank', desde:fechaMin||'', hasta:fechaMax||'', bruto, gastoTransbank, neto };
+}
+
+async function mostrarPreviewImport(p){
+  const cont = document.getElementById('import-preview');
+  const chk = await llamarAPI('verificarImportPeriodo', { fuente: p.tipo, desde:p.desde, hasta:p.hasta });
+  let html = '<div class="card">';
+  if(p.tipo==='aronium_productos') html += '<p style="font-size:13px;font-weight:600;">Aronium — Ventas por producto</p><p style="font-size:12px;color:var(--ink-soft);">Período '+p.desde+' a '+p.hasta+' &middot; '+p.productos.length+' productos &middot; total $'+Math.round(p.totalDia).toLocaleString('es-CL')+'</p>';
+  if(p.tipo==='aronium_medios') html += '<p style="font-size:13px;font-weight:600;">Aronium — Ventas según medios de pago</p><p style="font-size:12px;color:var(--ink-soft);">Período '+p.desde+' a '+p.hasta+' &middot; '+p.dias.length+' días — se auditará contra lo digitado en cada cierre</p>';
+  if(p.tipo==='pedidosya') html += '<p style="font-size:13px;font-weight:600;">PedidosYa — Liquidación</p><p style="font-size:12px;color:var(--ink-soft);">Bruto $'+Math.round(p.bruto).toLocaleString('es-CL')+' &middot; Comisión $'+Math.round(p.comision).toLocaleString('es-CL')+' &middot; Reintegros $'+Math.round(p.reintegro).toLocaleString('es-CL')+'</p>';
+  if(p.tipo==='transbank') html += '<p style="font-size:13px;font-weight:600;">Transbank — Resumen de abonos</p><p style="font-size:12px;color:var(--ink-soft);">Bruto $'+Math.round(p.bruto).toLocaleString('es-CL')+' &middot; Gasto Transbank $'+Math.round(p.gastoTransbank).toLocaleString('es-CL')+' &middot; Neto $'+Math.round(p.neto).toLocaleString('es-CL')+'</p>';
+  if(chk.traslape) html += '<div class="check-row check-warn">Ya importaste este período (el '+new Date(chk.fechaImportAnterior).toLocaleDateString('es-CL')+')</div>';
+  html += '</div>';
+  html += '<div style="display:flex;gap:8px;">';
+  html += '<button class="btn-secondary" onclick="cancelarImport()">Cancelar</button>';
+  html += '<button class="btn-primary" onclick="confirmarImport('+(chk.traslape?"'"+chk.loteAnteriorId+"'":'null')+')">'+(chk.traslape?'Reemplazar e importar':'Confirmar importación')+'</button>';
+  html += '</div>';
+  cont.innerHTML = html;
+}
+function cancelarImport(){ archivoParseado=null; document.getElementById('import-preview').innerHTML=''; document.getElementById('file-input').value=''; }
+async function confirmarImport(loteAnteriorId){
+  const p = archivoParseado;
+  const reemplazar = loteAnteriorId ? {loteAnteriorId} : null;
+  let r;
+  if(p.tipo==='aronium_productos') r = await llamarAPI('importarAroniumProductos',{data:p, reemplazar});
+  if(p.tipo==='aronium_medios') r = await llamarAPI('importarAroniumMedios',{data:p, reemplazar});
+  if(p.tipo==='pedidosya') r = await llamarAPI('importarPedidosYa',{data:p, reemplazar});
+  if(p.tipo==='transbank') r = await llamarAPI('importarTransbank',{data:p, reemplazar});
+  if(r && r.ok){
+    document.getElementById('confirm-title').textContent='Importación completa';
+    document.getElementById('confirm-msg').textContent='El reporte se procesó correctamente.';
+    document.getElementById('confirm-detalle').innerHTML='';
+    cancelarImport();
+    irA('screen-confirm');
+  } else { document.getElementById('import-error').textContent = (r&&r.error)||'Error al importar'; }
+}
+
+/* ===== CREDITOS ===== */
+async function abrirCreditos(){
+  const r = await llamarAPI('listarCreditos',{});
+  const cont = document.getElementById('lista-creditos'); cont.innerHTML='';
+  (r.creditos||[]).forEach(c=>{
+    const div = document.createElement('div'); div.className='card';
+    div.innerHTML = '<p style="font-weight:600;font-size:13px;">'+c.acreedor+' <span class="pill pill-menor">'+c.modo+'</span></p>'+
+      '<p style="font-size:12px;color:var(--ink-soft);">Saldo vigente: $'+Math.round(c.saldoVigente).toLocaleString('es-CL')+' &middot; Cuotas: '+c.nCuotasPagadas+'/'+(c.nCuotasTotales||'-')+'</p>'+
+      (c.modo==='Reportado' ? '<button class="btn-secondary" style="margin-top:6px;" onclick="abrirActualizarCredito(\''+c.id+'\')">Actualizar saldo</button>' : '');
+    cont.appendChild(div);
+  });
+  irA('screen-creditos');
+}
+function setModoCredito(modo, btn){
+  modoCreditoActual = modo;
+  [...btn.parentElement.children].forEach(c=>c.classList.remove('selected')); btn.classList.add('selected');
+  document.getElementById('nc-campos-calculado').style.display = modo==='Calculado'?'block':'none';
+  document.getElementById('nc-campos-reportado').style.display = modo==='Reportado'?'block':'none';
+}
+async function guardarCredito(){
+  const d = {
+    acreedor:document.getElementById('nc-acreedor').value, nOperacion:document.getElementById('nc-noperacion').value,
+    montoInicial:document.getElementById('nc-monto').value, periodicidad:document.getElementById('nc-periodicidad').value,
+    modo: modoCreditoActual, cuotaFija:document.getElementById('nc-cuota').value, tasa:document.getElementById('nc-tasa').value,
+    nCuotasTotales:document.getElementById('nc-cuotas-totales').value, nCuotasPagadas:document.getElementById('nc-cuotas-pagadas').value,
+    saldoVigente:document.getElementById('nc-saldo-vigente').value, fechaProxVencimiento:document.getElementById('nc-prox-venc').value,
+    atribucion:document.getElementById('nc-atribucion').value
+  };
+  if(!d.acreedor||!d.montoInicial){ document.getElementById('nc-error').textContent='Acreedor y monto inicial son obligatorios'; return; }
+  const r = await llamarAPI('crearCredito',{data:d});
+  if(r.ok) abrirCreditos(); else document.getElementById('nc-error').textContent=r.error||'Error al guardar';
+}
+
+/* ===== PERMISOS ===== */
+async function abrirPermisos(){
+  const r = await llamarAPI('listarPermisos',{});
+  const acciones = ['RegistrarMovimiento','VerDashboardCompleto','VerResumenPropio','EditarAnular','CrearProveedor','ConfigurarSistema'];
+  const personas = ['Osmar Meza','Rocío Romo','Rosa Merino','Lucas Ramos','Cecilia Yevenes','Katherine Bustamante'];
+  const mapa = {};
+  (r.permisos||[]).forEach(p=>{ mapa[p.nombre+'|'+p.accion]=p.permitido; });
+  let html = '<div style="overflow-x:auto;"><table class="table-simple"><tr><th>Acción</th>'+personas.map(p=>'<th style="text-align:center;">'+p.split(' ')[0]+'</th>').join('')+'</tr>';
+  acciones.forEach(ac=>{
+    html += '<tr><td>'+ac+'</td>';
+    personas.forEach(nombre=>{
+      const val = mapa[nombre+'|'+ac];
+      html += '<td style="text-align:center;"><input type="checkbox" data-nombre="'+nombre+'" data-accion="'+ac+'" '+(val?'checked':'')+'></td>';
+    });
+    html += '</tr>';
+  });
+  html += '</table></div>';
+  document.getElementById('tabla-permisos').innerHTML = html;
+  irA('screen-permisos');
+}
+async function guardarPermisos(){
+  const inputs = document.querySelectorAll('#tabla-permisos input[type=checkbox]');
+  for(const inp of inputs){ await llamarAPI('actualizarPermiso',{data:{nombre:inp.dataset.nombre, accion:inp.dataset.accion, permitido:inp.checked}}); }
+  irA('screen-home');
+}
+
+/* ===== ESTADO DE RESULTADOS ===== */
+async function abrirEstadoResultados(){ await cargarEstadoResultados(); irA('screen-estado-resultados'); }
+function cambiarNegocioER(neg, btn){ negocioER=neg; [...btn.parentElement.children].forEach(c=>c.classList.remove('selected')); btn.classList.add('selected'); cargarEstadoResultados(); }
+async function cargarEstadoResultados(){
+  const hoy = new Date();
+  const r = await llamarAPI('estadoResultados',{negocio:negocioER, anio:hoy.getFullYear(), mes:hoy.getMonth()+1});
+  const f = n=>'$'+Math.round(n||0).toLocaleString('es-CL');
+  document.getElementById('er-contenido').innerHTML =
+    '<table class="table-simple">'+
+    '<tr><td>Ingresos operacionales</td><td style="text-align:right;">'+f(r.ingresos)+'</td></tr>'+
+    '<tr><td>− Costo de ventas</td><td style="text-align:right;color:var(--warn);">-'+f(r.costoVentas)+'</td></tr>'+
+    '<tr style="font-weight:600;"><td>= Margen bruto</td><td style="text-align:right;">'+f(r.margenBruto)+'</td></tr>'+
+    '<tr><td>− Gasto de personal</td><td style="text-align:right;color:var(--warn);">-'+f(r.gastoPersonal)+'</td></tr>'+
+    '<tr><td>− Gasto operacional</td><td style="text-align:right;color:var(--warn);">-'+f(r.gastoOperacional)+'</td></tr>'+
+    '<tr style="font-weight:600;"><td>= Margen operacional</td><td style="text-align:right;">'+f(r.margenOperacional)+'</td></tr>'+
+    '<tr><td>− Gasto financiero</td><td style="text-align:right;color:var(--warn);">-'+f(r.gastoFinanciero)+'</td></tr>'+
+    '<tr style="font-weight:600;font-size:14px;"><td>Resultado del período</td><td style="text-align:right;color:var(--ok);">'+f(r.resultado)+'</td></tr>'+
+    '</table>';
+}
+
+/* ===== F29 ===== */
+async function abrirF29(){
+  const hoy = new Date();
+  const r = await llamarAPI('calcularF29',{anio:hoy.getFullYear(), mes:hoy.getMonth()+1});
+  const f = n=>'$'+Math.round(n||0).toLocaleString('es-CL');
+  document.getElementById('f29-contenido').innerHTML =
+    '<table class="table-simple">'+
+    '<tr><td>IVA Débito Fiscal</td><td style="text-align:right;">'+f(r.ivaDebito)+'</td></tr>'+
+    '<tr><td>− IVA Crédito Fiscal</td><td style="text-align:right;color:var(--ok);">-'+f(r.ivaCredito)+'</td></tr>'+
+    '<tr><td>− Remanente mes anterior</td><td style="text-align:right;color:var(--ok);">-'+f(r.remanenteAnterior)+'</td></tr>'+
+    '<tr style="font-weight:600;"><td>= IVA a pagar</td><td style="text-align:right;">'+f(r.ivaAPagar)+'</td></tr>'+
+    '<tr><td>+ PPM</td><td style="text-align:right;">'+f(r.ppm)+'</td></tr>'+
+    '<tr style="font-weight:600;font-size:14px;"><td>Total a pagar F29</td><td style="text-align:right;">'+f(r.total)+'</td></tr>'+
+    '</table>';
+  irA('screen-f29');
+}
+
+/* ===== ALERTAS ===== */
+async function cargarAlertasBadge(){
+  const r = await llamarAPI('listarAlertas',{});
+  const pendientes = (r.alertas||[]).filter(a=>a.estado==='Pendiente').length;
+  const badge = document.getElementById('sidebar-alertas-badge');
+  if(badge) badge.textContent = pendientes||'';
+}
+async function abrirAlertas(){
+  const r = await llamarAPI('listarAlertas',{});
+  const cont = document.getElementById('lista-alertas'); cont.innerHTML='';
+  (r.alertas||[]).forEach(a=>{
+    const pillClass = a.severidad==='Critica'?'pill-critica':a.severidad==='Alerta'?'pill-alerta':'pill-menor';
+    const div = document.createElement('div'); div.className='card';
+    div.innerHTML = '<div style="display:flex;justify-content:space-between;"><span style="font-size:12px;font-weight:600;">'+a.categoria+'</span><span class="pill '+pillClass+'">'+a.severidad+'</span></div>'+
+      '<p style="font-size:12px;color:var(--ink-soft);margin:4px 0;">'+a.fecha+' &middot; '+a.responsable+' &middot; diferencia $'+Math.abs(a.diferencia)+'</p>'+
+      (a.estado==='Pendiente' ? '<button class="btn-secondary" style="margin-top:4px;" onclick="resolverAlertaUI(\''+a.id+'\','+(a.severidad==='Critica')+')">Marcar resuelta</button>' : '<span class="pill pill-menor">Resuelta</span>');
+    cont.appendChild(div);
+  });
+  irA('screen-alertas');
+}
+async function resolverAlertaUI(id, requiereNota){
+  let nota = '';
+  if(requiereNota){ nota = prompt('Esta alerta es crítica: describe qué pasó'); if(!nota) return; }
+  await llamarAPI('resolverAlerta',{data:{id, nota}});
+  abrirAlertas();
+}
+
+pintarUsuarios();
+</script>
+</body>
+</html>
