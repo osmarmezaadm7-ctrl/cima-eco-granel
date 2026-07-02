@@ -644,11 +644,9 @@ function seleccionarToggle(groupId,btn,valor){
 /* ===== Pagos múltiples (Venta Vegan y Compra) =====
    pagosState['vv'|'co'] = [{medio, monto, contraparte}]. Canje pide contraparte. */
 let pagosState = { vv: [], co: [] };
-let cacheContraparte = { vv: [], co: [] };
 
-function inicializarPagos(prefix, montoInicial, opcionesContraparte){
+function inicializarPagos(prefix, montoInicial){
   pagosState[prefix] = [{ medio:'Efectivo', monto: montoInicial||0 }];
-  cacheContraparte[prefix] = opcionesContraparte || cacheProveedores.map(p=>({value:p.alias||p.nombre,label:p.alias||p.nombre}));
   document.getElementById(prefix+'-multi-check').checked = false;
   document.getElementById(prefix+'-parcial-check').checked = false;
   document.getElementById(prefix+'-parcial-wrap').style.display = 'none';
@@ -698,23 +696,6 @@ function pintarPagos(prefix){
       '<input type="number" placeholder="Monto" title="Monto" value="'+(p.monto||'')+'" oninput="cambiarMontoPago(\''+prefix+'\','+idx+',this.value)" style="width:120px;">'+
       (idx>0 ? '<button type="button" class="del" title="Quitar" onclick="quitarPago(\''+prefix+'\','+idx+')">🗑</button>' : '');
     cont.appendChild(row);
-    if(p.medio === 'Canje'){
-      const ssId = 'ss-'+prefix+'-canje'+idx;
-      const wrap = document.createElement('div');
-      wrap.style.cssText = 'margin:-2px 0 8px;';
-      wrap.innerHTML =
-        '<div class="search-select" id="'+ssId+'">'+
-          '<input type="text" placeholder="Contraparte del canje…" autocomplete="off" onfocus="abrirSearchSelect(\''+ssId+'\')" oninput="filtrarSearchSelect(\''+ssId+'\')">'+
-          '<input type="hidden" id="'+ssId+'-valor">'+
-          '<div class="search-select-list" id="'+ssId+'-list"></div>'+
-        '</div>';
-      cont.appendChild(wrap);
-      initSearchSelect(ssId, cacheContraparte[prefix], { onSelect: (v)=>{ pagosState[prefix][idx].contraparte = v; } });
-      if(p.contraparte){
-        document.querySelector('#'+ssId+' input[type=text]').value = p.contraparte;
-        document.getElementById(ssId+'-valor').value = p.contraparte;
-      }
-    }
   });
   actualizarResumenPagos(prefix);
 }
@@ -743,10 +724,15 @@ function validarPagosCliente(prefix){
   const estado = document.getElementById(prefix+'-estado-group').dataset.valor || 'Pagado';
   if(estado==='Pendiente de pago' && !document.getElementById(prefix+'-parcial-check').checked) return { ok:true, pagos:[], estado, abono:0 };
   const esperado = montoEsperadoPagos(prefix);
-  const pagosLimpios = pagosState[prefix].filter(p=>p.monto>0);
+  const contraparteFormulario = prefix==='vv' ? valorSearchSelect('ss-vv-cliente') : valorSearchSelect('ss-co-proveedor');
+  const pagosLimpios = pagosState[prefix].filter(p=>p.monto>0).map(p=>
+    p.medio==='Canje' ? Object.assign({}, p, { contraparte: contraparteFormulario }) : p
+  );
   const suma = pagosLimpios.reduce((s,p)=>s+p.monto,0);
   if(Math.abs(suma-esperado) >= 1) return { ok:false, error:'Los medios de pago deben sumar '+fmt(esperado) };
-  for(const p of pagosLimpios){ if(p.medio==='Canje' && !p.contraparte) return { ok:false, error:'Falta identificar la contraparte del Canje' }; }
+  if(pagosLimpios.some(p=>p.medio==='Canje') && !contraparteFormulario){
+    return { ok:false, error: prefix==='vv' ? 'Selecciona el cliente antes de usar Canje' : 'Selecciona el proveedor antes de usar Canje' };
+  }
   const estadoFinal = document.getElementById(prefix+'-parcial-check').checked ? 'Pago parcial' : estado;
   return { ok:true, pagos:pagosLimpios, estado:estadoFinal, abono: document.getElementById(prefix+'-parcial-check').checked ? (Number(document.getElementById(prefix+'-abono').value)||0) : undefined };
 }
@@ -1042,7 +1028,28 @@ async function cargarClientes(){
   if(cacheClientes.length) return;
   const r = await llamarAPI('listarClientes',{});
   cacheClientes = (r.clientes&&r.clientes.length)?r.clientes:[{nombre:'Dulce Luna'},{nombre:'Almacén Central'},{nombre:'La Astilla'},{nombre:'Casa de la Masa'}];
-  initSearchSelect('ss-vv-cliente', cacheClientes.map(c=>({value:c.nombre, label:c.nombre})), {});
+  initSearchSelect('ss-vv-cliente', cacheClientes.map(c=>({value:c.nombre, label:c.nombre})), {
+    incluirNuevo: true,
+    onSelect: (v)=>{ if(v==='__nuevo__'){ document.querySelector('#ss-vv-cliente input[type=text]').value=''; abrirModalCliente(); } }
+  });
+}
+function abrirModalCliente(){
+  abrirModal(
+    '<h3 style="font-size:15px;">Nuevo cliente</h3>'+
+    '<label>Nombre *</label><input type="text" id="ncl-nombre">'+
+    '<label>RUT</label><input type="text" id="ncl-rut" placeholder="76.123.456-7 (opcional)">'+
+    '<div class="error-msg" id="ncl-error"></div>'+
+    '<div style="display:flex;gap:8px;margin-top:14px;"><button class="btn-secondary" onclick="cerrarModal()">Cancelar</button><button class="btn-primary" onclick="crearClienteNuevo()">Crear</button></div>'
+  );
+}
+async function crearClienteNuevo(){
+  const d = { nombre:document.getElementById('ncl-nombre').value, rut:document.getElementById('ncl-rut').value };
+  if(!d.nombre){ document.getElementById('ncl-error').textContent='El nombre es obligatorio'; return; }
+  const r = await llamarAPI('crearCliente',{data:d});
+  if(r.ok){
+    cacheClientes=[]; await cargarClientes(); cerrarModal();
+    elegirSearchSelect('ss-vv-cliente', d.nombre);
+  } else document.getElementById('ncl-error').textContent=r.error||'Error al crear';
 }
 async function cargarCatalogo(){
   if(cacheCatalogo.length) return;
@@ -1214,7 +1221,10 @@ async function crearProveedorNuevo(){
   if(!d.nombre||!d.rut||!d.alias){ document.getElementById('np-error').textContent='Nombre, RUT y Alias son obligatorios'; return; }
   const r = await llamarAPI('crearProveedor',{data:d});
   if(r.ok){
-    cacheProveedores=[]; await cargarProveedores(); cerrarModal();
+    cacheProveedores=[];
+    const naturalezaActual = valorSearchSelect('ss-co-naturaleza');
+    if(naturalezaActual) await recargarContraparte(naturalezaActual); else await cargarProveedores();
+    cerrarModal();
     elegirSearchSelect('ss-co-proveedor', d.alias);
   } else document.getElementById('np-error').textContent=r.error||'Error al crear';
 }
