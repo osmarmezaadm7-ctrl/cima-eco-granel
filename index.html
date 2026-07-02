@@ -686,6 +686,7 @@ function quitarPago(prefix, idx){
 function pintarPagos(prefix){
   const cont = document.getElementById(prefix+'-pagos-lista'); cont.innerHTML='';
   const medios = ['Efectivo','Débito','Crédito','Transferencia','PedidosYa','Canje'];
+  const multi = pagosState[prefix].length > 1;
   pagosState[prefix].forEach((p,idx)=>{
     const row = document.createElement('div');
     row.style.cssText = 'display:flex;gap:8px;margin-bottom:6px;';
@@ -693,7 +694,7 @@ function pintarPagos(prefix){
       '<select style="flex:1;" onchange="cambiarMedioPago(\''+prefix+'\','+idx+',this.value)">'+
         medios.map(m=>'<option '+(m===p.medio?'selected':'')+'>'+m+'</option>').join('')+
       '</select>'+
-      '<input type="number" placeholder="Monto" title="Monto" value="'+(p.monto||'')+'" oninput="cambiarMontoPago(\''+prefix+'\','+idx+',this.value)" style="width:120px;">'+
+      (multi ? '<input type="number" placeholder="Monto" title="Monto" value="'+(p.monto||'')+'" oninput="cambiarMontoPago(\''+prefix+'\','+idx+',this.value)" style="width:120px;">' : '')+
       (idx>0 ? '<button type="button" class="del" title="Quitar" onclick="quitarPago(\''+prefix+'\','+idx+')">🗑</button>' : '');
     cont.appendChild(row);
   });
@@ -715,6 +716,7 @@ function actualizarResumenPagos(prefix){
     resumen.innerHTML = '<span style="color:var(--ink-soft);">Sin pago registrado ahora — el 100% queda pendiente.</span>';
     return;
   }
+  if(pagosState[prefix].length===1){ resumen.innerHTML=''; return; }
   const esperado = montoEsperadoPagos(prefix);
   const suma = pagosState[prefix].reduce((s,p)=>s+(p.monto||0),0);
   const ok = Math.abs(suma-esperado) < 1;
@@ -724,6 +726,7 @@ function validarPagosCliente(prefix){
   const estado = document.getElementById(prefix+'-estado-group').dataset.valor || 'Pagado';
   if(estado==='Pendiente de pago' && !document.getElementById(prefix+'-parcial-check').checked) return { ok:true, pagos:[], estado, abono:0 };
   const esperado = montoEsperadoPagos(prefix);
+  if(pagosState[prefix].length===1) pagosState[prefix][0].monto = esperado; // un solo medio: usa el monto ya declarado arriba
   const contraparteFormulario = prefix==='vv' ? valorSearchSelect('ss-vv-cliente') : valorSearchSelect('ss-co-proveedor');
   const pagosLimpios = pagosState[prefix].filter(p=>p.monto>0).map(p=>
     p.medio==='Canje' ? Object.assign({}, p, { contraparte: contraparteFormulario }) : p
@@ -1142,9 +1145,7 @@ function actualizarTotales(){
   document.getElementById('vv-neto').textContent = fmt(neto);
   document.getElementById('vv-iva').textContent = fmt(iva);
   document.getElementById('vv-total').textContent = fmt(total);
-  if(pagosState.vv && pagosState.vv.length===1 && document.getElementById('vv-estado-group').dataset.valor!=='Pendiente de pago'){
-    pagosState.vv[0].monto = total; pintarPagos('vv');
-  } else if(document.getElementById('vv-pagos-resumen')){ actualizarResumenPagos('vv'); }
+  if(document.getElementById('vv-pagos-resumen')) actualizarResumenPagos('vv');
 }
 function recalcularCarrito(){ actualizarTotales(); }
 
