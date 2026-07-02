@@ -1431,10 +1431,30 @@ async function abrirCuentasPorPagar(){
   (r.saldosCanje||[]).forEach(s=>{
     const div = document.createElement('div'); div.className='card';
     div.innerHTML = '<div style="display:flex;justify-content:space-between;"><strong style="font-size:13px;">'+s.contraparte+'</strong><b class="mono">'+fmt(Math.abs(s.saldo))+'</b></div>'+
-      '<p style="font-size:11.5px;color:var(--ink-soft);">Saldo neto de Canje en contra</p>';
+      '<p style="font-size:11.5px;color:var(--ink-soft);">Saldo neto de Canje en contra</p>'+
+      '<button class="btn-secondary btn-small" onclick="abrirModalLiquidarCanje(\''+s.contraparte.replace(/'/g,"\\'")+'\','+s.saldo+')">Registrar liquidación</button>';
     cont.appendChild(div);
   });
   if(!(r.cuentas||[]).length && !(r.saldosCanje||[]).length) cont.innerHTML = '<p style="font-size:12px;color:var(--ink-soft);">No hay facturas pendientes.</p>';
+}
+
+/* ===== Liquidación de saldo de Canje (común a Cobrar y Pagar) ===== */
+function abrirModalLiquidarCanje(contraparte, saldo){
+  const pendiente = Math.abs(saldo);
+  abrirModal(
+    '<h3 style="font-size:15px;">Liquidar Canje — '+contraparte+'</h3>'+
+    '<p style="font-size:12px;color:var(--ink-soft);margin:2px 0 8px;">Saldo pendiente: '+fmt(pendiente)+'</p>'+
+    '<label>Monto liquidado ahora</label><div class="field-money"><span>$</span><input type="number" id="lq-monto" value="'+pendiente+'"></div>'+
+    '<label>Medio de pago</label><select id="lq-medio"><option>Transferencia</option><option>Efectivo</option><option>Débito</option><option>Crédito</option></select>'+
+    '<div class="error-msg" id="lq-error"></div>'+
+    '<div style="display:flex;gap:8px;margin-top:14px;"><button class="btn-secondary" onclick="cerrarModal()">Cancelar</button><button class="btn-primary" onclick="confirmarLiquidarCanje(\''+contraparte.replace(/'/g,"\\'")+'\')">Guardar</button></div>'
+  );
+}
+async function confirmarLiquidarCanje(contraparte){
+  const d = { contraparte, monto:Number(document.getElementById('lq-monto').value)||0, medioPago:document.getElementById('lq-medio').value };
+  const r = await llamarAPI('liquidarSaldoCanje',{data:d});
+  if(r.ok){ cerrarModal(); if(document.getElementById('screen-cxc').classList.contains('active')) abrirCuentasPorCobrar(); else abrirCuentasPorPagar(); }
+  else document.getElementById('lq-error').textContent=r.error||'Error al liquidar';
 }
 function abrirModalPago(fila){
   abrirModal(
@@ -1469,7 +1489,8 @@ async function abrirCuentasPorCobrar(){
   (r.saldosCanje||[]).forEach(s=>{
     const div = document.createElement('div'); div.className='card';
     div.innerHTML = '<div style="display:flex;justify-content:space-between;"><strong style="font-size:13px;">'+s.contraparte+'</strong><b class="mono">'+fmt(s.saldo)+'</b></div>'+
-      '<p style="font-size:11.5px;color:var(--ink-soft);">Saldo neto de Canje a favor</p>';
+      '<p style="font-size:11.5px;color:var(--ink-soft);">Saldo neto de Canje a favor</p>'+
+      '<button class="btn-secondary btn-small" onclick="abrirModalLiquidarCanje(\''+s.contraparte.replace(/'/g,"\\'")+'\','+s.saldo+')">Registrar liquidación</button>';
     cont.appendChild(div);
   });
   if(!(r.cuentas||[]).length && !(r.saldosCanje||[]).length) cont.innerHTML = '<p style="font-size:12px;color:var(--ink-soft);">No hay cobros pendientes.</p>';
