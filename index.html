@@ -78,7 +78,7 @@ h1,h2,h3{font-family:'Fraunces',serif;margin:0;color:var(--ink);}
 .pin-dots{display:flex;justify-content:center;gap:11px;margin:14px 0;}
 .pin-dots div{width:12px;height:12px;border-radius:50%;border:2px solid var(--forest);}
 .pin-dots div.filled{background:var(--forest);}
-.back-link{background:var(--surface);border:1px solid var(--border);color:var(--forest);font-size:13px;font-weight:600;padding:8px 14px;border-radius:9px;margin-bottom:12px;text-align:left;cursor:pointer;display:inline-flex;align-items:center;gap:6px;}
+.back-link{background:var(--surface);border:1px solid var(--border);color:var(--forest);font-size:13px;font-weight:600;padding:8px 14px;border-radius:9px;margin-bottom:12px;text-align:left;cursor:pointer;display:inline-flex;align-items:center;gap:6px;align-self:flex-start;width:fit-content;}
 .back-link:hover{background:var(--forest-soft);}
 .link-sm{font-size:12px;color:var(--forest);font-weight:600;text-decoration:underline;cursor:pointer;background:none;border:none;}
 .kbd-hint{font-size:11px;color:var(--ink-soft);background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 10px;margin-top:12px;}
@@ -276,7 +276,7 @@ td{padding:8px 6px;border-bottom:1px solid var(--border);}
     <div class="field-money"><span>$</span><input type="number" id="cc-transferencia"></div>
     <label>Pedidos Ya <span style="font-weight:400;color:var(--ink-soft);">— total POS Pedidos Ya</span></label>
     <div class="field-money"><span>$</span><input type="number" id="cc-pedidosya"></div>
-    <label>Retiro - Efectivo <span style="font-weight:400;color:var(--ink-soft);">— fondo día siguiente</span></label>
+    <label>Retiro <span style="font-weight:400;color:var(--ink-soft);">— Efectivo</span></label>
     <div class="field-money"><span>$</span><input type="number" id="cc-retiro"></div>
     <div class="error-msg" id="cc-error"></div>
     <div class="submit-bar"><button class="btn-primary" onclick="enviarCierreCaja()">Guardar cierre de caja</button></div>
