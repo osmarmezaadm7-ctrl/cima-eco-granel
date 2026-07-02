@@ -5,112 +5,162 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
 <title>Cima Eco-Granel · Sistema Financiero</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Work+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Work+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
-  :root{
-    --cream:#F7F2E6; --paper:#FCFAF4; --forest:#2F4A3D; --forest-dark:#20342A;
-    --terracotta:#C1652E; --terracotta-dark:#A34F1F; --olive:#8C8460; --sand:#E6DCC3;
-    --ink:#2A2721; --ink-soft:#5C5648; --error:#B23A2E; --ok:#3B6D11; --warn:#993C1D;
-    --radius:14px; --shadow:0 2px 10px rgba(42,39,33,0.08);
-  }
-  *{box-sizing:border-box;}
-  body{margin:0;background:var(--cream);color:var(--ink);font-family:'Work Sans',sans-serif;-webkit-tap-highlight-color:transparent;}
-  .app{max-width:1200px;margin:0 auto;min-height:100vh;background:var(--paper);display:flex;}
-  .sidebar{display:none;width:190px;flex-shrink:0;background:var(--forest-dark);padding:20px 14px;}
-  .sidebar h1{font-family:'Fraunces',serif;color:#fff;font-size:15px;margin:0 0 20px;}
-  .sidebar .grupo{font-size:10px;text-transform:uppercase;letter-spacing:0.5px;color:#9CAE9F;margin:14px 0 6px;}
-  .sidebar .item{padding:8px 9px;border-radius:7px;color:#D8E0D4;font-size:13px;cursor:pointer;margin-bottom:2px;display:flex;justify-content:space-between;}
-  .sidebar .item:hover{background:rgba(255,255,255,0.08);}
-  .sidebar .item.activo{background:var(--forest);color:#fff;}
-  .sidebar .badge{background:var(--terracotta);color:#fff;border-radius:8px;padding:0 6px;font-size:10px;}
-  .main{flex:1;min-width:0;display:flex;flex-direction:column;}
-  .mobile-shell{max-width:480px;width:100%;margin:0 auto;display:flex;flex-direction:column;flex:1;}
-  .screen{display:none;flex-direction:column;flex:1;padding:22px 20px 90px;}
-  .screen.active{display:flex;}
-  .loading-overlay{position:fixed;inset:0;background:rgba(247,242,230,0.9);display:none;flex-direction:column;align-items:center;justify-content:center;gap:16px;z-index:999;}
-  .loading-overlay.active{display:flex;}
-  .grano{width:9px;height:9px;border-radius:50%;display:inline-block;animation:brincar 1.1s ease-in-out infinite;}
-  .grano:nth-child(odd){background:var(--forest);}
-  .grano:nth-child(even){background:var(--terracotta);}
-  .grano:nth-child(1){animation-delay:0s;} .grano:nth-child(2){animation-delay:.11s;}
-  .grano:nth-child(3){animation-delay:.22s;} .grano:nth-child(4){animation-delay:.33s;}
-  .grano:nth-child(5){animation-delay:.44s;}
-  @keyframes brincar{0%,60%,100%{transform:translateY(0) scale(1);opacity:.55;} 30%{transform:translateY(-10px) scale(1.25);opacity:1;}}
-  .loading-overlay .granos-row{display:flex;gap:10px;}
-  .loading-overlay .loading-text{font-family:'Fraunces',serif;font-style:italic;color:var(--forest-dark);font-size:15px;}
-  .content-panel{background:#fff;border:1px solid var(--sand);border-radius:var(--radius);padding:20px;box-shadow:var(--shadow);}
-  @media(min-width:900px){
-    .sidebar{display:block;}
-    .mobile-shell{max-width:none; padding:24px 32px;}
-    .screen{max-width:480px; margin:0 auto;}
-    .screen.desktop-wide{max-width:760px; margin:0;}
-    .screen.desktop-wide.active{padding:0;}
-  }
-  .grain-divider{display:flex;gap:6px;justify-content:center;margin:16px 0;}
-  .grain-divider span{width:5px;height:5px;border-radius:50%;background:var(--olive);opacity:.55;}
-  .grain-divider span:nth-child(3n){background:var(--terracotta);opacity:.7;}
-  h1,h2,h3{font-family:'Fraunces',serif;margin:0;color:var(--forest-dark);font-weight:600;}
-  .brand{text-align:center;margin-bottom:6px;}
-  .brand h1{font-size:24px;}
-  .brand p{margin:4px 0 0;color:var(--ink-soft);font-size:12px;text-transform:uppercase;letter-spacing:.5px;}
-  .user-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:8px;}
-  .user-card{background:var(--sand);border:none;border-radius:var(--radius);padding:16px 10px;display:flex;flex-direction:column;align-items:center;gap:8px;cursor:pointer;}
-  .avatar{width:48px;height:48px;border-radius:50%;background:var(--forest);color:#fff;display:flex;align-items:center;justify-content:center;font-family:'Fraunces',serif;font-size:18px;font-weight:600;}
-  .user-card span{font-size:13px;font-weight:600;color:var(--forest-dark);}
-  .user-card small{font-size:10px;color:var(--ink-soft);}
-  .pin-pad{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:18px;}
-  .pin-pad button{padding:16px 0;border:none;border-radius:12px;background:var(--sand);font-family:'JetBrains Mono',monospace;font-size:19px;font-weight:600;color:var(--forest-dark);}
-  .pin-dots{display:flex;justify-content:center;gap:12px;margin:16px 0;}
-  .pin-dots div{width:13px;height:13px;border-radius:50%;border:2px solid var(--forest);}
-  .pin-dots div.filled{background:var(--forest);}
-  .back-link{background:none;border:none;color:var(--ink-soft);font-size:13px;padding:0;margin-bottom:12px;text-align:left;cursor:pointer;}
-  .greeting{margin-bottom:16px;}
-  .greeting small{color:var(--ink-soft);font-size:12px;}
-  .menu-card{display:flex;align-items:center;gap:12px;background:var(--forest);color:#fff;border:none;border-radius:var(--radius);padding:16px;margin-bottom:10px;text-align:left;box-shadow:var(--shadow);width:100%;}
-  .menu-card .icon{font-size:20px;width:22px;text-align:center;}
-  .menu-card .txt strong{display:block;font-size:14px;font-family:'Fraunces',serif;}
-  .menu-card .txt span{font-size:11px;opacity:.8;}
-  .menu-card.alt{background:var(--terracotta);}
-  .menu-card.flat{background:#fff;color:var(--forest-dark);border:1.5px solid var(--sand);box-shadow:none;}
-  .menu-card.flat .txt span{color:var(--ink-soft);opacity:1;}
-  .menu-grupo-titulo{font-size:10px;text-transform:uppercase;letter-spacing:0.5px;color:var(--ink-soft);margin:14px 0 6px;}
-  .menu-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
-  .menu-item-flat{background:#fff;border:1px solid var(--sand);border-radius:12px;padding:14px;display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;cursor:pointer;}
-  .logout{margin-top:auto;padding-top:16px;text-align:center;}
-  .logout button{background:none;border:none;color:var(--ink-soft);font-size:12px;text-decoration:underline;}
-  label{display:block;font-size:12px;font-weight:600;color:var(--forest-dark);margin:14px 0 5px;}
-  input,select,textarea{width:100%;padding:12px;border:1.5px solid var(--sand);border-radius:10px;font-size:15px;background:#fff;color:var(--ink);font-family:'Work Sans',sans-serif;}
-  input:focus,select:focus{outline:none;border-color:var(--terracotta);}
-  .field-money{position:relative;}
-  .field-money span{position:absolute;left:12px;top:12px;color:var(--ink-soft);font-family:'JetBrains Mono',monospace;}
-  .field-money input{padding-left:24px;}
-  .toggle-group{display:flex;gap:8px;}
-  .toggle-group button{flex:1;padding:10px;border:1.5px solid var(--sand);border-radius:9px;background:#fff;font-weight:600;color:var(--ink-soft);font-size:13px;}
-  .toggle-group button.selected{background:var(--forest);color:#fff;border-color:var(--forest);}
-  .check-row{margin-top:8px;padding:10px 12px;border-radius:10px;display:flex;justify-content:space-between;align-items:center;font-size:12px;font-weight:600;}
-  .check-ok{background:#EAF3DE;color:var(--ok);}
-  .check-warn{background:#FBEAF0;color:var(--warn);}
-  .submit-bar{position:sticky;bottom:0;background:var(--paper);padding:14px 0 4px;margin-top:20px;border-top:1px solid var(--sand);}
-  .btn-primary{width:100%;padding:14px;border:none;border-radius:11px;background:var(--forest);color:#fff;font-size:15px;font-weight:600;}
-  .btn-primary:disabled{background:var(--olive);opacity:.6;}
-  .btn-secondary{width:100%;padding:12px;border:1.5px solid var(--sand);border-radius:11px;background:#fff;color:var(--ink-soft);font-size:14px;font-weight:600;}
-  .error-msg{color:var(--error);font-size:12px;margin-top:8px;min-height:14px;}
-  .banner{background:var(--terracotta);color:#fff;font-size:11px;text-align:center;padding:7px 10px;}
-  .dropzone{border:2px dashed var(--sand);border-radius:14px;padding:40px 16px;text-align:center;color:var(--ink-soft);font-size:13px;cursor:pointer;background:#fff;}
-  .dropzone.dragover{border-color:var(--terracotta);background:#FAECE7;}
-  .table-simple{width:100%;border-collapse:collapse;font-size:12px;}
-  .table-simple th{text-align:left;padding:8px 6px;color:var(--ink-soft);font-weight:600;border-bottom:1.5px solid var(--sand);font-size:11px;}
-  .table-simple td{padding:7px 6px;border-bottom:1px solid var(--sand);}
-  .card{background:#fff;border:1px solid var(--sand);border-radius:12px;padding:14px;margin-bottom:10px;}
-  .pill{display:inline-block;padding:2px 9px;border-radius:20px;font-size:10px;font-weight:600;}
-  .pill-menor{background:var(--sand);color:var(--ink-soft);}
-  .pill-alerta{background:#FAEEDA;color:#854F0B;}
-  .pill-critica{background:#FCEBEB;color:var(--error);}
-  .desktop-grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
-  @media(max-width:899px){.desktop-grid2{display:block;}}
-  .confirm-screen{align-items:center;justify-content:center;text-align:center;gap:10px;}
-  .confirm-check{width:68px;height:68px;border-radius:50%;background:var(--forest);display:flex;align-items:center;justify-content:center;font-size:32px;color:#fff;}
+:root{
+  --paper:#FAF9F5; --surface:#FFFFFF; --ink:#232520; --ink-soft:#6B6656;
+  --forest:#2B4638; --forest-dark:#1E3128; --forest-soft:#E8EEE7;
+  --terracotta:#BE5A2B; --terracotta-soft:#FBEBE0;
+  --border:#E4E0D3; --success:#3B7A4A; --warn:#B4531F; --danger:#B23A2E;
+  --radius:12px; --radius-lg:16px; --shadow:0 2px 10px rgba(35,37,32,0.06);
+}
+*{box-sizing:border-box;}
+body{margin:0;background:var(--paper);color:var(--ink);font-family:'Work Sans',sans-serif;-webkit-tap-highlight-color:transparent;}
+.serif{font-family:'Fraunces',serif;}
+.mono{font-family:'JetBrains Mono',monospace;}
+h1,h2,h3{font-family:'Fraunces',serif;margin:0;color:var(--ink);}
+
+.app{display:flex;min-height:100vh;}
+.sidebar{display:none;width:230px;flex-shrink:0;background:var(--surface);border-right:1px solid var(--border);padding:20px 12px;flex-direction:column;}
+.sidebar .brand{display:flex;align-items:center;gap:9px;padding:0 8px 18px;}
+.sidebar .brand .mark{width:28px;height:28px;border-radius:8px;background:var(--forest);display:flex;align-items:center;justify-content:center;}
+.sidebar .brand .mark span{width:5px;height:5px;border-radius:50%;background:var(--terracotta);}
+.sidebar .brand strong{font-family:'Fraunces',serif;font-size:14px;}
+.sidebar .grupo{font-size:10.5px;text-transform:uppercase;letter-spacing:.5px;color:var(--ink-soft);margin:14px 8px 5px;font-weight:700;}
+.nav-item{display:flex;align-items:center;gap:9px;padding:9px 10px;border-radius:9px;color:var(--ink-soft);font-size:13px;font-weight:500;cursor:pointer;margin-bottom:1px;}
+.nav-item:hover{background:var(--paper);}
+.nav-item.activo{background:var(--forest-soft);color:var(--forest);font-weight:600;}
+.nav-item.proximo{opacity:.5;cursor:default;}
+.nav-item .badge-mini{margin-left:auto;font-size:9px;background:var(--terracotta-soft);color:var(--warn);padding:1px 6px;border-radius:20px;font-weight:700;}
+.nav-item .badge-prox{margin-left:auto;font-size:9px;background:var(--border);color:var(--ink-soft);padding:1px 6px;border-radius:20px;font-weight:600;}
+.sidebar .foot{margin-top:auto;padding-top:12px;border-top:1px solid var(--border);}
+.sidebar .foot button{width:100%;background:none;border:none;color:var(--ink-soft);font-size:12px;text-align:left;padding:8px;cursor:pointer;}
+
+.main{flex:1;min-width:0;display:flex;flex-direction:column;}
+.mobile-shell{max-width:480px;width:100%;margin:0 auto;display:flex;flex-direction:column;flex:1;}
+.screen{display:none;flex-direction:column;flex:1;padding:22px 20px 100px;}
+.screen.active{display:flex;}
+
+.loading-overlay{position:fixed;inset:0;background:rgba(250,249,245,0.88);display:none;flex-direction:column;align-items:center;justify-content:center;gap:14px;z-index:999;}
+.loading-overlay.active{display:flex;}
+.granos-row{display:flex;gap:9px;}
+.grano{width:9px;height:9px;border-radius:50%;animation:brincar 1.1s ease-in-out infinite;}
+.grano:nth-child(odd){background:var(--forest);} .grano:nth-child(even){background:var(--terracotta);}
+.grano:nth-child(1){animation-delay:0s;} .grano:nth-child(2){animation-delay:.11s;} .grano:nth-child(3){animation-delay:.22s;} .grano:nth-child(4){animation-delay:.33s;} .grano:nth-child(5){animation-delay:.44s;}
+@keyframes brincar{0%,60%,100%{transform:translateY(0) scale(1);opacity:.55;} 30%{transform:translateY(-9px) scale(1.25);opacity:1;}}
+.loading-overlay .loading-text{font-family:'Fraunces',serif;font-style:italic;color:var(--ink-soft);font-size:14px;}
+
+@media(min-width:900px){
+  .sidebar{display:flex;}
+  .mobile-shell{max-width:none;padding:26px 34px;}
+  .screen{max-width:480px;margin:0 auto;}
+  .screen.desktop-wide{max-width:900px;margin:0;}
+}
+.grain-divider{display:flex;gap:6px;justify-content:center;margin:14px 0;}
+.grain-divider span{width:5px;height:5px;border-radius:50%;background:var(--border);}
+.grain-divider span:nth-child(3n){background:var(--terracotta);}
+
+.brand-hero{text-align:center;margin-bottom:6px;}
+.brand-hero h1{font-size:22px;}
+.brand-hero p{margin:4px 0 0;color:var(--ink-soft);font-size:11.5px;text-transform:uppercase;letter-spacing:.5px;}
+.user-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:8px;}
+.user-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:16px 10px;display:flex;flex-direction:column;align-items:center;gap:8px;cursor:pointer;}
+.avatar{width:46px;height:46px;border-radius:50%;background:var(--forest);color:#fff;display:flex;align-items:center;justify-content:center;font-family:'Fraunces',serif;font-size:17px;font-weight:600;}
+.user-card span{font-size:12.5px;font-weight:600;}
+.user-card small{font-size:10px;color:var(--ink-soft);}
+
+.pin-box{max-width:300px;margin:0 auto;text-align:center;}
+.pin-pad{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;margin-top:16px;}
+.pin-pad button{padding:15px 0;border:none;border-radius:11px;background:var(--surface);border:1px solid var(--border);font-family:'JetBrains Mono',monospace;font-size:18px;font-weight:600;}
+.pin-dots{display:flex;justify-content:center;gap:11px;margin:14px 0;}
+.pin-dots div{width:12px;height:12px;border-radius:50%;border:2px solid var(--forest);}
+.pin-dots div.filled{background:var(--forest);}
+.back-link{background:none;border:none;color:var(--ink-soft);font-size:12.5px;padding:0;margin-bottom:12px;text-align:left;cursor:pointer;}
+.link-sm{font-size:12px;color:var(--forest);font-weight:600;text-decoration:underline;cursor:pointer;background:none;border:none;}
+.kbd-hint{font-size:11px;color:var(--ink-soft);background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 10px;margin-top:12px;}
+
+.greeting{margin-bottom:14px;}
+.greeting small{color:var(--ink-soft);font-size:11.5px;}
+.greeting h1{font-size:21px;}
+.menu-card{display:flex;align-items:center;gap:12px;background:var(--forest);color:#fff;border:none;border-radius:var(--radius-lg);padding:15px;margin-bottom:9px;text-align:left;box-shadow:var(--shadow);width:100%;cursor:pointer;}
+.menu-card .icon{font-size:19px;width:22px;text-align:center;}
+.menu-card .txt strong{display:block;font-size:13.5px;font-family:'Fraunces',serif;}
+.menu-card .txt span{font-size:10.5px;opacity:.85;}
+.menu-card.flat{background:var(--surface);color:var(--ink);border:1px solid var(--border);box-shadow:none;}
+.menu-card.flat .txt span{color:var(--ink-soft);opacity:1;}
+.menu-grupo-titulo{font-size:10.5px;text-transform:uppercase;letter-spacing:.5px;color:var(--ink-soft);font-weight:700;margin:16px 2px 8px;}
+.logout{margin-top:auto;padding-top:14px;display:flex;flex-direction:column;gap:2px;}
+.logout button{background:none;border:none;color:var(--ink-soft);font-size:12px;text-decoration:underline;text-align:center;padding:6px;cursor:pointer;}
+
+label{display:block;font-size:12px;font-weight:600;color:var(--ink);margin:13px 0 5px;}
+input,select,textarea{width:100%;padding:11px;border:1.5px solid var(--border);border-radius:9px;font-size:14.5px;background:#fff;color:var(--ink);font-family:'Work Sans',sans-serif;}
+input:focus,select:focus{outline:none;border-color:var(--forest);}
+.field-money{position:relative;}
+.field-money span{position:absolute;left:11px;top:12px;color:var(--ink-soft);font-family:'JetBrains Mono',monospace;}
+.field-money input{padding-left:23px;}
+.toggle-group{display:flex;gap:8px;}
+.toggle-group button{flex:1;padding:10px;border:1.5px solid var(--border);border-radius:9px;background:#fff;font-weight:600;color:var(--ink-soft);font-size:12.5px;cursor:pointer;}
+.toggle-group button.selected{background:var(--forest);color:#fff;border-color:var(--forest);}
+.check-row{margin-top:8px;padding:10px 12px;border-radius:10px;display:flex;justify-content:space-between;align-items:center;font-size:12px;font-weight:600;}
+.check-warn{background:var(--terracotta-soft);color:var(--warn);}
+.submit-bar{position:sticky;bottom:0;background:var(--paper);padding:14px 0 4px;margin-top:18px;border-top:1px solid var(--border);}
+.btn-primary{width:100%;padding:13px;border:none;border-radius:11px;background:var(--forest);color:#fff;font-size:14.5px;font-weight:600;cursor:pointer;}
+.btn-primary:disabled{background:var(--border);color:var(--ink-soft);}
+.btn-secondary{width:100%;padding:12px;border:1.5px solid var(--border);border-radius:11px;background:#fff;color:var(--ink-soft);font-size:13.5px;font-weight:600;cursor:pointer;}
+.btn-small{padding:7px 12px;border-radius:9px;font-size:11.5px;font-weight:600;cursor:pointer;}
+.error-msg{color:var(--danger);font-size:12px;margin-top:8px;min-height:14px;}
+.banner{background:var(--terracotta);color:#fff;font-size:11px;text-align:center;padding:7px 10px;}
+.dropzone{border:2px dashed var(--border);border-radius:14px;padding:38px 16px;text-align:center;color:var(--ink-soft);font-size:12.5px;cursor:pointer;background:var(--surface);}
+.dropzone.dragover{border-color:var(--terracotta);background:var(--terracotta-soft);}
+table{width:100%;border-collapse:collapse;font-size:12.5px;}
+th{text-align:left;padding:8px 6px;color:var(--ink-soft);font-weight:700;border-bottom:1.5px solid var(--border);font-size:10.5px;text-transform:uppercase;}
+td{padding:8px 6px;border-bottom:1px solid var(--border);}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:9px;}
+.pill{display:inline-block;padding:2px 9px;border-radius:20px;font-size:10px;font-weight:700;}
+.pill-menor{background:var(--border);color:var(--ink-soft);}
+.pill-alerta{background:#FBF2E0;color:#8A5A0B;}
+.pill-critica{background:var(--terracotta-soft);color:var(--danger);}
+.desktop-grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+@media(max-width:899px){.desktop-grid2{display:block;}}
+.confirm-screen{align-items:center;justify-content:center;text-align:center;gap:8px;}
+.confirm-check{width:64px;height:64px;border-radius:50%;background:var(--forest);display:flex;align-items:center;justify-content:center;font-size:28px;color:#fff;}
+
+/* Panel (v2) */
+.pillbar{display:inline-flex;gap:6px;background:var(--surface);padding:4px;border-radius:24px;border:1px solid var(--border);margin-bottom:16px;}
+.pillbar button{border:none;background:none;padding:7px 15px;border-radius:20px;font-size:12px;font-weight:600;color:var(--ink-soft);cursor:pointer;}
+.pillbar button.sel{background:var(--forest);color:#fff;}
+.kpi-row{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-bottom:18px;}
+@media(min-width:900px){.kpi-row{grid-template-columns:repeat(4,1fr);}}
+.kpi{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:14px 16px;}
+.kpi .lbl{font-size:10.5px;color:var(--ink-soft);font-weight:700;text-transform:uppercase;}
+.kpi .val{font-family:'JetBrains Mono',monospace;font-size:19px;font-weight:700;margin-top:5px;}
+.panelc{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:16px;margin-bottom:14px;}
+.panelc h3{font-size:13.5px;margin-bottom:10px;}
+.rowline{display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--border);font-size:12px;}
+.rowline:last-child{border:none;}
+.rowline b{font-family:'JetBrains Mono',monospace;}
+.tag-alert{display:block;padding:9px 10px;border-radius:9px;background:var(--terracotta-soft);font-size:11.5px;color:var(--warn);font-weight:600;margin-bottom:7px;}
+.barh{display:flex;align-items:center;gap:8px;margin-bottom:8px;}
+.barh .lb{width:110px;font-size:11px;color:var(--ink-soft);flex-shrink:0;}
+.barh .tr{flex:1;height:8px;background:var(--forest-soft);border-radius:6px;overflow:hidden;}
+.barh .tr i{display:block;height:100%;background:var(--forest);}
+.barh .pc{width:32px;text-align:right;font-size:10.5px;font-family:'JetBrains Mono',monospace;}
+.barmini{display:flex;align-items:flex-end;gap:5px;height:90px;margin-top:6px;}
+.barmini i{flex:1;background:var(--forest-soft);border-radius:4px 4px 0 0;}
+.barmini i.hi{background:var(--forest);}
+
+/* modal — overlay sutil */
+.modal-bg{position:fixed;inset:0;background:rgba(250,249,245,0.72);backdrop-filter:blur(2px);display:none;align-items:center;justify-content:center;padding:20px;z-index:900;}
+.modal-bg.active{display:flex;}
+.modal-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:20px 18px;width:100%;max-width:380px;box-shadow:0 16px 40px rgba(43,70,56,0.14);}
+
+/* carrito venta vegan */
+.cart-row{display:grid;grid-template-columns:2fr 0.7fr 0.9fr 0.9fr auto;gap:6px;align-items:center;margin-bottom:6px;}
+.cart-row select,.cart-row input{padding:8px;font-size:12px;}
+.cart-row .sub{font-size:12px;font-family:'JetBrains Mono',monospace;text-align:right;}
+.cart-row .del{background:none;border:none;color:var(--danger);font-size:15px;cursor:pointer;}
+.cart-total{border-top:1px solid var(--border);margin-top:10px;padding-top:10px;}
 </style>
 </head>
 <body>
@@ -121,20 +171,16 @@
     <span class="loading-text" id="loading-text">Cargando&hellip;</span>
   </div>
 
-  <div class="sidebar" id="sidebar" style="display:none;">
-    <h1>Cima &amp; Vegan Corner</h1>
-    <div class="grupo">Registro</div>
-    <div class="item" onclick="irA('screen-cierre')">Cierre de caja</div>
-    <div class="item" onclick="irA('screen-venta-vegan')">Venta Vegan Corner</div>
-    <div class="item" onclick="prepararCompra(); irA('screen-compra')">Compra / gasto</div>
-    <div class="item" onclick="irA('screen-importar')">Importar reportes</div>
-    <div class="grupo">Reportes</div>
-    <div class="item" onclick="abrirEstadoResultados()">Estado de resultados</div>
-    <div class="item" onclick="abrirF29()">F29</div>
-    <div class="item" onclick="abrirAlertas()">Alertas <span class="badge" id="sidebar-alertas-badge"></span></div>
-    <div class="grupo">Configuraciones</div>
-    <div class="item" onclick="abrirCreditos()">Créditos</div>
-    <div class="item" onclick="abrirPermisos()">Usuarios y permisos</div>
+  <div class="modal-bg" id="modal-bg"><div class="modal-card" id="modal-card"></div></div>
+
+  <div class="sidebar" id="sidebar">
+    <div class="brand"><div class="mark"><span></span></div><strong>Cima &amp; Vegan Corner</strong></div>
+    <div id="sidebar-nav"></div>
+    <div class="foot">
+      <div style="font-size:11.5px;color:var(--ink-soft);padding:6px 8px;" id="sidebar-user"></div>
+      <button onclick="irA('screen-cambiar-pin')">Cambiar mi PIN</button>
+      <button onclick="cerrarSesion()">Cerrar sesión</button>
+    </div>
   </div>
 
   <div class="main">
@@ -143,29 +189,66 @@
   <div id="banner-demo" class="banner" style="display:none;">Modo demostración — conecta CONFIG.API_URL para guardar datos reales</div>
 
   <div class="screen active" id="screen-select-user">
-    <div class="brand"><h1>Cima Eco-Granel</h1><p>Vegan Corner · Sistema financiero</p></div>
+    <div class="brand-hero"><h1>Cima Eco-Granel</h1><p>Vegan Corner · Sistema financiero</p></div>
     <div class="grain-divider"><span></span><span></span><span></span><span></span><span></span></div>
     <div class="user-grid" id="user-grid"></div>
   </div>
 
   <div class="screen" id="screen-pin">
     <button class="back-link" onclick="irA('screen-select-user')">← Elegir otra persona</button>
-    <div class="brand"><div class="avatar" id="pin-avatar" style="margin:0 auto 10px;"></div><h2 id="pin-nombre"></h2><p style="color:var(--ink-soft);font-size:12px;">Ingresa tu PIN</p></div>
-    <div class="pin-dots" id="pin-dots"></div>
-    <div class="pin-pad" id="pin-pad"></div>
-    <div class="error-msg" id="pin-error"></div>
+    <div class="pin-box">
+      <div class="avatar" id="pin-avatar" style="margin:0 auto 10px;"></div>
+      <h2 id="pin-nombre" style="font-size:16px;"></h2>
+      <p style="color:var(--ink-soft);font-size:12px;">Ingresa tu PIN</p>
+      <div class="pin-dots" id="pin-dots"></div>
+      <div class="pin-pad" id="pin-pad"></div>
+      <div class="error-msg" id="pin-error"></div>
+      <div class="kbd-hint">Escritorio: escribe el PIN y presiona <b>Enter</b> u OK. Móvil: se confirma solo al 4° dígito.</div>
+      <div style="margin-top:12px;"><button class="link-sm" onclick="irA('screen-pin-olvide')">¿Olvidaste tu PIN?</button></div>
+    </div>
+  </div>
+
+  <div class="screen" id="screen-pin-olvide">
+    <button class="back-link" onclick="irA('screen-pin')">← Volver</button>
+    <div class="pin-box">
+      <div style="font-size:30px;margin-bottom:8px;">🔐</div>
+      <h3 style="font-size:15px;">Pide ayuda a un Administrador</h3>
+      <p style="font-size:12.5px;color:var(--ink-soft);">Osmar puede restablecer tu PIN desde Configuraciones → Usuarios y permisos. Búscalo directamente.</p>
+    </div>
+  </div>
+
+  <div class="screen" id="screen-cambiar-pin">
+    <button class="back-link" onclick="irA('screen-home')">← Volver</button>
+    <h2 style="font-size:17px;">Cambiar mi PIN</h2>
+    <div class="grain-divider"><span></span><span></span><span></span></div>
+    <div class="pin-box" style="max-width:280px;">
+      <label style="text-align:left;">PIN actual</label><input type="password" maxlength="4" id="cp-actual" inputmode="numeric">
+      <label style="text-align:left;">PIN nuevo</label><input type="password" maxlength="4" id="cp-nuevo" inputmode="numeric">
+      <label style="text-align:left;">Confirmar PIN nuevo</label><input type="password" maxlength="4" id="cp-confirmar" inputmode="numeric">
+      <div class="error-msg" id="cp-error"></div>
+      <button class="btn-primary" style="margin-top:12px;" onclick="guardarCambioPin()">Guardar nuevo PIN</button>
+    </div>
   </div>
 
   <div class="screen" id="screen-home">
-    <div class="greeting"><small>Hola,</small><h1 id="home-nombre" style="font-size:22px;"></h1></div>
-    <div id="home-menu"></div>
-    <div class="logout"><button onclick="cerrarSesion()">Cerrar sesión</button></div>
+    <div class="greeting"><small>Hola,</small><h1 id="home-nombre"></h1></div>
+    <div id="home-content"></div>
+    <div class="logout"><button onclick="irA('screen-cambiar-pin')">Cambiar mi PIN</button><button onclick="cerrarSesion()">Cerrar sesión</button></div>
+  </div>
+
+  <!-- PANEL -->
+  <div class="screen desktop-wide" id="screen-panel">
+    <button class="back-link" onclick="irA('screen-home')">← Volver</button>
+    <h2>Panel</h2>
+    <div class="grain-divider"><span></span><span></span><span></span></div>
+    <div class="pillbar" id="panel-periodo"><button class="sel" data-m="actual">Este mes</button><button data-m="anterior">Mes anterior</button></div>
+    <div id="panel-contenido"></div>
   </div>
 
   <!-- CIERRE DE CAJA -->
   <div class="screen" id="screen-cierre">
     <button class="back-link" onclick="irA('screen-home')">← Volver</button>
-    <h2>Cierre de caja · Cima Eco-Granel</h2>
+    <h2 style="font-size:17px;">Cierre de caja · Cima Eco-Granel</h2>
     <div class="grain-divider"><span></span><span></span><span></span></div>
     <label>Fecha</label><input type="date" id="cc-fecha">
     <label>Saldo inicial <span style="font-weight:400;color:var(--ink-soft);">— Reporte Z Aronium</span></label>
@@ -186,30 +269,46 @@
     <div class="submit-bar"><button class="btn-primary" onclick="enviarCierreCaja()">Guardar cierre de caja</button></div>
   </div>
 
-  <!-- VENTA VEGAN CORNER -->
-  <div class="screen" id="screen-venta-vegan">
+  <!-- VENTA VEGAN CORNER (multi-producto, solo Osmar) -->
+  <div class="screen desktop-wide" id="screen-venta-vegan">
     <button class="back-link" onclick="irA('screen-home')">← Volver</button>
-    <h2>Venta · Vegan Corner</h2>
+    <h2 style="font-size:17px;">Venta · Vegan Corner</h2>
     <div class="grain-divider"><span></span><span></span><span></span></div>
     <label>Fecha</label><input type="date" id="vv-fecha">
     <label>Cliente</label><select id="vv-cliente"></select>
     <label>N° de orden</label><input type="text" id="vv-orden">
-    <label>¿Con factura?</label>
-    <div class="toggle-group" id="vv-factura-group">
-      <button type="button" onclick="seleccionarToggle('vv-factura-group',this,'SI')">Sí</button>
-      <button type="button" onclick="seleccionarToggle('vv-factura-group',this,'NO')">No</button>
+
+    <label>Productos</label>
+    <div id="vv-carrito"></div>
+    <button class="btn-secondary" style="margin-top:4px;" onclick="agregarLineaCarrito()">+ Agregar producto</button>
+
+    <div class="cart-total">
+      <div class="rowline"><span>Subtotal</span><b class="mono" id="vv-subtotal">$0</b></div>
+      <label style="margin-top:6px;">Descuento</label>
+      <div style="display:flex;gap:8px;">
+        <div class="field-money" style="flex:1;"><span>$</span><input type="number" id="vv-descuento" value="0" oninput="recalcularCarrito()"></div>
+        <select id="vv-descuento-tipo" style="flex:0 0 90px;" onchange="recalcularCarrito()"><option value="monto">$</option><option value="pct">%</option></select>
+      </div>
+      <div class="rowline"><span>Neto</span><b class="mono" id="vv-neto">$0</b></div>
+      <label>¿Con factura?</label>
+      <div class="toggle-group" id="vv-factura-group">
+        <button type="button" onclick="seleccionarToggle('vv-factura-group',this,'SI');recalcularCarrito();">Sí</button>
+        <button type="button" onclick="seleccionarToggle('vv-factura-group',this,'NO');recalcularCarrito();">No</button>
+      </div>
+      <div class="rowline"><span>IVA (19%)</span><b class="mono" id="vv-iva">$0</b></div>
+      <div class="rowline" style="font-size:14px;font-weight:700;"><span>TOTAL</span><b class="mono" id="vv-total">$0</b></div>
     </div>
-    <label>Monto recibido</label><div class="field-money"><span>$</span><input type="number" id="vv-monto"></div>
+
     <label>Medio de pago</label>
     <select id="vv-medio"><option>Efectivo</option><option>Transferencia</option><option>Débito</option><option>Crédito</option></select>
     <div class="error-msg" id="vv-error"></div>
     <div class="submit-bar"><button class="btn-primary" onclick="enviarVentaVegan()">Guardar venta</button></div>
   </div>
 
-  <!-- COMPRA / GASTO -->
+  <!-- COMPRA / GASTO (Admin + Rocío) -->
   <div class="screen" id="screen-compra">
     <button class="back-link" onclick="irA('screen-home')">← Volver</button>
-    <h2>Compra / gasto</h2>
+    <h2 style="font-size:17px;">Compra / gasto</h2>
     <div class="grain-divider"><span></span><span></span><span></span></div>
     <label>Negocio</label><select id="co-negocio"></select>
     <label>Categoría</label><select id="co-naturaleza"></select>
@@ -230,30 +329,10 @@
     <div class="submit-bar"><button class="btn-primary" onclick="enviarCompra()">Guardar compra/gasto</button></div>
   </div>
 
-  <!-- MODAL PROVEEDOR -->
-  <div class="screen" id="screen-modal-proveedor">
-    <div style="min-height:400px;background:rgba(42,39,33,0.5);display:flex;align-items:center;justify-content:center;padding:20px;flex:1;">
-      <div style="background:var(--paper);border-radius:16px;padding:20px 18px;width:100%;max-width:380px;">
-        <p style="font-family:'Fraunces',serif;font-size:16px;font-weight:600;color:var(--forest-dark);margin:0 0 4px;">Nuevo proveedor</p>
-        <p style="font-size:11px;color:var(--ink-soft);margin:0 0 10px;">Solo Admin puede crear proveedores</p>
-        <label>Nombre *</label><input type="text" id="np-nombre">
-        <label>RUT *</label><input type="text" id="np-rut" placeholder="76.123.456-7">
-        <label>Alias *</label><input type="text" id="np-alias">
-        <label style="color:var(--ink-soft);">Dirección (opcional)</label><input type="text" id="np-direccion">
-        <label style="color:var(--ink-soft);">Contacto (opcional)</label><input type="text" id="np-contacto">
-        <div class="error-msg" id="np-error"></div>
-        <div style="display:flex;gap:8px;margin-top:14px;">
-          <button class="btn-secondary" onclick="irA('screen-compra')">Cancelar</button>
-          <button class="btn-primary" onclick="crearProveedorNuevo()">Crear</button>
-        </div>
-      </div>
-    </div>
-  </div>
-
   <!-- IMPORTAR REPORTES -->
   <div class="screen desktop-wide" id="screen-importar">
     <button class="back-link" onclick="irA('screen-home')">← Volver</button>
-    <h2>Importar reportes</h2>
+    <h2 style="font-size:17px;">Importar reportes</h2>
     <div class="grain-divider"><span></span><span></span><span></span></div>
     <p style="font-size:12px;color:var(--ink-soft);">Arrastra el archivo de Aronium, PedidosYa o Transbank — el sistema detecta solo qué tipo de reporte es.</p>
     <div class="dropzone" id="dropzone">Arrastra el archivo aquí, o toca para elegir<input type="file" id="file-input" style="display:none;" accept=".csv,.xls,.xlsx"></div>
@@ -261,12 +340,21 @@
     <div class="error-msg" id="import-error"></div>
   </div>
 
+  <!-- CUENTAS POR PAGAR -->
+  <div class="screen desktop-wide" id="screen-cxp">
+    <button class="back-link" onclick="irA('screen-home')">← Volver</button>
+    <h2 style="font-size:17px;">Cuentas por pagar</h2>
+    <div class="grain-divider"><span></span><span></span><span></span></div>
+    <div id="cxp-resumen" class="panelc"></div>
+    <div id="cxp-lista"></div>
+  </div>
+
   <!-- CREDITOS -->
   <div class="screen desktop-wide" id="screen-creditos">
     <button class="back-link" onclick="irA('screen-home')">← Volver</button>
     <div style="display:flex;justify-content:space-between;align-items:center;">
-      <h2>Créditos y financiamientos</h2>
-      <button class="btn-secondary" style="width:auto;padding:8px 14px;font-size:12px;" onclick="irA('screen-credito-nuevo')">+ Nuevo</button>
+      <h2 style="font-size:17px;">Créditos y financiamientos</h2>
+      <button class="btn-secondary btn-small" onclick="irA('screen-credito-nuevo')">+ Nuevo</button>
     </div>
     <div class="grain-divider"><span></span><span></span><span></span></div>
     <div id="lista-creditos"></div>
@@ -274,7 +362,7 @@
 
   <div class="screen" id="screen-credito-nuevo">
     <button class="back-link" onclick="irA('screen-creditos')">← Volver</button>
-    <h2>Nuevo crédito</h2>
+    <h2 style="font-size:17px;">Nuevo crédito</h2>
     <div class="grain-divider"><span></span><span></span><span></span></div>
     <label>Acreedor</label><input type="text" id="nc-acreedor">
     <label>N° operación (opcional)</label><input type="text" id="nc-noperacion">
@@ -296,10 +384,7 @@
       <label>Próximo vencimiento</label><input type="date" id="nc-prox-venc">
     </div>
     <label>Atribución del gasto</label>
-    <select id="nc-atribucion">
-      <option>100% Cima Eco-Granel</option><option>100% Vegan Corner</option>
-      <option>Proporcional según ingresos</option><option>Corporativo</option>
-    </select>
+    <select id="nc-atribucion"><option>100% Cima Eco-Granel</option><option>100% Vegan Corner</option><option>Proporcional según ingresos</option><option>Corporativo</option></select>
     <div class="error-msg" id="nc-error"></div>
     <div class="submit-bar"><button class="btn-primary" onclick="guardarCredito()">Guardar crédito</button></div>
   </div>
@@ -307,7 +392,7 @@
   <!-- PERMISOS -->
   <div class="screen desktop-wide" id="screen-permisos">
     <button class="back-link" onclick="irA('screen-home')">← Volver</button>
-    <h2>Usuarios y permisos</h2>
+    <h2 style="font-size:17px;">Usuarios y permisos</h2>
     <div class="grain-divider"><span></span><span></span><span></span></div>
     <div id="tabla-permisos"></div>
     <div class="submit-bar"><button class="btn-primary" onclick="guardarPermisos()">Guardar cambios</button></div>
@@ -316,19 +401,16 @@
   <!-- ESTADO DE RESULTADOS -->
   <div class="screen desktop-wide" id="screen-estado-resultados">
     <button class="back-link" onclick="irA('screen-home')">← Volver</button>
-    <h2>Estado de resultados</h2>
+    <h2 style="font-size:17px;">Estado de resultados</h2>
     <div class="grain-divider"><span></span><span></span><span></span></div>
-    <div class="toggle-group" style="margin-bottom:14px;" id="er-negocio-group">
-      <button type="button" onclick="cambiarNegocioER('Cima Eco-Granel', this)">Cima</button>
-      <button type="button" onclick="cambiarNegocioER('Vegan Corner', this)">Vegan Corner</button>
-    </div>
+    <div class="pillbar" id="er-negocio-group"><button class="sel" onclick="cambiarNegocioER('Cima Eco-Granel', this)">Cima</button><button onclick="cambiarNegocioER('Vegan Corner', this)">Vegan Corner</button></div>
     <div id="er-contenido"></div>
   </div>
 
   <!-- F29 -->
   <div class="screen desktop-wide" id="screen-f29">
     <button class="back-link" onclick="irA('screen-home')">← Volver</button>
-    <h2>F29 estimado</h2>
+    <h2 style="font-size:17px;">F29 estimado</h2>
     <div class="grain-divider"><span></span><span></span><span></span></div>
     <div id="f29-contenido"></div>
     <p style="font-size:11px;color:var(--ink-soft);">Cálculo de apoyo — la declaración se presenta en sii.cl</p>
@@ -337,14 +419,64 @@
   <!-- ALERTAS -->
   <div class="screen desktop-wide" id="screen-alertas">
     <button class="back-link" onclick="irA('screen-home')">← Volver</button>
-    <h2>Alertas</h2>
+    <h2 style="font-size:17px;">Alertas</h2>
     <div class="grain-divider"><span></span><span></span><span></span></div>
+    <p style="font-size:12px;color:var(--ink-soft);">Facturas pendientes de pago se gestionan en <button class="link-sm" onclick="abrirCuentasPorPagar()">Cuentas por pagar</button>. Los márgenes negativos son informativos y no requieren acción.</p>
     <div id="lista-alertas"></div>
+  </div>
+
+  <!-- PRODUCCIÓN — PROGRAMA -->
+  <div class="screen desktop-wide" id="screen-programa">
+    <button class="back-link" onclick="irA('screen-home')">← Volver</button>
+    <div style="display:flex;justify-content:space-between;align-items:center;">
+      <h2 style="font-size:17px;">Programa de producción</h2>
+      <button class="btn-secondary btn-small" id="btn-nuevo-programa" style="display:none;" onclick="irA('screen-programa-nuevo')">+ Nuevo</button>
+    </div>
+    <div class="grain-divider"><span></span><span></span><span></span></div>
+    <div id="lista-programa"></div>
+  </div>
+
+  <div class="screen" id="screen-programa-nuevo">
+    <button class="back-link" onclick="irA('screen-programa')">← Volver</button>
+    <h2 style="font-size:17px;">Nuevo ítem de programa</h2>
+    <div class="grain-divider"><span></span><span></span><span></span></div>
+    <label>Fecha</label><input type="date" id="pp-fecha">
+    <label>Producto</label><select id="pp-producto"></select>
+    <label>Cantidad programada</label><input type="number" id="pp-cantidad">
+    <div class="error-msg" id="pp-error"></div>
+    <div class="submit-bar"><button class="btn-primary" onclick="guardarPrograma()">Guardar</button></div>
+  </div>
+
+  <!-- INVENTARIO MP -->
+  <div class="screen desktop-wide" id="screen-inventario">
+    <button class="back-link" onclick="irA('screen-home')">← Volver</button>
+    <h2 style="font-size:17px;">Inventario de materia prima</h2>
+    <div class="grain-divider"><span></span><span></span><span></span></div>
+    <div class="card">
+      <label>Insumo</label><input type="text" id="inv-insumo" placeholder="Ej: Harina">
+      <div class="desktop-grid2">
+        <div><label>Stock actual</label><input type="number" id="inv-stock"></div>
+        <div><label>Stock mínimo</label><input type="number" id="inv-minimo"></div>
+      </div>
+      <label>Unidad</label><input type="text" id="inv-unidad" placeholder="kg, lt, unidades...">
+      <div class="error-msg" id="inv-error"></div>
+      <button class="btn-primary" style="margin-top:12px;" onclick="guardarInventario()">Guardar / actualizar insumo</button>
+    </div>
+    <div id="lista-inventario"></div>
+  </div>
+
+  <!-- LISTA DE COMPRA MP -->
+  <div class="screen desktop-wide" id="screen-lista-compra">
+    <button class="back-link" onclick="irA('screen-home')">← Volver</button>
+    <h2 style="font-size:17px;">Lista de compra — Materia Prima</h2>
+    <div class="grain-divider"><span></span><span></span><span></span></div>
+    <p style="font-size:12px;color:var(--ink-soft);">Insumos bajo su stock mínimo, calculado desde Inventario MP.</p>
+    <div id="lista-compra-mp"></div>
   </div>
 
   <div class="screen confirm-screen" id="screen-confirm">
     <div class="confirm-check">✓</div>
-    <h2 id="confirm-title">Registro guardado</h2>
+    <h2 id="confirm-title" style="font-size:18px;">Registro guardado</h2>
     <p id="confirm-msg" style="color:var(--ink-soft);font-size:13px;max-width:280px;"></p>
     <div id="confirm-detalle" style="width:100%;"></div>
     <div class="submit-bar" style="width:100%;"><button class="btn-primary" onclick="irA('screen-home')">Volver al inicio</button></div>
@@ -355,19 +487,19 @@
 </div>
 
 <script>
-const CONFIG = {
-  API_URL: 'PEGA_AQUI_TU_URL_DE_APPS_SCRIPT',
-  NEGOCIOS: ['Cima Eco-Granel','Vegan Corner','Ambos','Personal']
-};
+const CONFIG = { API_URL: 'https://script.google.com/macros/s/AKfycbyMw5bun6svTAXXAiCEQciGmwVT6m-oRwucAliICc28_uh3w4BbfV5OvwHnRamL5j8/exec', NEGOCIOS: ['Cima Eco-Granel','Vegan Corner','Ambos','Personal'] };
 const modoDemo = CONFIG.API_URL.indexOf('PEGA_AQUI') !== -1;
 if (modoDemo) document.getElementById('banner-demo').style.display = 'block';
 
 let sesion = { nombre:null, rol:null, negocio:null };
+let permisosSesion = {};
 let pinBuffer = ''; let usuarioSeleccionado = null;
-let cacheProveedores = []; let cacheClientes = []; let cacheCategorias = [];
+let cacheProveedores = []; let cacheClientes = []; let cacheCategorias = []; let cacheCatalogo = [];
 let modoCreditoActual = 'Calculado';
 let archivoParseado = null;
 let negocioER = 'Cima Eco-Granel';
+let carritoVegan = [];
+let programaActualId = null;
 
 const USUARIOS_DEMO = [
   {nombre:'Osmar Meza', rol:'Admin', negocio:'Ambos'},
@@ -381,32 +513,54 @@ const USUARIOS_DEMO = [
 function irA(id){
   document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
   document.getElementById(id).classList.add('active');
-  document.querySelectorAll('.sidebar .item').forEach(i=>i.classList.remove('activo'));
+  document.querySelectorAll('.sidebar .nav-item').forEach(i=>i.classList.remove('activo'));
+  const nav = document.querySelector('.sidebar .nav-item[data-target="'+id+'"]');
+  if (nav) nav.classList.add('activo');
 }
 
+function fmt(n){ return '$'+Math.round(n||0).toLocaleString('es-CL'); }
+function tienePermisoLocal(accion){ return !!permisosSesion[accion]; }
+
 async function llamarAPI(accion, extra){
-  if (modoDemo){
-    await new Promise(r=>setTimeout(r,300));
-    return simularAPI(accion, extra);
+  document.getElementById('loading-overlay').classList.add('active');
+  try{
+    if (modoDemo){ await new Promise(r=>setTimeout(r,280)); return simularAPI(accion, extra); }
+    const res = await fetch(CONFIG.API_URL, { method:'POST', headers:{'Content-Type':'text/plain;charset=utf-8'}, body: JSON.stringify(Object.assign({accion:accion, solicitante:sesion.nombre}, extra)) });
+    return await res.json();
+  } finally {
+    document.getElementById('loading-overlay').classList.remove('active');
   }
-  const res = await fetch(CONFIG.API_URL, { method:'POST', headers:{'Content-Type':'text/plain;charset=utf-8'}, body: JSON.stringify(Object.assign({accion:accion}, extra)) });
-  return res.json();
 }
 
 function simularAPI(accion, extra){
   if (accion === 'login') return { ok:true, usuario:{ nombre: extra.nombre, rol: usuarioSeleccionado.rol, negocio: usuarioSeleccionado.negocio } };
   if (accion === 'listarProveedores') return { ok:true, proveedores:[{nombre:'Shen',alias:'Shen'},{nombre:'Rabanal',alias:'Rabanal'}] };
-  if (accion === 'listarClientes') return { ok:true, clientes:[{nombre:'Dulce Luna'},{nombre:'Almacén Central'}] };
+  if (accion === 'listarClientes') return { ok:true, clientes:[{nombre:'Dulce Luna'},{nombre:'Almacén Central'},{nombre:'La Astilla'},{nombre:'Casa de la Masa'}] };
   if (accion === 'listarCategorias') return { ok:true, categorias:[{naturaleza:'Compra mercadería'},{naturaleza:'Sueldos'},{naturaleza:'Gastos de administración'}] };
+  if (accion === 'listarCatalogoProductos') return { ok:true, catalogo:[{codigo:'5014',nombre:'Rollito de canela',precioMayorista:1500},{codigo:'2005',nombre:'Empanada Pino Soya',precioMayorista:1500}] };
   if (accion === 'listarCreditos') return { ok:true, creditos:[] };
   if (accion === 'listarPermisos') return { ok:true, permisos:[] };
   if (accion === 'listarAlertas') return { ok:true, alertas:[] };
-  if (accion === 'registrarCierreCaja') return { ok:true, chequeos:{efectivo:{diferencia:0,severidad:'Menor'},tarjetas:{diferencia:0,severidad:'Menor'},pedidosYa:{diferencia:0,severidad:'Menor'}}, tolerancia:500 };
+  if (accion === 'listarCuentasPorPagar') return { ok:true, cuentas:[], total:0, cantidad:0 };
+  if (accion === 'listarPrograma') return { ok:true, programa:[] };
+  if (accion === 'listarInventarioMP') return { ok:true, inventario:[] };
+  if (accion === 'listaCompraMP') return { ok:true, listaCompra:[] };
+  if (accion === 'obtenerPanel') return { ok:true, ingresosTotal:7729801, egresosTotal:5830269, margenOperacional:1899532, retiros:1378559,
+    porNegocio:{cima:{ingresos:7289351,egresos:3501358,margen:3787993},vegan:{ingresos:440450,egresos:2328911,margen:-1888461}},
+    medios:{efectivo:860480,debito:4591469,credito:1121821,transferencia:329111,pedidosYa:386470},
+    gastosPorCategoria:{'Compra mercadería':1849168,'Sueldos':1386410,'Compra insumos pastelería':800818},
+    iva:{credito:446485,debito:962412,aPagar:515927}, cuentasPorPagar:{total:657665,cantidad:3,proximas:[]}, alertas:[] };
+  if (accion === 'registrarCierreCaja') return { ok:true };
   return { ok:true, mensaje:'(demo) guardado' };
 }
 
 function iniciales(n){ return n.split(' ').map(p=>p[0]).slice(0,2).join('').toUpperCase(); }
+function seleccionarToggle(groupId,btn,valor){
+  const g=document.getElementById(groupId); [...g.children].forEach(c=>c.classList.remove('selected'));
+  btn.classList.add('selected'); g.dataset.valor=valor;
+}
 
+/* ===== LOGIN / PIN ===== */
 function pintarUsuarios(){
   const grid = document.getElementById('user-grid'); grid.innerHTML='';
   USUARIOS_DEMO.forEach(u=>{
@@ -439,62 +593,177 @@ async function tocarTecla(t){
   if(pinBuffer.length<4){ pinBuffer+=t; pintarPinDots(); }
   if(pinBuffer.length===4) await intentarLogin();
 }
+// Teclado físico: dígitos rellenan sin auto-enviar (excepto Enter/OK) — pensado para escritorio
+document.addEventListener('keydown', (e)=>{
+  if(!document.getElementById('screen-pin').classList.contains('active')) return;
+  if(/^[0-9]$/.test(e.key) && pinBuffer.length<4){ pinBuffer+=e.key; pintarPinDots(); }
+  else if(e.key==='Backspace'){ pinBuffer=pinBuffer.slice(0,-1); pintarPinDots(); }
+  else if(e.key==='Enter' && pinBuffer.length===4){ intentarLogin(); }
+});
 async function intentarLogin(){
   const r = await llamarAPI('login', {nombre:usuarioSeleccionado.nombre, pin:pinBuffer});
-  if(r.ok){ sesion=r.usuario; entrarAHome(); } else { document.getElementById('pin-error').textContent=r.error||'PIN incorrecto'; pinBuffer=''; pintarPinDots(); }
+  if(r.ok){ sesion=r.usuario; await entrarAHome(); } else { document.getElementById('pin-error').textContent=r.error||'PIN incorrecto'; pinBuffer=''; pintarPinDots(); }
 }
-function cerrarSesion(){ sesion={nombre:null,rol:null,negocio:null}; irA('screen-select-user'); }
+function cerrarSesion(){ sesion={nombre:null,rol:null,negocio:null}; permisosSesion={}; irA('screen-select-user'); }
 
-let permisosSesion = {};
+async function guardarCambioPin(){
+  const actual=document.getElementById('cp-actual').value, nuevo=document.getElementById('cp-nuevo').value, confirmar=document.getElementById('cp-confirmar').value;
+  if(nuevo.length!==4){ document.getElementById('cp-error').textContent='El PIN nuevo debe tener 4 dígitos'; return; }
+  if(nuevo!==confirmar){ document.getElementById('cp-error').textContent='Los PIN nuevos no coinciden'; return; }
+  const r = await llamarAPI('cambiarPin', {nombre:sesion.nombre, pinActual:actual, pinNuevo:nuevo});
+  if(r.ok){ document.getElementById('cp-error').textContent=''; document.getElementById('cp-actual').value=''; document.getElementById('cp-nuevo').value=''; document.getElementById('cp-confirmar').value=''; irA('screen-home'); }
+  else document.getElementById('cp-error').textContent=r.error||'No se pudo cambiar el PIN';
+}
 
-function tienePermisoLocal(accion){ return !!permisosSesion[accion]; }
-
+/* ===== HOME según nivel de permiso (3 variantes) ===== */
 async function entrarAHome(){
   document.getElementById('home-nombre').textContent = sesion.nombre;
   const rp = await llamarAPI('listarPermisos', {});
   permisosSesion = {};
   (rp.permisos||[]).filter(p=>p.nombre===sesion.nombre).forEach(p=>{ permisosSesion[p.accion]=p.permitido; });
 
-  const sidebar = document.getElementById('sidebar');
-  sidebar.style.display = (tienePermisoLocal('VerDashboardCompleto') || tienePermisoLocal('VerResumenPropio') || tienePermisoLocal('ConfigurarSistema')) ? '' : 'none';
+  const mostrarSidebar = tienePermisoLocal('VerDashboardCompleto') || tienePermisoLocal('VerResumenPropio') ||
+    tienePermisoLocal('VerPrograma') || tienePermisoLocal('ConfigurarSistema') || tienePermisoLocal('RegistrarMovimiento');
+  document.getElementById('sidebar').style.display = mostrarSidebar ? '' : 'none';
+  document.getElementById('sidebar-user').textContent = sesion.nombre + ' · ' + sesion.rol;
+  pintarSidebar();
 
-  const menu = document.getElementById('home-menu'); menu.innerHTML='';
-  const puedeCima = sesion.rol==='Admin' || sesion.negocio==='Cima Eco-Granel';
-  const puedeVegan = sesion.rol==='Admin' || sesion.negocio==='Vegan Corner';
-  menu.insertAdjacentHTML('beforeend', '<div class="menu-grupo-titulo">Registro rápido</div>');
-  if (puedeCima) menu.appendChild(crearMenuCard('💵','Cierre de caja','Registrar ventas del día',()=>{document.getElementById('cc-fecha').valueAsDate=new Date();irA('screen-cierre');}));
-  if (puedeVegan) menu.appendChild(crearMenuCard('🥐','Venta Vegan Corner','Registrar despacho/orden',()=>{document.getElementById('vv-fecha').valueAsDate=new Date();cargarClientes();irA('screen-venta-vegan');},'alt'));
-  menu.appendChild(crearMenuCard('🧾','Compra / gasto','Registrar egreso o factura',()=>{prepararCompra();irA('screen-compra');},'flat'));
-  if (tienePermisoLocal('VerDashboardCompleto') || tienePermisoLocal('VerResumenPropio')){
-    menu.appendChild(crearMenuCard('📤','Importar reportes','Aronium, PedidosYa, Transbank',()=>irA('screen-importar'),'flat'));
+  const cont = document.getElementById('home-content'); cont.innerHTML='';
+  const puedeCima = sesion.rol==='Admin' || sesion.negocio==='Cima Eco-Granel' || sesion.negocio==='Ambos';
+
+  if (tienePermisoLocal('VerDashboardCompleto')){
+    // Nivel 1: Panel completo (Admin / Rocío)
+    cont.insertAdjacentHTML('beforeend','<div class="menu-grupo-titulo">Panel</div>');
+    cont.appendChild(crearMenuCard('📊','Ver Panel','Ingresos, gastos, IVA y alertas',()=>abrirPanel(),false));
+    cont.insertAdjacentHTML('beforeend','<div class="menu-grupo-titulo">Registro rápido</div>');
+    if (puedeCima) cont.appendChild(crearMenuCard('💵','Cierre de caja','Registrar ventas del día',()=>{document.getElementById('cc-fecha').valueAsDate=new Date();irA('screen-cierre');},true));
+    if (tienePermisoLocal('RegistrarVentaVegan')) cont.appendChild(crearMenuCard('🥐','Venta Vegan Corner','Registrar pedido a otro negocio',()=>abrirVentaVegan(),false));
+    if (tienePermisoLocal('RegistrarCompra')) cont.appendChild(crearMenuCard('🧾','Compra / gasto','Registrar egreso o factura',()=>{prepararCompra();irA('screen-compra');},true));
+    cont.insertAdjacentHTML('beforeend','<div class="menu-grupo-titulo">Reportes</div>');
+    cont.appendChild(crearMenuCard('📥','Importar reportes','Aronium, PedidosYa, Transbank',()=>irA('screen-importar'),true));
+    cont.appendChild(crearMenuCard('📑','Cuentas por pagar','Facturas pendientes de pago',()=>abrirCuentasPorPagar(),true));
+    cont.appendChild(crearMenuCard('📈','Estado de resultados','Por negocio, mes actual',()=>abrirEstadoResultados(),true));
+    cont.appendChild(crearMenuCard('🧾','F29','Cálculo de apoyo IVA + PPM',()=>abrirF29(),true));
+    cont.appendChild(crearMenuCard('⚠️','Alertas','Auditoría e informativas',()=>abrirAlertas(),true));
+    if (tienePermisoLocal('ConfigurarSistema')){
+      cont.insertAdjacentHTML('beforeend','<div class="menu-grupo-titulo">Configuraciones</div>');
+      cont.appendChild(crearMenuCard('🏦','Créditos','Financiamientos activos',()=>abrirCreditos(),true));
+      cont.appendChild(crearMenuCard('🧑‍🤝‍🧑','Usuarios y permisos','Accesos y restablecer PIN',()=>abrirPermisos(),true));
+    }
+  } else if (tienePermisoLocal('VerPrograma')){
+    // Nivel 2: Producción (Rosa / Katherine)
+    cont.insertAdjacentHTML('beforeend','<div class="menu-grupo-titulo">Producción</div>');
+    cont.appendChild(crearMenuCard('📋','Programa de producción', tienePermisoLocal('EditarPrograma')?'Ver y editar el programa':'Ver programa y declarar entregas', ()=>abrirPrograma(),false));
+    cont.appendChild(crearMenuCard('📦','Inventario de MP','Ver y actualizar stock',()=>abrirInventario(),true));
+    cont.appendChild(crearMenuCard('🛒','Lista de compra MP','Insumos bajo su mínimo',()=>abrirListaCompra(),true));
+  } else {
+    // Nivel 3: accesos rápidos (Lucas / Cecilia)
+    cont.insertAdjacentHTML('beforeend','<div class="menu-grupo-titulo">Accesos rápidos</div>');
+    if (puedeCima && tienePermisoLocal('RegistrarMovimiento')) cont.appendChild(crearMenuCard('💵','Cierre de caja','Registrar ventas del día',()=>{document.getElementById('cc-fecha').valueAsDate=new Date();irA('screen-cierre');},true));
   }
-  cargarAlertasBadge();
   irA('screen-home');
 }
-function crearMenuCard(icon,titulo,sub,onClick,clase){
-  const b=document.createElement('button'); b.className='menu-card'+(clase?' '+clase:'');
+function crearMenuCard(icon,titulo,sub,onClick,flat){
+  const b=document.createElement('button'); b.className='menu-card'+(flat?' flat':'');
   b.innerHTML='<div class="icon">'+icon+'</div><div class="txt"><strong>'+titulo+'</strong><span>'+sub+'</span></div>';
   b.onclick=onClick; return b;
 }
 
-function seleccionarToggle(groupId,btn,valor){
-  const g=document.getElementById(groupId); [...g.children].forEach(c=>c.classList.remove('selected'));
-  btn.classList.add('selected'); g.dataset.valor=valor;
+function pintarSidebar(){
+  const nav = document.getElementById('sidebar-nav'); nav.innerHTML='';
+  const item = (id,icon,label,badge)=>'<div class="nav-item" data-target="'+id+'" onclick="irA(\''+id+'\');onEntrarScreen(\''+id+'\');">'+icon+' '+label+(badge?'<span class="badge-mini">'+badge+'</span>':'')+'</div>';
+  const itemProx = (icon,label)=>'<div class="nav-item proximo">'+icon+' '+label+'<span class="badge-prox">Próximamente</span></div>';
+
+  if (tienePermisoLocal('VerDashboardCompleto')) nav.insertAdjacentHTML('beforeend', item('screen-panel','📊','Panel'));
+
+  let finanzasHtml='';
+  const puedeCima = sesion.rol==='Admin' || sesion.negocio==='Cima Eco-Granel' || sesion.negocio==='Ambos';
+  if (tienePermisoLocal('RegistrarMovimiento') && puedeCima) finanzasHtml += item('screen-cierre','💵','Cierre de caja');
+  if (tienePermisoLocal('RegistrarVentaVegan')) finanzasHtml += item('screen-venta-vegan','🥐','Venta Vegan Corner');
+  if (tienePermisoLocal('RegistrarCompra')) finanzasHtml += item('screen-compra','🧾','Compra / gasto');
+  if (tienePermisoLocal('VerDashboardCompleto')||tienePermisoLocal('VerResumenPropio')) finanzasHtml += item('screen-importar','📥','Importar reportes');
+  if (tienePermisoLocal('VerDashboardCompleto')) finanzasHtml += item('screen-cxp','📑','Cuentas por pagar');
+  if (tienePermisoLocal('VerDashboardCompleto')||tienePermisoLocal('VerResumenPropio')) finanzasHtml += item('screen-estado-resultados','📈','Estado de resultados') + item('screen-f29','🧾','F29') + item('screen-alertas','⚠️','Alertas');
+  if (finanzasHtml) nav.insertAdjacentHTML('beforeend', '<div class="grupo">Finanzas</div>'+finanzasHtml);
+
+  let prodHtml='';
+  if (tienePermisoLocal('VerPrograma')) prodHtml += item('screen-programa','📋','Programa de producción');
+  if (tienePermisoLocal('GestionarInventario')) prodHtml += item('screen-inventario','📦','Inventario MP') + item('screen-lista-compra','🛒','Lista de compra MP');
+  if (prodHtml) nav.insertAdjacentHTML('beforeend', '<div class="grupo">Producción</div>'+prodHtml);
+  else nav.insertAdjacentHTML('beforeend', '<div class="grupo">Producción</div>'+itemProx('🥐','Producción'));
+
+  nav.insertAdjacentHTML('beforeend', '<div class="grupo">Operaciones</div>'+itemProx('📦','Operaciones'));
+  nav.insertAdjacentHTML('beforeend', '<div class="grupo">CRM</div>'+itemProx('👥','Clientes'));
+  nav.insertAdjacentHTML('beforeend', '<div class="grupo">Remuneraciones</div>'+itemProx('🧑‍🍳','Sueldos'));
+
+  let confHtml='';
+  if (tienePermisoLocal('ConfigurarSistema')) confHtml += item('screen-creditos','🏦','Créditos') + item('screen-permisos','🧑‍🤝‍🧑','Usuarios y permisos');
+  if (confHtml) nav.insertAdjacentHTML('beforeend', '<div class="grupo">Configuraciones</div>'+confHtml);
+}
+function onEntrarScreen(id){
+  if(id==='screen-panel') abrirPanel();
+  if(id==='screen-cxp') abrirCuentasPorPagar();
+  if(id==='screen-creditos') abrirCreditos();
+  if(id==='screen-permisos') abrirPermisos();
+  if(id==='screen-estado-resultados') abrirEstadoResultados();
+  if(id==='screen-f29') abrirF29();
+  if(id==='screen-alertas') abrirAlertas();
+  if(id==='screen-programa') abrirPrograma();
+  if(id==='screen-inventario') abrirInventario();
+  if(id==='screen-lista-compra') abrirListaCompra();
+  if(id==='screen-venta-vegan') abrirVentaVegan();
+  if(id==='screen-compra') prepararCompra();
+  if(id==='screen-cierre') document.getElementById('cc-fecha').valueAsDate=new Date();
+}
+
+/* ===== MODAL genérico (overlay sutil) ===== */
+function abrirModal(html){ document.getElementById('modal-card').innerHTML=html; document.getElementById('modal-bg').classList.add('active'); }
+function cerrarModal(){ document.getElementById('modal-bg').classList.remove('active'); }
+
+/* ===== PANEL ===== */
+async function abrirPanel(){
+  irA('screen-panel');
+  const hoy=new Date();
+  const r = await llamarAPI('obtenerPanel', {anio:hoy.getFullYear(), mes:hoy.getMonth()+1});
+  const c = document.getElementById('panel-contenido');
+  const alertasHtml = (r.alertas||[]).slice(0,4).map(a=>'<span class="tag-alert">⚠ '+a.categoria+' — dif. '+fmt(Math.abs(a.diferencia))+'</span>').join('') || '<span style="font-size:12px;color:var(--ink-soft);">Sin alertas pendientes.</span>';
+  const cxp = r.cuentasPorPagar||{total:0,cantidad:0};
+  const medios = r.medios||{}; const totalMedios = (medios.efectivo||0)+(medios.debito||0)+(medios.credito||0)+(medios.transferencia||0)+(medios.pedidosYa||0) || 1;
+  const barraMedio = (lb,val)=>'<div class="barh"><span class="lb">'+lb+'</span><div class="tr"><i style="width:'+Math.round(val/totalMedios*100)+'%"></i></div><span class="pc">'+Math.round(val/totalMedios*100)+'%</span></div>';
+  const gastos = r.gastosPorCategoria||{};
+  const gastosOrdenados = Object.entries(gastos).sort((a,b)=>b[1]-a[1]).slice(0,6);
+
+  c.innerHTML =
+    '<div class="kpi-row">'+
+      '<div class="kpi"><div class="lbl">Ingresos totales</div><div class="val">'+fmt(r.ingresosTotal)+'</div></div>'+
+      '<div class="kpi"><div class="lbl">Egresos operacionales</div><div class="val">'+fmt(r.egresosTotal)+'</div></div>'+
+      '<div class="kpi"><div class="lbl">Margen operacional</div><div class="val">'+fmt(r.margenOperacional)+'</div></div>'+
+      '<div class="kpi"><div class="lbl">IVA a pagar</div><div class="val">'+fmt((r.iva||{}).aPagar)+'</div></div>'+
+    '</div>'+
+    '<div class="desktop-grid2">'+
+      '<div class="panelc"><h3>Por negocio</h3>'+
+        '<div class="rowline"><span>Cima Eco-Granel</span><b>'+fmt(r.porNegocio.cima.margen)+'</b></div>'+
+        '<div class="rowline"><span>Vegan Corner</span><b style="color:'+(r.porNegocio.vegan.margen<0?'var(--warn)':'inherit')+';">'+fmt(r.porNegocio.vegan.margen)+'</b></div>'+
+        '<h3 style="margin-top:14px;">Medios de pago — Cima</h3>'+
+        barraMedio('Débito',medios.debito)+barraMedio('Crédito',medios.credito)+barraMedio('Efectivo',medios.efectivo)+barraMedio('PedidosYa',medios.pedidosYa)+barraMedio('Transferencia',medios.transferencia)+
+      '</div>'+
+      '<div class="panelc"><h3>Alertas pendientes</h3>'+alertasHtml+
+        '<h3 style="margin-top:14px;">Cuentas por pagar</h3>'+
+        '<div class="rowline"><span>'+cxp.cantidad+' documento(s)</span><b>'+fmt(cxp.total)+'</b></div>'+
+        '<button class="btn-secondary btn-small" style="margin-top:8px;" onclick="abrirCuentasPorPagar()">Ver Cuentas por pagar</button>'+
+      '</div>'+
+    '</div>'+
+    '<div class="panelc"><h3>Gastos por categoría</h3>'+
+      gastosOrdenados.map(([k,v])=>'<div class="rowline"><span>'+k+'</span><b>'+fmt(v)+'</b></div>').join('')+
+    '</div>';
 }
 
 /* ===== CIERRE DE CAJA ===== */
 async function enviarCierreCaja(){
-  const data = {
-    fecha: document.getElementById('cc-fecha').value,
-    saldoInicial: document.getElementById('cc-saldo').value||0,
-    efectivo: document.getElementById('cc-efectivo').value||0,
-    debito: document.getElementById('cc-debito').value||0,
-    credito: document.getElementById('cc-credito').value||0,
-    transferencia: document.getElementById('cc-transferencia').value||0,
-    pedidosYa: document.getElementById('cc-pedidosya').value||0,
-    retiro: document.getElementById('cc-retiro').value||0,
-    responsable: sesion.nombre
-  };
+  const data = { fecha:document.getElementById('cc-fecha').value, saldoInicial:document.getElementById('cc-saldo').value||0,
+    efectivo:document.getElementById('cc-efectivo').value||0, debito:document.getElementById('cc-debito').value||0,
+    credito:document.getElementById('cc-credito').value||0, transferencia:document.getElementById('cc-transferencia').value||0,
+    pedidosYa:document.getElementById('cc-pedidosya').value||0, retiro:document.getElementById('cc-retiro').value||0, responsable:sesion.nombre };
   if(!data.fecha){ document.getElementById('cc-error').textContent='Selecciona la fecha'; return; }
   const r = await llamarAPI('registrarCierreCaja',{data});
   if(r.ok){
@@ -505,18 +774,81 @@ async function enviarCierreCaja(){
   } else { document.getElementById('cc-error').textContent = r.error||'Error al guardar'; }
 }
 
-/* ===== VENTA VEGAN CORNER ===== */
-async function cargarClientes(){
-  if(cacheClientes.length) return pintarClientes();
-  const r = await llamarAPI('listarClientes',{});
-  cacheClientes = (r.clientes&&r.clientes.length)?r.clientes:[{nombre:'Dulce Luna'},{nombre:'Almacén Central'},{nombre:'La Astilla'},{nombre:'Casa de la Masa'},{nombre:'Anfer'}];
-  pintarClientes();
+/* ===== VENTA VEGAN CORNER (carrito multi-producto) ===== */
+async function abrirVentaVegan(){
+  document.getElementById('vv-fecha').valueAsDate = new Date();
+  await cargarClientes(); await cargarCatalogo();
+  carritoVegan = []; agregarLineaCarrito();
+  document.getElementById('vv-descuento').value = 0;
+  recalcularCarrito();
+  irA('screen-venta-vegan');
 }
-function pintarClientes(){ document.getElementById('vv-cliente').innerHTML = cacheClientes.map(c=>'<option>'+c.nombre+'</option>').join('')+'<option>Otro</option>'; }
+async function cargarClientes(){
+  if(cacheClientes.length) return;
+  const r = await llamarAPI('listarClientes',{});
+  cacheClientes = (r.clientes&&r.clientes.length)?r.clientes:[{nombre:'Dulce Luna'},{nombre:'Almacén Central'},{nombre:'La Astilla'},{nombre:'Casa de la Masa'}];
+  document.getElementById('vv-cliente').innerHTML = cacheClientes.map(c=>'<option>'+c.nombre+'</option>').join('')+'<option>Otro</option>';
+}
+async function cargarCatalogo(){
+  if(cacheCatalogo.length) return;
+  const r = await llamarAPI('listarCatalogoProductos',{});
+  cacheCatalogo = r.catalogo||[];
+}
+function agregarLineaCarrito(){
+  const id = 'l'+Date.now()+Math.floor(Math.random()*999);
+  carritoVegan.push({id, codigo:'', nombre:'', cantidad:1, precioUnit:0});
+  pintarCarrito();
+}
+function quitarLineaCarrito(id){ carritoVegan = carritoVegan.filter(l=>l.id!==id); pintarCarrito(); recalcularCarrito(); }
+function cambiarProductoCarrito(id, codigo){
+  const linea = carritoVegan.find(l=>l.id===id);
+  const p = cacheCatalogo.find(c=>c.codigo===codigo);
+  linea.codigo = codigo; linea.nombre = p? p.nombre : codigo; linea.precioUnit = p? p.precioMayorista : 0;
+  pintarCarrito(); recalcularCarrito();
+}
+function cambiarCantidadCarrito(id, val){ carritoVegan.find(l=>l.id===id).cantidad = Number(val)||0; recalcularCarrito(); }
+function cambiarPrecioCarrito(id, val){ carritoVegan.find(l=>l.id===id).precioUnit = Number(val)||0; recalcularCarrito(); }
+function pintarCarrito(){
+  const cont = document.getElementById('vv-carrito'); cont.innerHTML='';
+  carritoVegan.forEach(l=>{
+    const row = document.createElement('div'); row.className='cart-row';
+    const opciones = '<option value="">Elegir…</option>'+cacheCatalogo.map(p=>'<option value="'+p.codigo+'" '+(p.codigo===l.codigo?'selected':'')+'>'+p.nombre+'</option>').join('');
+    row.innerHTML =
+      '<select onchange="cambiarProductoCarrito(\''+l.id+'\',this.value)">'+opciones+'</select>'+
+      '<input type="number" min="1" value="'+l.cantidad+'" oninput="cambiarCantidadCarrito(\''+l.id+'\',this.value)">'+
+      '<input type="number" value="'+l.precioUnit+'" oninput="cambiarPrecioCarrito(\''+l.id+'\',this.value)">'+
+      '<span class="sub">'+fmt(l.cantidad*l.precioUnit)+'</span>'+
+      '<button class="del" onclick="quitarLineaCarrito(\''+l.id+'\')">🗑</button>';
+    cont.appendChild(row);
+  });
+}
+function recalcularCarrito(){
+  pintarCarrito();
+  const subtotal = carritoVegan.reduce((s,l)=>s+l.cantidad*l.precioUnit,0);
+  const descVal = Number(document.getElementById('vv-descuento').value)||0;
+  const descTipo = document.getElementById('vv-descuento-tipo').value;
+  const descuento = descTipo==='pct' ? Math.round(subtotal*descVal/100) : descVal;
+  const neto = Math.max(0, subtotal-descuento);
+  const conFactura = (document.getElementById('vv-factura-group').dataset.valor||'NO')==='SI';
+  const iva = conFactura ? Math.round(neto*0.19) : 0;
+  const total = neto+iva;
+  document.getElementById('vv-subtotal').textContent = fmt(subtotal);
+  document.getElementById('vv-neto').textContent = fmt(neto);
+  document.getElementById('vv-iva').textContent = fmt(iva);
+  document.getElementById('vv-total').textContent = fmt(total);
+}
 async function enviarVentaVegan(){
   const fg = document.getElementById('vv-factura-group');
-  const data = { fecha:document.getElementById('vv-fecha').value, cliente:document.getElementById('vv-cliente').value, nOrden:document.getElementById('vv-orden').value, factura:fg.dataset.valor||'NO', montoRecibido:document.getElementById('vv-monto').value||0, medioPago:document.getElementById('vv-medio').value };
-  if(!data.fecha||!data.montoRecibido){ document.getElementById('vv-error').textContent='Completa fecha y monto'; return; }
+  recalcularCarrito();
+  const subtotal = carritoVegan.reduce((s,l)=>s+l.cantidad*l.precioUnit,0);
+  const descVal = Number(document.getElementById('vv-descuento').value)||0;
+  const descTipo = document.getElementById('vv-descuento-tipo').value;
+  const descuento = descTipo==='pct' ? Math.round(subtotal*descVal/100) : descVal;
+  const total = Number(document.getElementById('vv-total').textContent.replace(/[^\d]/g,''))||0;
+  const productos = carritoVegan.filter(l=>l.codigo).map(l=>({codigo:l.codigo, nombre:l.nombre, cantidad:l.cantidad, precioUnit:l.precioUnit, subtotal:l.cantidad*l.precioUnit}));
+  const data = { fecha:document.getElementById('vv-fecha').value, cliente:document.getElementById('vv-cliente').value, nOrden:document.getElementById('vv-orden').value,
+    factura:fg.dataset.valor||'NO', descuento, medioPago:document.getElementById('vv-medio').value, productos, total };
+  if(!data.fecha || !productos.length){ document.getElementById('vv-error').textContent='Completa la fecha y al menos un producto'; return; }
   const r = await llamarAPI('registrarVentaVegan',{data});
   if(r.ok){ document.getElementById('confirm-title').textContent='Venta guardada'; document.getElementById('confirm-msg').textContent='Venta Vegan Corner registrada correctamente.'; document.getElementById('confirm-detalle').innerHTML=''; irA('screen-confirm'); }
   else document.getElementById('vv-error').textContent=r.error||'Error al guardar';
@@ -538,24 +870,36 @@ async function cargarProveedores(){
   cacheProveedores = (r.proveedores&&r.proveedores.length)?r.proveedores:[];
   document.getElementById('co-proveedor').innerHTML = cacheProveedores.map(p=>'<option>'+(p.alias||p.nombre)+'</option>').join('')+'<option value="__nuevo__">+ Proveedor nuevo</option>';
 }
-function abrirModalProveedor(){ irA('screen-modal-proveedor'); }
+function abrirModalProveedor(){
+  abrirModal(
+    '<h3 style="font-size:15px;">Nuevo proveedor</h3>'+
+    '<p style="font-size:11px;color:var(--ink-soft);margin:2px 0 6px;">Solo Admin puede crear proveedores</p>'+
+    '<label>Nombre *</label><input type="text" id="np-nombre">'+
+    '<label>RUT *</label><input type="text" id="np-rut" placeholder="76.123.456-7">'+
+    '<label>Alias *</label><input type="text" id="np-alias">'+
+    '<div class="error-msg" id="np-error"></div>'+
+    '<div style="display:flex;gap:8px;margin-top:14px;"><button class="btn-secondary" onclick="cerrarModal()">Cancelar</button><button class="btn-primary" onclick="crearProveedorNuevo()">Crear</button></div>'
+  );
+}
 async function crearProveedorNuevo(){
-  const d = { nombre:document.getElementById('np-nombre').value, rut:document.getElementById('np-rut').value, alias:document.getElementById('np-alias').value, direccion:document.getElementById('np-direccion').value, contacto:document.getElementById('np-contacto').value };
+  const d = { nombre:document.getElementById('np-nombre').value, rut:document.getElementById('np-rut').value, alias:document.getElementById('np-alias').value };
   if(!d.nombre||!d.rut||!d.alias){ document.getElementById('np-error').textContent='Nombre, RUT y Alias son obligatorios'; return; }
   const r = await llamarAPI('crearProveedor',{data:d});
-  if(r.ok){ cacheProveedores=[]; await cargarProveedores(); irA('screen-compra'); }
+  if(r.ok){ cacheProveedores=[]; await cargarProveedores(); cerrarModal(); }
   else document.getElementById('np-error').textContent=r.error||'Error al crear';
 }
 async function enviarCompra(){
   const eg = document.getElementById('co-estado-group');
-  const data = { negocio:document.getElementById('co-negocio').value, naturaleza:document.getElementById('co-naturaleza').value, proveedor:document.getElementById('co-proveedor').value, tipoDocumento:document.getElementById('co-tipo-doc').value, nDocumento:document.getElementById('co-ndoc').value, monto:document.getElementById('co-monto').value||0, medioPago:document.getElementById('co-medio-pago').value, descripcion:document.getElementById('co-desc').value, estado:eg.dataset.valor||'Pagado' };
+  const data = { negocio:document.getElementById('co-negocio').value, naturaleza:document.getElementById('co-naturaleza').value, proveedor:document.getElementById('co-proveedor').value,
+    tipoDocumento:document.getElementById('co-tipo-doc').value, nDocumento:document.getElementById('co-ndoc').value, monto:document.getElementById('co-monto').value||0,
+    medioPago:document.getElementById('co-medio-pago').value, descripcion:document.getElementById('co-desc').value, estado:eg.dataset.valor||'Pagado' };
   if(!data.monto||data.monto<=0){ document.getElementById('co-error').textContent='Ingresa un monto válido'; return; }
   const r = await llamarAPI('registrarCompra',{data});
   if(r.ok){ document.getElementById('confirm-title').textContent='Compra guardada'; document.getElementById('confirm-msg').textContent='Compra/gasto registrado correctamente.'; document.getElementById('confirm-detalle').innerHTML=''; irA('screen-confirm'); }
   else document.getElementById('co-error').textContent=r.error||'Error al guardar';
 }
 
-/* ===== IMPORTAR REPORTES (drag & drop + parseo) ===== */
+/* ===== IMPORTAR REPORTES (sin cambios — ya probado con datos reales) ===== */
 const dropzone = document.getElementById('dropzone');
 dropzone.addEventListener('click', ()=>document.getElementById('file-input').click());
 dropzone.addEventListener('dragover', e=>{ e.preventDefault(); dropzone.classList.add('dragover'); });
@@ -583,14 +927,12 @@ async function procesarArchivo(file){
     await mostrarPreviewImport(archivoParseado);
   } catch(err){ document.getElementById('import-error').textContent = 'No se pudo leer el archivo: '+err.message; }
 }
-
 function filaTexto(r){ return (r||[]).join(' ').toUpperCase(); }
 function numCL(s){ return Number(String(s||'0').replace(/\./g,'').replace(',','.'))||0; }
 function encontrarColumna(header, textos){
   for(let i=0;i<header.length;i++){ const h=String(header[i]).toUpperCase(); if(textos.some(t=>h.indexOf(t)!==-1)) return i; }
   return -1;
 }
-
 function detectarYParsear(rows){
   const muestra = rows.slice(0,12).map(filaTexto).join(' ');
   if(muestra.indexOf('VENTAS POR PRODUCTO')!==-1) return parseAroniumProductos(rows);
@@ -599,7 +941,6 @@ function detectarYParsear(rows){
   if(muestra.indexOf('FECHA DE ABONO')!==-1) return parseTransbank(rows);
   return { error: 'No se pudo identificar el tipo de reporte. Verifica que sea un export de Aronium, PedidosYa o Transbank.' };
 }
-
 function extraerPeriodo(rows, regexEtiqueta){
   for(const r of rows.slice(0,10)){
     const t = filaTexto(r);
@@ -611,13 +952,11 @@ function extraerPeriodo(rows, regexEtiqueta){
   }
   return { desde:'', hasta:'' };
 }
-
 function parseAroniumProductos(rows){
   const periodo = extraerPeriodo(rows, /PERIODO/);
   let headerIdx = -1;
   for(let i=0;i<rows.length;i++){ if(filaTexto(rows[i]).indexOf('CÓDIGO')!==-1 || filaTexto(rows[i]).indexOf('CODIGO')!==-1){ headerIdx=i; break; } }
-  const productos = [];
-  let total = 0;
+  const productos = []; let total = 0;
   if(headerIdx>=0){
     const header = rows[headerIdx];
     const idxCod = encontrarColumna(header,['CÓDIGO','CODIGO']);
@@ -638,7 +977,6 @@ function parseAroniumProductos(rows){
   }
   return { tipo:'aronium_productos', desde:periodo.desde, hasta:periodo.hasta, productos, totalDia: total };
 }
-
 function parseAroniumMedios(rows){
   const periodo = extraerPeriodo(rows, /PERIODO/);
   let headerIdx = -1;
@@ -662,7 +1000,6 @@ function parseAroniumMedios(rows){
   }
   return { tipo:'aronium_medios', desde:periodo.desde, hasta:periodo.hasta, dias };
 }
-
 function parsePedidosYa(rows){
   let headerIdx = -1;
   for(let i=0;i<rows.length;i++){ if(filaTexto(rows[i]).indexOf('NÚMERO DEL PEDIDO')!==-1 || filaTexto(rows[i]).indexOf('NUMERO DEL PEDIDO')!==-1){ headerIdx=i; break; } }
@@ -677,15 +1014,12 @@ function parsePedidosYa(rows){
   for(let i=headerIdx+1;i<rows.length;i++){
     const r = rows[i];
     if(!r || !r[idxTotalUsuario] || filaTexto(r).indexOf('TOTALES')!==-1) continue;
-    bruto += numMiles(r[idxTotalUsuario]);
-    comision += numMiles(r[idxComision]);
-    reintegro += numMiles(r[idxReintegro]);
+    bruto += numMiles(r[idxTotalUsuario]); comision += numMiles(r[idxComision]); reintegro += numMiles(r[idxReintegro]);
     const f = r[idxFecha];
     if(f){ if(!fechaMin||f<fechaMin) fechaMin=f; if(!fechaMax||f>fechaMax) fechaMax=f; }
   }
   return { tipo:'pedidosya', desde:fechaMin||'', hasta:fechaMax||'', bruto, comision, reintegro };
 }
-
 function parseTransbank(rows){
   let headerIdx = -1;
   for(let i=rows.length-1;i>=0;i--){ if(filaTexto(rows[i]).indexOf('FECHA DE ABONO')!==-1 && filaTexto(rows[i]).indexOf('CUENTA')!==-1){ headerIdx=i; break; } }
@@ -708,21 +1042,16 @@ function parseTransbank(rows){
   }
   return { tipo:'transbank', desde:fechaMin||'', hasta:fechaMax||'', bruto, gastoTransbank, neto };
 }
-
 async function mostrarPreviewImport(p){
   const cont = document.getElementById('import-preview');
   const chk = await llamarAPI('verificarImportPeriodo', { fuente: p.tipo, desde:p.desde, hasta:p.hasta });
   let html = '<div class="card">';
   if(p.tipo==='aronium_productos') html += '<p style="font-size:13px;font-weight:600;">Aronium — Ventas por producto</p><p style="font-size:12px;color:var(--ink-soft);">Período '+p.desde+' a '+p.hasta+' &middot; '+p.productos.length+' productos &middot; total $'+Math.round(p.totalDia).toLocaleString('es-CL')+'</p>';
-  if(p.tipo==='aronium_medios') html += '<p style="font-size:13px;font-weight:600;">Aronium — Ventas según medios de pago</p><p style="font-size:12px;color:var(--ink-soft);">Período '+p.desde+' a '+p.hasta+' &middot; '+p.dias.length+' días — se auditará contra lo digitado en cada cierre</p>';
+  if(p.tipo==='aronium_medios') html += '<p style="font-size:13px;font-weight:600;">Aronium — Ventas según medios de pago</p><p style="font-size:12px;color:var(--ink-soft);">Período '+p.desde+' a '+p.hasta+' &middot; '+p.dias.length+' días</p>';
   if(p.tipo==='pedidosya') html += '<p style="font-size:13px;font-weight:600;">PedidosYa — Liquidación</p><p style="font-size:12px;color:var(--ink-soft);">Bruto $'+Math.round(p.bruto).toLocaleString('es-CL')+' &middot; Comisión $'+Math.round(p.comision).toLocaleString('es-CL')+' &middot; Reintegros $'+Math.round(p.reintegro).toLocaleString('es-CL')+'</p>';
   if(p.tipo==='transbank') html += '<p style="font-size:13px;font-weight:600;">Transbank — Resumen de abonos</p><p style="font-size:12px;color:var(--ink-soft);">Bruto $'+Math.round(p.bruto).toLocaleString('es-CL')+' &middot; Gasto Transbank $'+Math.round(p.gastoTransbank).toLocaleString('es-CL')+' &middot; Neto $'+Math.round(p.neto).toLocaleString('es-CL')+'</p>';
   if(chk.traslape) html += '<div class="check-row check-warn">Ya importaste este período (el '+new Date(chk.fechaImportAnterior).toLocaleDateString('es-CL')+')</div>';
-  html += '</div>';
-  html += '<div style="display:flex;gap:8px;">';
-  html += '<button class="btn-secondary" onclick="cancelarImport()">Cancelar</button>';
-  html += '<button class="btn-primary" onclick="confirmarImport('+(chk.traslape?"'"+chk.loteAnteriorId+"'":'null')+')">'+(chk.traslape?'Reemplazar e importar':'Confirmar importación')+'</button>';
-  html += '</div>';
+  html += '</div><div style="display:flex;gap:8px;"><button class="btn-secondary" onclick="cancelarImport()">Cancelar</button><button class="btn-primary" onclick="confirmarImport('+(chk.traslape?"'"+chk.loteAnteriorId+"'":'null')+')">'+(chk.traslape?'Reemplazar e importar':'Confirmar importación')+'</button></div>';
   cont.innerHTML = html;
 }
 function cancelarImport(){ archivoParseado=null; document.getElementById('import-preview').innerHTML=''; document.getElementById('file-input').value=''; }
@@ -738,23 +1067,52 @@ async function confirmarImport(loteAnteriorId){
     document.getElementById('confirm-title').textContent='Importación completa';
     document.getElementById('confirm-msg').textContent='El reporte se procesó correctamente.';
     document.getElementById('confirm-detalle').innerHTML='';
-    cancelarImport();
-    irA('screen-confirm');
+    cancelarImport(); irA('screen-confirm');
   } else { document.getElementById('import-error').textContent = (r&&r.error)||'Error al importar'; }
+}
+
+/* ===== CUENTAS POR PAGAR ===== */
+async function abrirCuentasPorPagar(){
+  irA('screen-cxp');
+  const r = await llamarAPI('listarCuentasPorPagar',{});
+  document.getElementById('cxp-resumen').innerHTML = '<div class="rowline" style="font-size:14px;font-weight:700;"><span>'+r.cantidad+' documento(s) pendientes</span><b>'+fmt(r.total)+'</b></div>';
+  const cont = document.getElementById('cxp-lista'); cont.innerHTML='';
+  (r.cuentas||[]).forEach(c=>{
+    const div = document.createElement('div'); div.className='card';
+    div.innerHTML = '<div style="display:flex;justify-content:space-between;"><strong style="font-size:13px;">'+c.proveedor+'</strong><b class="mono">'+fmt(c.monto)+'</b></div>'+
+      '<p style="font-size:11.5px;color:var(--ink-soft);">'+c.negocio+' &middot; '+c.fecha+' &middot; '+(c.descripcion||'')+'</p>'+
+      '<button class="btn-secondary btn-small" onclick="abrirModalPago('+c.fila+')">Registrar pago</button>';
+    cont.appendChild(div);
+  });
+  if(!(r.cuentas||[]).length) cont.innerHTML = '<p style="font-size:12px;color:var(--ink-soft);">No hay facturas pendientes.</p>';
+}
+function abrirModalPago(fila){
+  abrirModal(
+    '<h3 style="font-size:15px;">Registrar pago</h3>'+
+    '<label>Fecha de pago</label><input type="date" id="pg-fecha">'+
+    '<label>Medio de pago</label><select id="pg-medio"><option>Transferencia</option><option>Efectivo</option><option>Débito</option><option>Crédito</option></select>'+
+    '<div class="error-msg" id="pg-error"></div>'+
+    '<div style="display:flex;gap:8px;margin-top:14px;"><button class="btn-secondary" onclick="cerrarModal()">Cancelar</button><button class="btn-primary" onclick="confirmarPago('+fila+')">Guardar</button></div>'
+  );
+  document.getElementById('pg-fecha').valueAsDate = new Date();
+}
+async function confirmarPago(fila){
+  const d = { fila, fechaPago:document.getElementById('pg-fecha').value, medioPago:document.getElementById('pg-medio').value };
+  const r = await llamarAPI('registrarPagoFactura',{data:d});
+  if(r.ok){ cerrarModal(); abrirCuentasPorPagar(); } else document.getElementById('pg-error').textContent=r.error||'Error al registrar el pago';
 }
 
 /* ===== CREDITOS ===== */
 async function abrirCreditos(){
+  irA('screen-creditos');
   const r = await llamarAPI('listarCreditos',{});
   const cont = document.getElementById('lista-creditos'); cont.innerHTML='';
   (r.creditos||[]).forEach(c=>{
     const div = document.createElement('div'); div.className='card';
     div.innerHTML = '<p style="font-weight:600;font-size:13px;">'+c.acreedor+' <span class="pill pill-menor">'+c.modo+'</span></p>'+
-      '<p style="font-size:12px;color:var(--ink-soft);">Saldo vigente: $'+Math.round(c.saldoVigente).toLocaleString('es-CL')+' &middot; Cuotas: '+c.nCuotasPagadas+'/'+(c.nCuotasTotales||'-')+'</p>'+
-      (c.modo==='Reportado' ? '<button class="btn-secondary" style="margin-top:6px;" onclick="abrirActualizarCredito(\''+c.id+'\')">Actualizar saldo</button>' : '');
+      '<p style="font-size:12px;color:var(--ink-soft);">Saldo vigente: '+fmt(c.saldoVigente)+' &middot; Cuotas: '+c.nCuotasPagadas+'/'+(c.nCuotasTotales||'-')+'</p>';
     cont.appendChild(div);
   });
-  irA('screen-creditos');
 }
 function setModoCredito(modo, btn){
   modoCreditoActual = modo;
@@ -763,27 +1121,26 @@ function setModoCredito(modo, btn){
   document.getElementById('nc-campos-reportado').style.display = modo==='Reportado'?'block':'none';
 }
 async function guardarCredito(){
-  const d = {
-    acreedor:document.getElementById('nc-acreedor').value, nOperacion:document.getElementById('nc-noperacion').value,
+  const d = { acreedor:document.getElementById('nc-acreedor').value, nOperacion:document.getElementById('nc-noperacion').value,
     montoInicial:document.getElementById('nc-monto').value, periodicidad:document.getElementById('nc-periodicidad').value,
     modo: modoCreditoActual, cuotaFija:document.getElementById('nc-cuota').value, tasa:document.getElementById('nc-tasa').value,
     nCuotasTotales:document.getElementById('nc-cuotas-totales').value, nCuotasPagadas:document.getElementById('nc-cuotas-pagadas').value,
     saldoVigente:document.getElementById('nc-saldo-vigente').value, fechaProxVencimiento:document.getElementById('nc-prox-venc').value,
-    atribucion:document.getElementById('nc-atribucion').value
-  };
+    atribucion:document.getElementById('nc-atribucion').value };
   if(!d.acreedor||!d.montoInicial){ document.getElementById('nc-error').textContent='Acreedor y monto inicial son obligatorios'; return; }
   const r = await llamarAPI('crearCredito',{data:d});
-  if(r.ok) abrirCreditos(); else document.getElementById('nc-error').textContent=r.error||'Error al guardar';
+  if(r.ok) irA('screen-creditos'), abrirCreditos(); else document.getElementById('nc-error').textContent=r.error||'Error al guardar';
 }
 
-/* ===== PERMISOS ===== */
+/* ===== PERMISOS + RESTABLECER PIN ===== */
 async function abrirPermisos(){
+  irA('screen-permisos');
   const r = await llamarAPI('listarPermisos',{});
-  const acciones = ['RegistrarMovimiento','VerDashboardCompleto','VerResumenPropio','EditarAnular','CrearProveedor','ConfigurarSistema'];
+  const acciones = ['RegistrarMovimiento','VerDashboardCompleto','VerResumenPropio','RegistrarCompra','RegistrarVentaVegan','VerPrograma','GestionarInventario','ConfigurarSistema'];
   const personas = ['Osmar Meza','Rocío Romo','Rosa Merino','Lucas Ramos','Cecilia Yevenes','Katherine Bustamante'];
   const mapa = {};
   (r.permisos||[]).forEach(p=>{ mapa[p.nombre+'|'+p.accion]=p.permitido; });
-  let html = '<div style="overflow-x:auto;"><table class="table-simple"><tr><th>Acción</th>'+personas.map(p=>'<th style="text-align:center;">'+p.split(' ')[0]+'</th>').join('')+'</tr>';
+  let html = '<div style="overflow-x:auto;"><table><tr><th>Acción</th>'+personas.map(p=>'<th style="text-align:center;">'+p.split(' ')[0]+'</th>').join('')+'<th></th></tr>';
   acciones.forEach(ac=>{
     html += '<tr><td>'+ac+'</td>';
     personas.forEach(nombre=>{
@@ -792,72 +1149,78 @@ async function abrirPermisos(){
     });
     html += '</tr>';
   });
-  html += '</table></div>';
+  html += '</table></div><h3 style="font-size:13px;margin:18px 0 8px;">Restablecer PIN</h3>';
+  personas.forEach(nombre=>{ html += '<div class="rowline"><span>'+nombre+'</span><button class="btn-secondary btn-small" onclick="abrirModalRestablecerPin(\''+nombre+'\')">Restablecer PIN</button></div>'; });
   document.getElementById('tabla-permisos').innerHTML = html;
-  irA('screen-permisos');
 }
 async function guardarPermisos(){
   const inputs = document.querySelectorAll('#tabla-permisos input[type=checkbox]');
   for(const inp of inputs){ await llamarAPI('actualizarPermiso',{data:{nombre:inp.dataset.nombre, accion:inp.dataset.accion, permitido:inp.checked}}); }
   irA('screen-home');
 }
+function abrirModalRestablecerPin(nombre){
+  abrirModal(
+    '<h3 style="font-size:15px;">Restablecer PIN — '+nombre+'</h3>'+
+    '<p style="font-size:11.5px;color:var(--ink-soft);margin:2px 0 6px;">Se sobrescribe directo. Comunícaselo de palabra — no hay aviso automático.</p>'+
+    '<label>PIN nuevo</label><input type="password" maxlength="4" id="rp-nuevo" inputmode="numeric">'+
+    '<label>Confirmar PIN nuevo</label><input type="password" maxlength="4" id="rp-confirmar" inputmode="numeric">'+
+    '<div class="error-msg" id="rp-error"></div>'+
+    '<div style="display:flex;gap:8px;margin-top:14px;"><button class="btn-secondary" onclick="cerrarModal()">Cancelar</button><button class="btn-primary" onclick="confirmarRestablecerPin(\''+nombre+'\')">Guardar</button></div>'
+  );
+}
+async function confirmarRestablecerPin(nombre){
+  const nuevo=document.getElementById('rp-nuevo').value, confirmar=document.getElementById('rp-confirmar').value;
+  if(nuevo.length!==4){ document.getElementById('rp-error').textContent='El PIN debe tener 4 dígitos'; return; }
+  if(nuevo!==confirmar){ document.getElementById('rp-error').textContent='Los PIN no coinciden'; return; }
+  const r = await llamarAPI('restablecerPin',{data:{nombre, pinNuevo:nuevo}});
+  if(r.ok) cerrarModal(); else document.getElementById('rp-error').textContent=r.error||'Error al restablecer';
+}
 
 /* ===== ESTADO DE RESULTADOS ===== */
-async function abrirEstadoResultados(){ await cargarEstadoResultados(); irA('screen-estado-resultados'); }
-function cambiarNegocioER(neg, btn){ negocioER=neg; [...btn.parentElement.children].forEach(c=>c.classList.remove('selected')); btn.classList.add('selected'); cargarEstadoResultados(); }
+async function abrirEstadoResultados(){ irA('screen-estado-resultados'); await cargarEstadoResultados(); }
+function cambiarNegocioER(neg, btn){ negocioER=neg; [...btn.parentElement.children].forEach(c=>c.classList.remove('sel')); btn.classList.add('sel'); cargarEstadoResultados(); }
 async function cargarEstadoResultados(){
   const hoy = new Date();
   const r = await llamarAPI('estadoResultados',{negocio:negocioER, anio:hoy.getFullYear(), mes:hoy.getMonth()+1});
-  const f = n=>'$'+Math.round(n||0).toLocaleString('es-CL');
   document.getElementById('er-contenido').innerHTML =
-    '<table class="table-simple">'+
-    '<tr><td>Ingresos operacionales</td><td style="text-align:right;">'+f(r.ingresos)+'</td></tr>'+
-    '<tr><td>− Costo de ventas</td><td style="text-align:right;color:var(--warn);">-'+f(r.costoVentas)+'</td></tr>'+
-    '<tr style="font-weight:600;"><td>= Margen bruto</td><td style="text-align:right;">'+f(r.margenBruto)+'</td></tr>'+
-    '<tr><td>− Gasto de personal</td><td style="text-align:right;color:var(--warn);">-'+f(r.gastoPersonal)+'</td></tr>'+
-    '<tr><td>− Gasto operacional</td><td style="text-align:right;color:var(--warn);">-'+f(r.gastoOperacional)+'</td></tr>'+
-    '<tr style="font-weight:600;"><td>= Margen operacional</td><td style="text-align:right;">'+f(r.margenOperacional)+'</td></tr>'+
-    '<tr><td>− Gasto financiero</td><td style="text-align:right;color:var(--warn);">-'+f(r.gastoFinanciero)+'</td></tr>'+
-    '<tr style="font-weight:600;font-size:14px;"><td>Resultado del período</td><td style="text-align:right;color:var(--ok);">'+f(r.resultado)+'</td></tr>'+
-    '</table>';
+    '<table><tr><td>Ingresos operacionales</td><td style="text-align:right;">'+fmt(r.ingresos)+'</td></tr>'+
+    '<tr><td>− Costo de ventas</td><td style="text-align:right;color:var(--warn);">-'+fmt(r.costoVentas)+'</td></tr>'+
+    '<tr style="font-weight:700;"><td>= Margen bruto</td><td style="text-align:right;">'+fmt(r.margenBruto)+'</td></tr>'+
+    '<tr><td>− Gasto de personal</td><td style="text-align:right;color:var(--warn);">-'+fmt(r.gastoPersonal)+'</td></tr>'+
+    '<tr><td>− Gasto operacional</td><td style="text-align:right;color:var(--warn);">-'+fmt(r.gastoOperacional)+'</td></tr>'+
+    '<tr style="font-weight:700;"><td>= Margen operacional</td><td style="text-align:right;">'+fmt(r.margenOperacional)+'</td></tr>'+
+    '<tr><td>− Gasto financiero</td><td style="text-align:right;color:var(--warn);">-'+fmt(r.gastoFinanciero)+'</td></tr>'+
+    '<tr style="font-weight:700;font-size:14px;"><td>Resultado del período</td><td style="text-align:right;color:var(--success);">'+fmt(r.resultado)+'</td></tr></table>';
 }
 
 /* ===== F29 ===== */
 async function abrirF29(){
+  irA('screen-f29');
   const hoy = new Date();
   const r = await llamarAPI('calcularF29',{anio:hoy.getFullYear(), mes:hoy.getMonth()+1});
-  const f = n=>'$'+Math.round(n||0).toLocaleString('es-CL');
   document.getElementById('f29-contenido').innerHTML =
-    '<table class="table-simple">'+
-    '<tr><td>IVA Débito Fiscal</td><td style="text-align:right;">'+f(r.ivaDebito)+'</td></tr>'+
-    '<tr><td>− IVA Crédito Fiscal</td><td style="text-align:right;color:var(--ok);">-'+f(r.ivaCredito)+'</td></tr>'+
-    '<tr><td>− Remanente mes anterior</td><td style="text-align:right;color:var(--ok);">-'+f(r.remanenteAnterior)+'</td></tr>'+
-    '<tr style="font-weight:600;"><td>= IVA a pagar</td><td style="text-align:right;">'+f(r.ivaAPagar)+'</td></tr>'+
-    '<tr><td>+ PPM</td><td style="text-align:right;">'+f(r.ppm)+'</td></tr>'+
-    '<tr style="font-weight:600;font-size:14px;"><td>Total a pagar F29</td><td style="text-align:right;">'+f(r.total)+'</td></tr>'+
-    '</table>';
-  irA('screen-f29');
+    '<table><tr><td>IVA Débito Fiscal</td><td style="text-align:right;">'+fmt(r.ivaDebito)+'</td></tr>'+
+    '<tr><td>− IVA Crédito Fiscal</td><td style="text-align:right;color:var(--success);">-'+fmt(r.ivaCredito)+'</td></tr>'+
+    '<tr><td>− Remanente mes anterior</td><td style="text-align:right;color:var(--success);">-'+fmt(r.remanenteAnterior)+'</td></tr>'+
+    '<tr style="font-weight:700;"><td>= IVA a pagar</td><td style="text-align:right;">'+fmt(r.ivaAPagar)+'</td></tr>'+
+    '<tr><td>+ PPM</td><td style="text-align:right;">'+fmt(r.ppm)+'</td></tr>'+
+    '<tr style="font-weight:700;font-size:14px;"><td>Total a pagar F29</td><td style="text-align:right;">'+fmt(r.total)+'</td></tr></table>';
 }
 
-/* ===== ALERTAS ===== */
-async function cargarAlertasBadge(){
-  const r = await llamarAPI('listarAlertas',{});
-  const pendientes = (r.alertas||[]).filter(a=>a.estado==='Pendiente').length;
-  const badge = document.getElementById('sidebar-alertas-badge');
-  if(badge) badge.textContent = pendientes||'';
-}
+/* ===== ALERTAS (informativas + auditoría, sin botón para márgenes negativos) ===== */
 async function abrirAlertas(){
+  irA('screen-alertas');
   const r = await llamarAPI('listarAlertas',{});
   const cont = document.getElementById('lista-alertas'); cont.innerHTML='';
   (r.alertas||[]).forEach(a=>{
     const pillClass = a.severidad==='Critica'?'pill-critica':a.severidad==='Alerta'?'pill-alerta':'pill-menor';
     const div = document.createElement('div'); div.className='card';
     div.innerHTML = '<div style="display:flex;justify-content:space-between;"><span style="font-size:12px;font-weight:600;">'+a.categoria+'</span><span class="pill '+pillClass+'">'+a.severidad+'</span></div>'+
-      '<p style="font-size:12px;color:var(--ink-soft);margin:4px 0;">'+a.fecha+' &middot; '+a.responsable+' &middot; diferencia $'+Math.abs(a.diferencia)+'</p>'+
-      (a.estado==='Pendiente' ? '<button class="btn-secondary" style="margin-top:4px;" onclick="resolverAlertaUI(\''+a.id+'\','+(a.severidad==='Critica')+')">Marcar resuelta</button>' : '<span class="pill pill-menor">Resuelta</span>');
+      '<p style="font-size:12px;color:var(--ink-soft);margin:4px 0;">'+a.fecha+' &middot; '+a.responsable+' &middot; diferencia '+fmt(Math.abs(a.diferencia))+'</p>'+
+      (a.estado==='Pendiente' ? '<button class="btn-secondary btn-small" onclick="resolverAlertaUI(\''+a.id+'\','+(a.severidad==='Critica')+')">Resolver con nota</button>' : '<span class="pill pill-menor">Resuelta</span>');
     cont.appendChild(div);
   });
-  irA('screen-alertas');
+  if(!(r.alertas||[]).length) cont.innerHTML = '<p style="font-size:12px;color:var(--ink-soft);">Sin alertas de auditoría.</p>';
 }
 async function resolverAlertaUI(id, requiereNota){
   let nota = '';
@@ -865,6 +1228,91 @@ async function resolverAlertaUI(id, requiereNota){
   await llamarAPI('resolverAlerta',{data:{id, nota}});
   abrirAlertas();
 }
+
+/* ===== PRODUCCIÓN — PROGRAMA ===== */
+async function abrirPrograma(){
+  irA('screen-programa');
+  document.getElementById('btn-nuevo-programa').style.display = tienePermisoLocal('EditarPrograma') ? '' : 'none';
+  const r = await llamarAPI('listarPrograma',{});
+  const cont = document.getElementById('lista-programa'); cont.innerHTML='';
+  (r.programa||[]).forEach(p=>{
+    const div = document.createElement('div'); div.className='card';
+    div.innerHTML = '<div style="display:flex;justify-content:space-between;"><strong style="font-size:13px;">'+p.producto+'</strong><span class="pill '+(p.estado==='Entregado'?'pill-menor':'pill-alerta')+'">'+p.estado+'</span></div>'+
+      '<p style="font-size:12px;color:var(--ink-soft);">'+p.fecha+' &middot; Programado: '+p.cantidadProgramada+' &middot; '+(p.responsable||'')+'</p>'+
+      (p.estado==='Programado' && tienePermisoLocal('MarcarEntregado') ? '<button class="btn-secondary btn-small" onclick="abrirModalEntrega(\''+p.id+'\',\''+p.producto+'\','+p.cantidadProgramada+')">Declarar entrega</button>' : '');
+    cont.appendChild(div);
+  });
+  if(!(r.programa||[]).length) cont.innerHTML = '<p style="font-size:12px;color:var(--ink-soft);">Sin ítems en el programa todavía.</p>';
+}
+async function guardarPrograma(){
+  const d = { fecha:document.getElementById('pp-fecha').value, producto:document.getElementById('pp-producto').value, cantidadProgramada:document.getElementById('pp-cantidad').value, responsable:sesion.nombre };
+  if(!d.fecha||!d.producto||!d.cantidadProgramada){ document.getElementById('pp-error').textContent='Completa todos los campos'; return; }
+  const r = await llamarAPI('crearPrograma',{data:d});
+  if(r.ok) irA('screen-programa'), abrirPrograma(); else document.getElementById('pp-error').textContent=r.error||'Error al guardar';
+}
+function abrirModalEntrega(programaId, producto, cantidadProgramada){
+  abrirModal(
+    '<h3 style="font-size:15px;">Declarar entrega — '+producto+'</h3>'+
+    '<label>Cantidad entregada</label><input type="number" id="me-cantidad" value="'+cantidadProgramada+'">'+
+    '<div class="error-msg" id="me-error"></div>'+
+    '<div style="display:flex;gap:8px;margin-top:14px;"><button class="btn-secondary" onclick="cerrarModal()">Cancelar</button><button class="btn-primary" onclick="confirmarEntrega(\''+programaId+'\',\''+producto+'\')">Guardar</button></div>'
+  );
+}
+async function confirmarEntrega(programaId, producto){
+  const cantidad = Number(document.getElementById('me-cantidad').value)||0;
+  const r = await llamarAPI('marcarProgramaEntregado',{data:{programaId, entregas:[{producto, cantidadEntregada:cantidad}], responsable:sesion.nombre}});
+  if(r.ok){ cerrarModal(); abrirPrograma(); } else document.getElementById('me-error').textContent=r.error||'Error al guardar';
+}
+
+/* ===== INVENTARIO MP ===== */
+async function abrirInventario(){
+  irA('screen-inventario');
+  await cargarCatalogo();
+  const productosUnicos = [...new Set(cacheCatalogo.map(p=>p.productoProduccion||p.nombre))];
+  const r = await llamarAPI('listarInventarioMP',{});
+  const cont = document.getElementById('lista-inventario'); cont.innerHTML='';
+  (r.inventario||[]).forEach(i=>{
+    const bajo = i.stockActual < i.stockMinimo;
+    const div = document.createElement('div'); div.className='card';
+    div.innerHTML = '<div style="display:flex;justify-content:space-between;"><strong style="font-size:13px;">'+i.insumo+'</strong>'+(bajo?'<span class="pill pill-critica">Bajo mínimo</span>':'')+'</div>'+
+      '<p style="font-size:12px;color:var(--ink-soft);">Stock: '+i.stockActual+' '+i.unidad+' &middot; Mínimo: '+i.stockMinimo+' '+i.unidad+'</p>';
+    cont.appendChild(div);
+  });
+}
+async function guardarInventario(){
+  const d = { insumo:document.getElementById('inv-insumo').value, stockActual:document.getElementById('inv-stock').value, stockMinimo:document.getElementById('inv-minimo').value, unidad:document.getElementById('inv-unidad').value };
+  if(!d.insumo){ document.getElementById('inv-error').textContent='Ingresa el nombre del insumo'; return; }
+  const r = await llamarAPI('actualizarInventarioMP',{data:d});
+  if(r.ok){ document.getElementById('inv-insumo').value=''; document.getElementById('inv-stock').value=''; document.getElementById('inv-minimo').value=''; document.getElementById('inv-unidad').value=''; abrirInventario(); }
+  else document.getElementById('inv-error').textContent=r.error||'Error al guardar';
+}
+
+/* ===== LISTA DE COMPRA MP ===== */
+async function abrirListaCompra(){
+  irA('screen-lista-compra');
+  const r = await llamarAPI('listaCompraMP',{});
+  const cont = document.getElementById('lista-compra-mp'); cont.innerHTML='';
+  (r.listaCompra||[]).forEach(i=>{
+    const div = document.createElement('div'); div.className='card';
+    div.innerHTML = '<strong style="font-size:13px;">'+i.insumo+'</strong><p style="font-size:12px;color:var(--ink-soft);">Stock actual: '+i.stockActual+' '+i.unidad+' &middot; Mínimo: '+i.stockMinimo+' '+i.unidad+'</p>';
+    cont.appendChild(div);
+  });
+  if(!(r.listaCompra||[]).length) cont.innerHTML = '<p style="font-size:12px;color:var(--ink-soft);">Nada bajo el mínimo por ahora.</p>';
+}
+
+// Cargar dropdown de producto al abrir "Nuevo ítem de programa"
+document.getElementById('screen-programa-nuevo').addEventListener('transitionstart', ()=>{});
+const _irAOriginal = irA;
+irA = function(id){
+  _irAOriginal(id);
+  if(id==='screen-programa-nuevo'){
+    cargarCatalogo().then(()=>{
+      const productosUnicos = [...new Set(cacheCatalogo.map(p=>p.productoProduccion||p.nombre))];
+      document.getElementById('pp-producto').innerHTML = productosUnicos.map(p=>'<option>'+p+'</option>').join('');
+      document.getElementById('pp-fecha').valueAsDate = new Date();
+    });
+  }
+};
 
 pintarUsuarios();
 </script>
