@@ -317,8 +317,27 @@ td{padding:8px 6px;border-bottom:1px solid var(--border);}
       <div class="rowline" style="font-size:14px;font-weight:700;"><span>TOTAL</span><b class="mono" id="vv-total">$0</b></div>
     </div>
 
-    <label>Medio de pago</label>
-    <select id="vv-medio"><option>Efectivo</option><option>Transferencia</option><option>Débito</option><option>Crédito</option></select>
+    <label>Estado</label>
+    <div class="toggle-group" id="vv-estado-group">
+      <button type="button" onclick="seleccionarEstadoPago('vv',this,'Pagado')">Pagado</button>
+      <button type="button" onclick="seleccionarEstadoPago('vv',this,'Pendiente de pago')">Pendiente</button>
+    </div>
+    <div id="vv-parcial-wrap" style="display:none;">
+      <label style="display:flex;align-items:center;gap:7px;margin-top:8px;font-weight:400;">
+        <input type="checkbox" id="vv-parcial-check" onchange="togglePagoParcial('vv')">Pago parcial (dejar un saldo pendiente)
+      </label>
+      <div id="vv-abono-wrap" style="display:none;">
+        <label>Abono ahora</label>
+        <div class="field-money"><span>$</span><input type="number" id="vv-abono" oninput="actualizarResumenPagos('vv')"></div>
+      </div>
+    </div>
+
+    <label style="margin-top:10px;">Medios de pago</label>
+    <div id="vv-pagos-lista"></div>
+    <label style="display:flex;align-items:center;gap:7px;margin-top:2px;font-weight:400;">
+      <input type="checkbox" id="vv-multi-check" onchange="toggleSegundoPago('vv')">Agregar otro medio de pago
+    </label>
+    <div id="vv-pagos-resumen" style="font-size:12px;margin-top:6px;"></div>
     <div class="error-msg" id="vv-error"></div>
     <div class="submit-bar"><button class="btn-primary" onclick="enviarVentaVegan()">Guardar venta</button></div>
   </div>
@@ -345,14 +364,28 @@ td{padding:8px 6px;border-bottom:1px solid var(--border);}
     <select id="co-tipo-doc"><option>Factura</option><option>Boleta</option><option>Nota de Crédito</option><option>Sin documento</option><option>Otro</option></select>
     <label>N° de documento</label><input type="text" id="co-ndoc">
     <label>Monto</label><div class="field-money"><span>$</span><input type="number" id="co-monto"></div>
-    <label>Medio de pago</label>
-    <select id="co-medio-pago"><option>Efectivo</option><option>Transferencia</option><option>Débito</option><option>Crédito</option><option>Cheque</option></select>
-    <label>Descripción</label><input type="text" id="co-desc">
+    <label>Descripción</label><input type="text" id="co-desc"></input>
     <label>Estado</label>
     <div class="toggle-group" id="co-estado-group">
-      <button type="button" onclick="seleccionarToggle('co-estado-group',this,'Pagado')">Pagado</button>
-      <button type="button" onclick="seleccionarToggle('co-estado-group',this,'Pendiente de pago')">Pendiente</button>
+      <button type="button" onclick="seleccionarEstadoPago('co',this,'Pagado')">Pagado</button>
+      <button type="button" onclick="seleccionarEstadoPago('co',this,'Pendiente de pago')">Pendiente</button>
     </div>
+    <div id="co-parcial-wrap" style="display:none;">
+      <label style="display:flex;align-items:center;gap:7px;margin-top:8px;font-weight:400;">
+        <input type="checkbox" id="co-parcial-check" onchange="togglePagoParcial('co')">Pago parcial (dejar un saldo pendiente)
+      </label>
+      <div id="co-abono-wrap" style="display:none;">
+        <label>Abono ahora</label>
+        <div class="field-money"><span>$</span><input type="number" id="co-abono" oninput="actualizarResumenPagos('co')"></div>
+      </div>
+    </div>
+
+    <label style="margin-top:10px;">Medios de pago</label>
+    <div id="co-pagos-lista"></div>
+    <label style="display:flex;align-items:center;gap:7px;margin-top:2px;font-weight:400;">
+      <input type="checkbox" id="co-multi-check" onchange="toggleSegundoPago('co')">Agregar otro medio de pago
+    </label>
+    <div id="co-pagos-resumen" style="font-size:12px;margin-top:6px;"></div>
     <div class="error-msg" id="co-error"></div>
     <div class="submit-bar"><button class="btn-primary" onclick="enviarCompra()">Guardar compra/gasto</button></div>
   </div>
@@ -375,6 +408,15 @@ td{padding:8px 6px;border-bottom:1px solid var(--border);}
     <div class="grain-divider"><span></span><span></span><span></span></div>
     <div id="cxp-resumen" class="panelc"></div>
     <div id="cxp-lista"></div>
+  </div>
+
+  <!-- CUENTAS POR COBRAR -->
+  <div class="screen desktop-wide" id="screen-cxc">
+    <button class="back-link" onclick="irA('screen-home')">← Volver</button>
+    <h2 style="font-size:17px;">Cuentas por cobrar</h2>
+    <div class="grain-divider"><span></span><span></span><span></span></div>
+    <div id="cxc-resumen" class="panelc"></div>
+    <div id="cxc-lista"></div>
   </div>
 
   <!-- CREDITOS -->
@@ -599,6 +641,116 @@ function seleccionarToggle(groupId,btn,valor){
   btn.classList.add('selected'); g.dataset.valor=valor;
 }
 
+/* ===== Pagos múltiples (Venta Vegan y Compra) =====
+   pagosState['vv'|'co'] = [{medio, monto, contraparte}]. Canje pide contraparte. */
+let pagosState = { vv: [], co: [] };
+let cacheContraparte = { vv: [], co: [] };
+
+function inicializarPagos(prefix, montoInicial, opcionesContraparte){
+  pagosState[prefix] = [{ medio:'Efectivo', monto: montoInicial||0 }];
+  cacheContraparte[prefix] = opcionesContraparte || cacheProveedores.map(p=>({value:p.alias||p.nombre,label:p.alias||p.nombre}));
+  document.getElementById(prefix+'-multi-check').checked = false;
+  document.getElementById(prefix+'-parcial-check').checked = false;
+  document.getElementById(prefix+'-parcial-wrap').style.display = 'none';
+  document.getElementById(prefix+'-abono-wrap').style.display = 'none';
+  const eg = document.getElementById(prefix+'-estado-group');
+  [...eg.children].forEach(c=>c.classList.remove('selected'));
+  eg.children[0].classList.add('selected'); eg.dataset.valor='Pagado';
+  pintarPagos(prefix);
+}
+function seleccionarEstadoPago(prefix, btn, valor){
+  seleccionarToggle(prefix+'-estado-group', btn, valor);
+  document.getElementById(prefix+'-parcial-wrap').style.display = valor==='Pendiente de pago' ? 'block' : 'none';
+  if(valor!=='Pendiente de pago'){
+    document.getElementById(prefix+'-parcial-check').checked=false;
+    document.getElementById(prefix+'-abono-wrap').style.display='none';
+  }
+  actualizarResumenPagos(prefix);
+}
+function togglePagoParcial(prefix){
+  const on = document.getElementById(prefix+'-parcial-check').checked;
+  document.getElementById(prefix+'-abono-wrap').style.display = on?'block':'none';
+  actualizarResumenPagos(prefix);
+}
+function toggleSegundoPago(prefix){
+  const on = document.getElementById(prefix+'-multi-check').checked;
+  if(on && pagosState[prefix].length<2) pagosState[prefix].push({ medio:'Canje', monto:0 });
+  if(!on) pagosState[prefix] = pagosState[prefix].slice(0,1);
+  pintarPagos(prefix);
+}
+function cambiarMedioPago(prefix, idx, medio){ pagosState[prefix][idx].medio = medio; pintarPagos(prefix); }
+function cambiarMontoPago(prefix, idx, val){ pagosState[prefix][idx].monto = Number(val)||0; actualizarResumenPagos(prefix); }
+function quitarPago(prefix, idx){
+  pagosState[prefix].splice(idx,1);
+  document.getElementById(prefix+'-multi-check').checked=false;
+  pintarPagos(prefix);
+}
+function pintarPagos(prefix){
+  const cont = document.getElementById(prefix+'-pagos-lista'); cont.innerHTML='';
+  const medios = ['Efectivo','Débito','Crédito','Transferencia','PedidosYa','Canje'];
+  pagosState[prefix].forEach((p,idx)=>{
+    const row = document.createElement('div');
+    row.style.cssText = 'display:flex;gap:8px;margin-bottom:6px;';
+    row.innerHTML =
+      '<select style="flex:1;" onchange="cambiarMedioPago(\''+prefix+'\','+idx+',this.value)">'+
+        medios.map(m=>'<option '+(m===p.medio?'selected':'')+'>'+m+'</option>').join('')+
+      '</select>'+
+      '<input type="number" placeholder="Monto" title="Monto" value="'+(p.monto||'')+'" oninput="cambiarMontoPago(\''+prefix+'\','+idx+',this.value)" style="width:120px;">'+
+      (idx>0 ? '<button type="button" class="del" title="Quitar" onclick="quitarPago(\''+prefix+'\','+idx+')">🗑</button>' : '');
+    cont.appendChild(row);
+    if(p.medio === 'Canje'){
+      const ssId = 'ss-'+prefix+'-canje'+idx;
+      const wrap = document.createElement('div');
+      wrap.style.cssText = 'margin:-2px 0 8px;';
+      wrap.innerHTML =
+        '<div class="search-select" id="'+ssId+'">'+
+          '<input type="text" placeholder="Contraparte del canje…" autocomplete="off" onfocus="abrirSearchSelect(\''+ssId+'\')" oninput="filtrarSearchSelect(\''+ssId+'\')">'+
+          '<input type="hidden" id="'+ssId+'-valor">'+
+          '<div class="search-select-list" id="'+ssId+'-list"></div>'+
+        '</div>';
+      cont.appendChild(wrap);
+      initSearchSelect(ssId, cacheContraparte[prefix], { onSelect: (v)=>{ pagosState[prefix][idx].contraparte = v; } });
+      if(p.contraparte){
+        document.querySelector('#'+ssId+' input[type=text]').value = p.contraparte;
+        document.getElementById(ssId+'-valor').value = p.contraparte;
+      }
+    }
+  });
+  actualizarResumenPagos(prefix);
+}
+function montoEsperadoPagos(prefix){
+  const estado = document.getElementById(prefix+'-estado-group').dataset.valor || 'Pagado';
+  const total = prefix==='vv'
+    ? Number((document.getElementById('vv-total').textContent||'').replace(/[^\d-]/g,''))||0
+    : Number(document.getElementById('co-monto').value)||0;
+  if(estado==='Pendiente de pago' && !document.getElementById(prefix+'-parcial-check').checked) return 0;
+  if(document.getElementById(prefix+'-parcial-check').checked) return Number(document.getElementById(prefix+'-abono').value)||0;
+  return total;
+}
+function actualizarResumenPagos(prefix){
+  const resumen = document.getElementById(prefix+'-pagos-resumen');
+  const estado = document.getElementById(prefix+'-estado-group').dataset.valor || 'Pagado';
+  if(estado==='Pendiente de pago' && !document.getElementById(prefix+'-parcial-check').checked){
+    resumen.innerHTML = '<span style="color:var(--ink-soft);">Sin pago registrado ahora — el 100% queda pendiente.</span>';
+    return;
+  }
+  const esperado = montoEsperadoPagos(prefix);
+  const suma = pagosState[prefix].reduce((s,p)=>s+(p.monto||0),0);
+  const ok = Math.abs(suma-esperado) < 1;
+  resumen.innerHTML = '<span style="color:'+(ok?'var(--forest)':'var(--terracotta)')+';font-weight:500;">Suma de medios de pago: '+fmt(suma)+' de '+fmt(esperado)+(ok?' ✓':'')+'</span>';
+}
+function validarPagosCliente(prefix){
+  const estado = document.getElementById(prefix+'-estado-group').dataset.valor || 'Pagado';
+  if(estado==='Pendiente de pago' && !document.getElementById(prefix+'-parcial-check').checked) return { ok:true, pagos:[], estado, abono:0 };
+  const esperado = montoEsperadoPagos(prefix);
+  const pagosLimpios = pagosState[prefix].filter(p=>p.monto>0);
+  const suma = pagosLimpios.reduce((s,p)=>s+p.monto,0);
+  if(Math.abs(suma-esperado) >= 1) return { ok:false, error:'Los medios de pago deben sumar '+fmt(esperado) };
+  for(const p of pagosLimpios){ if(p.medio==='Canje' && !p.contraparte) return { ok:false, error:'Falta identificar la contraparte del Canje' }; }
+  const estadoFinal = document.getElementById(prefix+'-parcial-check').checked ? 'Pago parcial' : estado;
+  return { ok:true, pagos:pagosLimpios, estado:estadoFinal, abono: document.getElementById(prefix+'-parcial-check').checked ? (Number(document.getElementById(prefix+'-abono').value)||0) : undefined };
+}
+
 /* ===== Buscador / autocompletado reutilizable =====
    Uso: initSearchSelect('ss-id', [{value,label}], {onSelect, incluirNuevo}) */
 let searchSelectData = {};
@@ -720,6 +872,7 @@ async function entrarAHome(){
     cont.insertAdjacentHTML('beforeend','<div class="menu-grupo-titulo">Reportes</div>');
     cont.appendChild(crearMenuCard('📥','Importar reportes','Aronium, PedidosYa, Transbank',()=>irA('screen-importar'),true));
     cont.appendChild(crearMenuCard('📑','Cuentas por pagar','Facturas pendientes de pago',()=>abrirCuentasPorPagar(),true));
+    cont.appendChild(crearMenuCard('📥','Cuentas por cobrar','Ventas y canjes pendientes',()=>abrirCuentasPorCobrar(),false));
     cont.appendChild(crearMenuCard('📈','Estado de resultados','Por negocio, mes actual',()=>abrirEstadoResultados(),true));
     cont.appendChild(crearMenuCard('🧾','F29','Cálculo de apoyo IVA + PPM',()=>abrirF29(),true));
     cont.appendChild(crearMenuCard('⚠️','Alertas','Auditoría e informativas',()=>abrirAlertas(),true));
@@ -768,7 +921,7 @@ function pintarSidebar(){
   if (tienePermisoLocal('RegistrarVentaVegan')) finanzasHtml += item('screen-venta-vegan','🥐','Venta Vegan Corner');
   if (tienePermisoLocal('RegistrarCompra')) finanzasHtml += item('screen-compra','🧾','Compra / gasto');
   if (tienePermisoLocal('VerDashboardCompleto')||tienePermisoLocal('VerResumenPropio')) finanzasHtml += item('screen-importar','📥','Importar reportes');
-  if (tienePermisoLocal('VerDashboardCompleto')) finanzasHtml += item('screen-cxp','📑','Cuentas por pagar');
+  if (tienePermisoLocal('VerDashboardCompleto')) finanzasHtml += item('screen-cxp','📑','Cuentas por pagar') + item('screen-cxc','📥','Cuentas por cobrar');
   if (tienePermisoLocal('VerDashboardCompleto')||tienePermisoLocal('VerResumenPropio')) finanzasHtml += item('screen-estado-resultados','📈','Estado de resultados') + item('screen-f29','🧾','F29') + item('screen-alertas','⚠️','Alertas');
   if (finanzasHtml) nav.insertAdjacentHTML('beforeend', '<div class="grupo">Finanzas</div>'+finanzasHtml);
 
@@ -789,6 +942,7 @@ function pintarSidebar(){
 function onEntrarScreen(id){
   if(id==='screen-panel') abrirPanel();
   if(id==='screen-cxp') abrirCuentasPorPagar();
+  if(id==='screen-cxc') abrirCuentasPorCobrar();
   if(id==='screen-creditos') abrirCreditos();
   if(id==='screen-permisos') abrirPermisos();
   if(id==='screen-estado-resultados') abrirEstadoResultados();
@@ -876,11 +1030,12 @@ async function enviarCierreCaja(){
 /* ===== VENTA VEGAN CORNER (carrito multi-producto) ===== */
 async function abrirVentaVegan(){
   document.getElementById('vv-fecha').valueAsDate = new Date();
-  await cargarClientes(); await cargarCatalogo();
+  await cargarClientes(); await cargarCatalogo(); if(!cacheProveedores.length) await cargarProveedores();
   document.querySelector('#ss-vv-cliente input[type=text]').value=''; document.getElementById('ss-vv-cliente-valor').value='';
   carritoVegan = []; pintarCarrito();
   document.getElementById('vv-descuento').value = 0;
   actualizarTotales();
+  inicializarPagos('vv', 0);
   irA('screen-venta-vegan');
 }
 async function cargarClientes(){
@@ -980,6 +1135,9 @@ function actualizarTotales(){
   document.getElementById('vv-neto').textContent = fmt(neto);
   document.getElementById('vv-iva').textContent = fmt(iva);
   document.getElementById('vv-total').textContent = fmt(total);
+  if(pagosState.vv && pagosState.vv.length===1 && document.getElementById('vv-estado-group').dataset.valor!=='Pendiente de pago'){
+    pagosState.vv[0].monto = total; pintarPagos('vv');
+  } else if(document.getElementById('vv-pagos-resumen')){ actualizarResumenPagos('vv'); }
 }
 function recalcularCarrito(){ actualizarTotales(); }
 
@@ -992,11 +1150,13 @@ async function enviarVentaVegan(){
   const descuento = descTipo==='pct' ? Math.round(subtotal*descVal/100) : descVal;
   const total = Number(document.getElementById('vv-total').textContent.replace(/[^\d]/g,''))||0;
   const productos = carritoVegan.filter(l=>l.codigo).map(l=>({codigo:l.codigo, nombre:l.nombre, cantidad:l.cantidad, precioUnit:l.precioUnit, subtotal:l.cantidad*l.precioUnit}));
+  const v = validarPagosCliente('vv');
+  if(!v.ok){ document.getElementById('vv-error').textContent=v.error; return; }
   const data = { fecha:document.getElementById('vv-fecha').value, cliente:valorSearchSelect('ss-vv-cliente'), nOrden:document.getElementById('vv-orden').value,
-    factura:fg.dataset.valor||'NO', descuento, medioPago:document.getElementById('vv-medio').value, productos, total };
+    factura:fg.dataset.valor||'NO', descuento, productos, total, pagos:v.pagos, estado:v.estado, abono:v.abono };
   if(!data.fecha || !productos.length){ document.getElementById('vv-error').textContent='Completa la fecha y al menos un producto'; return; }
   const r = await llamarAPI('registrarVentaVegan',{data});
-  if(r.ok){ document.getElementById('confirm-title').textContent='Venta guardada'; document.getElementById('confirm-msg').textContent='Venta Vegan Corner registrada correctamente.'; document.getElementById('confirm-detalle').innerHTML=''; irA('screen-confirm'); }
+  if(r.ok){ document.getElementById('confirm-title').textContent='Venta guardada'; document.getElementById('confirm-msg').textContent='Venta Vegan Corner registrada correctamente.'+(r.saldoPendiente>0?' Saldo pendiente: '+fmt(r.saldoPendiente)+'.':''); document.getElementById('confirm-detalle').innerHTML=''; irA('screen-confirm'); }
   else document.getElementById('vv-error').textContent=r.error||'Error al guardar';
 }
 
@@ -1008,11 +1168,27 @@ function prepararCompra(){
   grupo.dataset.valor = opciones[0];
   document.querySelector('#ss-co-naturaleza input[type=text]').value=''; document.getElementById('ss-co-naturaleza-valor').value='';
   document.querySelector('#ss-co-proveedor input[type=text]').value=''; document.getElementById('ss-co-proveedor-valor').value='';
-  cargarCategorias(); cargarProveedores();
+  document.getElementById('co-monto').oninput = ()=>actualizarResumenPagos('co');
+  cargarCategoriasCompra(); cargarProveedores().then(()=>inicializarPagos('co', 0));
 }
-async function cargarCategorias(){
+async function cargarCategoriasCompra(){
   if(!cacheCategorias.length){ const r = await llamarAPI('listarCategorias',{}); cacheCategorias = r.categorias||[]; }
-  initSearchSelect('ss-co-naturaleza', cacheCategorias.map(c=>({value:c.naturaleza, label:c.naturaleza})), {});
+  initSearchSelect('ss-co-naturaleza', cacheCategorias.map(c=>({value:c.naturaleza, label:c.naturaleza})), {
+    onSelect: (v)=>recargarContraparte(v)
+  });
+}
+// Contraparte configurable: la categoría define si el buscador de "Proveedor" muestra
+// tu equipo, tus proveedores comerciales, o ambos (hoja ConfigContraparte, editable sin código).
+async function recargarContraparte(naturaleza){
+  document.querySelector('#ss-co-proveedor input[type=text]').value=''; document.getElementById('ss-co-proveedor-valor').value='';
+  const r = await llamarAPI('listarContraparteOpciones', { naturaleza });
+  const opciones = r.opciones && r.opciones.length ? r.opciones : cacheProveedores.map(p=>({value:p.alias||p.nombre,label:p.alias||p.nombre}));
+  const placeholder = r.tipo==='Equipo' ? 'Buscar en el equipo…' : r.tipo==='Ambos' ? 'Buscar equipo o proveedor…' : 'Buscar proveedor…';
+  document.querySelector('#ss-co-proveedor input[type=text]').placeholder = placeholder;
+  initSearchSelect('ss-co-proveedor', opciones, {
+    incluirNuevo: r.tipo!=='Equipo',
+    onSelect: (v)=>{ if(v==='__nuevo__'){ document.querySelector('#ss-co-proveedor input[type=text]').value=''; abrirModalProveedor(); } }
+  });
 }
 async function cargarProveedores(){
   const r = await llamarAPI('listarProveedores',{});
@@ -1043,13 +1219,15 @@ async function crearProveedorNuevo(){
   } else document.getElementById('np-error').textContent=r.error||'Error al crear';
 }
 async function enviarCompra(){
-  const eg = document.getElementById('co-estado-group');
+  const v = validarPagosCliente('co');
+  if(!v.ok){ document.getElementById('co-error').textContent=v.error; return; }
   const data = { negocio:document.getElementById('co-negocio-group').dataset.valor, naturaleza:valorSearchSelect('ss-co-naturaleza'), proveedor:valorSearchSelect('ss-co-proveedor'),
     tipoDocumento:document.getElementById('co-tipo-doc').value, nDocumento:document.getElementById('co-ndoc').value, monto:document.getElementById('co-monto').value||0,
-    medioPago:document.getElementById('co-medio-pago').value, descripcion:document.getElementById('co-desc').value, estado:eg.dataset.valor||'Pagado' };
+    descripcion:document.getElementById('co-desc').value, pagos:v.pagos, estado:v.estado, abono:v.abono };
   if(!data.monto||data.monto<=0){ document.getElementById('co-error').textContent='Ingresa un monto válido'; return; }
+  if(!data.proveedor){ document.getElementById('co-error').textContent='Selecciona la contraparte (proveedor o equipo)'; return; }
   const r = await llamarAPI('registrarCompra',{data});
-  if(r.ok){ document.getElementById('confirm-title').textContent='Compra guardada'; document.getElementById('confirm-msg').textContent='Compra/gasto registrado correctamente.'; document.getElementById('confirm-detalle').innerHTML=''; irA('screen-confirm'); }
+  if(r.ok){ document.getElementById('confirm-title').textContent='Compra guardada'; document.getElementById('confirm-msg').textContent='Compra/gasto registrado correctamente.'+(r.saldoPendiente>0?' Saldo pendiente: '+fmt(r.saldoPendiente)+'.':''); document.getElementById('confirm-detalle').innerHTML=''; irA('screen-confirm'); }
   else document.getElementById('co-error').textContent=r.error||'Error al guardar';
 }
 
@@ -1233,8 +1411,9 @@ async function abrirCuentasPorPagar(){
   const cont = document.getElementById('cxp-lista'); cont.innerHTML='';
   (r.cuentas||[]).forEach(c=>{
     const div = document.createElement('div'); div.className='card';
-    div.innerHTML = '<div style="display:flex;justify-content:space-between;"><strong style="font-size:13px;">'+c.proveedor+'</strong><b class="mono">'+fmt(c.monto)+'</b></div>'+
-      '<p style="font-size:11.5px;color:var(--ink-soft);">'+c.negocio+' &middot; '+c.fecha+' &middot; '+(c.descripcion||'')+'</p>'+
+    const etiquetaParcial = c.estado==='Pago parcial' ? ' <span style="color:var(--terracotta);font-weight:600;">(parcial, de '+fmt(c.monto)+')</span>' : '';
+    div.innerHTML = '<div style="display:flex;justify-content:space-between;"><strong style="font-size:13px;">'+c.proveedor+'</strong><b class="mono">'+fmt(c.saldo)+'</b></div>'+
+      '<p style="font-size:11.5px;color:var(--ink-soft);">'+c.negocio+' &middot; '+c.fecha+' &middot; '+(c.descripcion||'')+etiquetaParcial+'</p>'+
       '<button class="btn-secondary btn-small" onclick="abrirModalPago('+c.fila+')">Registrar pago</button>';
     cont.appendChild(div);
   });
@@ -1254,6 +1433,44 @@ async function confirmarPago(fila){
   const d = { fila, fechaPago:document.getElementById('pg-fecha').value, medioPago:document.getElementById('pg-medio').value };
   const r = await llamarAPI('registrarPagoFactura',{data:d});
   if(r.ok){ cerrarModal(); abrirCuentasPorPagar(); } else document.getElementById('pg-error').textContent=r.error||'Error al registrar el pago';
+}
+
+/* ===== CUENTAS POR COBRAR ===== */
+async function abrirCuentasPorCobrar(){
+  irA('screen-cxc');
+  const r = await llamarAPI('listarCuentasPorCobrar',{});
+  document.getElementById('cxc-resumen').innerHTML = '<div class="rowline" style="font-size:14px;font-weight:700;"><span>'+r.cantidad+' pendiente(s)</span><b>'+fmt(r.total)+'</b></div>';
+  const cont = document.getElementById('cxc-lista'); cont.innerHTML='';
+  (r.cuentas||[]).forEach(c=>{
+    const div = document.createElement('div'); div.className='card';
+    const etiquetaParcial = c.estado==='Pago parcial' ? ' <span style="color:var(--terracotta);font-weight:600;">(parcial, de '+fmt(c.monto)+')</span>' : '';
+    div.innerHTML = '<div style="display:flex;justify-content:space-between;"><strong style="font-size:13px;">'+c.cliente+'</strong><b class="mono">'+fmt(c.saldo)+'</b></div>'+
+      '<p style="font-size:11.5px;color:var(--ink-soft);">Venta &middot; '+c.fecha+etiquetaParcial+'</p>'+
+      '<button class="btn-secondary btn-small" onclick="abrirModalCobro('+c.fila+')">Registrar cobro</button>';
+    cont.appendChild(div);
+  });
+  (r.saldosCanje||[]).forEach(s=>{
+    const div = document.createElement('div'); div.className='card';
+    div.innerHTML = '<div style="display:flex;justify-content:space-between;"><strong style="font-size:13px;">'+s.contraparte+'</strong><b class="mono">'+fmt(s.saldo)+'</b></div>'+
+      '<p style="font-size:11.5px;color:var(--ink-soft);">Saldo neto de Canje a favor</p>';
+    cont.appendChild(div);
+  });
+  if(!(r.cuentas||[]).length && !(r.saldosCanje||[]).length) cont.innerHTML = '<p style="font-size:12px;color:var(--ink-soft);">No hay cobros pendientes.</p>';
+}
+function abrirModalCobro(fila){
+  abrirModal(
+    '<h3 style="font-size:15px;">Registrar cobro</h3>'+
+    '<label>Fecha de cobro</label><input type="date" id="cb-fecha">'+
+    '<label>Medio de pago</label><select id="cb-medio"><option>Transferencia</option><option>Efectivo</option><option>Débito</option><option>Crédito</option></select>'+
+    '<div class="error-msg" id="cb-error"></div>'+
+    '<div style="display:flex;gap:8px;margin-top:14px;"><button class="btn-secondary" onclick="cerrarModal()">Cancelar</button><button class="btn-primary" onclick="confirmarCobro('+fila+')">Guardar</button></div>'
+  );
+  document.getElementById('cb-fecha').valueAsDate = new Date();
+}
+async function confirmarCobro(fila){
+  const d = { fila, fechaCobro:document.getElementById('cb-fecha').value, medioPago:document.getElementById('cb-medio').value };
+  const r = await llamarAPI('registrarCobro',{data:d});
+  if(r.ok){ cerrarModal(); abrirCuentasPorCobrar(); } else document.getElementById('cb-error').textContent=r.error||'Error al registrar el cobro';
 }
 
 /* ===== CREDITOS ===== */
