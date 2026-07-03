@@ -111,7 +111,7 @@ input:focus,select:focus{outline:none;border-color:var(--forest);}
 .btn-primary{width:100%;padding:13px;border:none;border-radius:11px;background:var(--forest);color:#fff;font-size:14.5px;font-weight:600;cursor:pointer;}
 .btn-primary:disabled{background:var(--border);color:var(--ink-soft);}
 .btn-secondary{width:100%;padding:12px;border:1.5px solid var(--border);border-radius:11px;background:#fff;color:var(--ink-soft);font-size:13.5px;font-weight:600;cursor:pointer;}
-.btn-small{padding:7px 12px;border-radius:9px;font-size:11.5px;font-weight:600;cursor:pointer;}
+.btn-small{padding:7px 12px;border-radius:9px;font-size:11.5px;font-weight:600;cursor:pointer;width:auto;}
 .error-msg{color:var(--danger);font-size:12px;margin-top:8px;min-height:14px;}
 .banner{background:var(--terracotta);color:#fff;font-size:11px;text-align:center;padding:7px 10px;}
 .dropzone{border:2px dashed var(--border);border-radius:14px;padding:38px 16px;text-align:center;color:var(--ink-soft);font-size:12.5px;cursor:pointer;background:var(--surface);}
@@ -174,6 +174,13 @@ td{padding:8px 6px;border-bottom:1px solid var(--border);}
 .ss-item:hover{background:var(--forest-soft);}
 .ss-item.ss-empty{color:var(--ink-soft);cursor:default;}
 .ss-item.ss-nuevo{color:var(--forest);font-weight:600;border-top:1px solid var(--border);}
+
+/* skeleton liviano — reemplaza al overlay bloqueante en pantallas con caché */
+.skel-line{background:linear-gradient(90deg,var(--border) 25%,#EFEBDD 37%,var(--border) 63%);background-size:400% 100%;animation:skel-shine 1.4s ease infinite;border-radius:8px;}
+@keyframes skel-shine{0%{background-position:100% 50%;}100%{background-position:0 50%;}}
+.skel-card{height:64px;margin-bottom:9px;border-radius:12px;}
+.skel-kpi{height:70px;border-radius:16px;}
+.header-row{display:flex;justify-content:space-between;align-items:center;gap:10px;}
 </style>
 </head>
 <body>
@@ -252,7 +259,7 @@ td{padding:8px 6px;border-bottom:1px solid var(--border);}
   <!-- PANEL -->
   <div class="screen desktop-wide" id="screen-panel">
     <button class="back-link" onclick="irA('screen-home')">← Volver</button>
-    <h2>Panel</h2>
+    <div class="header-row"><h2>Panel</h2><button class="btn-secondary btn-small" onclick="abrirPanel(panelPeriodoActual,true)">🔄 Actualizar</button></div>
     <div class="grain-divider"><span></span><span></span><span></span></div>
     <div class="pillbar" id="panel-periodo"><button class="sel" data-m="actual">Este mes</button><button data-m="anterior">Mes anterior</button></div>
     <div id="panel-contenido"></div>
@@ -405,7 +412,7 @@ td{padding:8px 6px;border-bottom:1px solid var(--border);}
   <!-- CUENTAS POR PAGAR -->
   <div class="screen desktop-wide" id="screen-cxp">
     <button class="back-link" onclick="irA('screen-home')">← Volver</button>
-    <h2 style="font-size:17px;">Cuentas por pagar</h2>
+    <div class="header-row"><h2 style="font-size:17px;">Cuentas por pagar</h2><button class="btn-secondary btn-small" onclick="abrirCuentasPorPagar(true)">🔄 Actualizar</button></div>
     <div class="grain-divider"><span></span><span></span><span></span></div>
     <div id="cxp-resumen" class="panelc"></div>
     <div id="cxp-lista"></div>
@@ -414,7 +421,7 @@ td{padding:8px 6px;border-bottom:1px solid var(--border);}
   <!-- CUENTAS POR COBRAR -->
   <div class="screen desktop-wide" id="screen-cxc">
     <button class="back-link" onclick="irA('screen-home')">← Volver</button>
-    <h2 style="font-size:17px;">Cuentas por cobrar</h2>
+    <div class="header-row"><h2 style="font-size:17px;">Cuentas por cobrar</h2><button class="btn-secondary btn-small" onclick="abrirCuentasPorCobrar(true)">🔄 Actualizar</button></div>
     <div class="grain-divider"><span></span><span></span><span></span></div>
     <div id="cxc-resumen" class="panelc"></div>
     <div id="cxc-lista"></div>
@@ -491,7 +498,7 @@ td{padding:8px 6px;border-bottom:1px solid var(--border);}
   <!-- ALERTAS -->
   <div class="screen desktop-wide" id="screen-alertas">
     <button class="back-link" onclick="irA('screen-home')">← Volver</button>
-    <h2 style="font-size:17px;">Alertas</h2>
+    <div class="header-row"><h2 style="font-size:17px;">Alertas</h2><button class="btn-secondary btn-small" onclick="abrirAlertas(true)">🔄 Actualizar</button></div>
     <div class="grain-divider"><span></span><span></span><span></span></div>
     <p style="font-size:12px;color:var(--ink-soft);">Facturas pendientes de pago se gestionan en <button class="link-sm" onclick="abrirCuentasPorPagar()">Cuentas por pagar</button>. Los márgenes negativos son informativos y no requieren acción.</p>
     <div id="lista-alertas"></div>
@@ -500,9 +507,12 @@ td{padding:8px 6px;border-bottom:1px solid var(--border);}
   <!-- PRODUCCIÓN — PROGRAMA -->
   <div class="screen desktop-wide" id="screen-programa">
     <button class="back-link" onclick="irA('screen-home')">← Volver</button>
-    <div style="display:flex;justify-content:space-between;align-items:center;">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;">
       <h2 style="font-size:17px;">Programa de producción</h2>
-      <button class="btn-secondary btn-small" id="btn-nuevo-programa" style="display:none;" onclick="irA('screen-programa-nuevo')">+ Nuevo</button>
+      <div style="display:flex;gap:8px;">
+        <button class="btn-secondary btn-small" onclick="abrirPrograma(true)">🔄 Actualizar</button>
+        <button class="btn-secondary btn-small" id="btn-nuevo-programa" style="display:none;" onclick="irA('screen-programa-nuevo')">+ Nuevo</button>
+      </div>
     </div>
     <div class="grain-divider"><span></span><span></span><span></span></div>
     <div id="lista-programa"></div>
@@ -527,7 +537,7 @@ td{padding:8px 6px;border-bottom:1px solid var(--border);}
   <!-- INVENTARIO MP -->
   <div class="screen desktop-wide" id="screen-inventario">
     <button class="back-link" onclick="irA('screen-home')">← Volver</button>
-    <h2 style="font-size:17px;">Inventario de materia prima</h2>
+    <div class="header-row"><h2 style="font-size:17px;">Inventario de materia prima</h2><button class="btn-secondary btn-small" onclick="abrirInventario(true)">🔄 Actualizar</button></div>
     <div class="grain-divider"><span></span><span></span><span></span></div>
     <div class="card">
       <label>Insumo</label><input type="text" id="inv-insumo" placeholder="Ej: Harina">
@@ -545,7 +555,7 @@ td{padding:8px 6px;border-bottom:1px solid var(--border);}
   <!-- LISTA DE COMPRA MP -->
   <div class="screen desktop-wide" id="screen-lista-compra">
     <button class="back-link" onclick="irA('screen-home')">← Volver</button>
-    <h2 style="font-size:17px;">Lista de compra — Materia Prima</h2>
+    <div class="header-row"><h2 style="font-size:17px;">Lista de compra — Materia Prima</h2><button class="btn-secondary btn-small" onclick="abrirListaCompra(true)">🔄 Actualizar</button></div>
     <div class="grain-divider"><span></span><span></span><span></span></div>
     <p style="font-size:12px;color:var(--ink-soft);">Insumos bajo su stock mínimo, calculado desde Inventario MP.</p>
     <div id="lista-compra-mp"></div>
@@ -578,6 +588,13 @@ let negocioER = 'Cima Eco-Granel';
 let carritoVegan = [];
 let programaActualId = null;
 
+/* ===== Caché de módulos secundarios (Alertas / CxP / CxC / Programa / Inventario / Lista compra) =====
+   null = "no cargado todavía, hay que pedirlo". Cualquier acción que escribe datos en uno de estos
+   módulos lo pone en null para forzar que la próxima vez que se abra la pantalla se pida de nuevo.
+   cachePanel (más abajo) es aparte porque además se indexa por período (año-mes). */
+let cacheModulo = { alertas:null, cxp:null, cxc:null, programa:null, inventario:null, listaCompra:null };
+let panelPeriodoActual = 'actual';
+
 const USUARIOS_DEMO = [
   {nombre:'Osmar Meza', rol:'Admin', negocio:'Ambos'},
   {nombre:'Rocío Romo', rol:'Manager', negocio:'Cima Eco-Granel'},
@@ -603,6 +620,7 @@ function fmtCompacto(n){
   return signo+'$'+abs;
 }
 function tienePermisoLocal(accion){ return !!permisosSesion[accion]; }
+function skeletonCards(n){ let h=''; for(let i=0;i<(n||3);i++) h+='<div class="skel-line skel-card"></div>'; return h; }
 
 async function llamarAPI(accion, extra){
   document.getElementById('loading-overlay').classList.add('active');
@@ -617,6 +635,21 @@ async function llamarAPI(accion, extra){
     return { ok:false, error:'No se pudo conectar con el servidor: '+e.message };
   } finally {
     document.getElementById('loading-overlay').classList.remove('active');
+  }
+}
+
+/* Variante silenciosa: no muestra el overlay de pantalla completa. Se usa cuando la pantalla
+   ya está visible (con caché viejo o skeleton) y solo queremos traer datos frescos detrás de cámara. */
+async function llamarAPISilencioso(accion, extra){
+  try{
+    if (modoDemo){ await new Promise(r=>setTimeout(r,280)); return simularAPI(accion, extra); }
+    const solicitante = (sesion && sesion.nombre) ? sesion.nombre : null;
+    const res = await fetch(CONFIG.API_URL, { method:'POST', headers:{'Content-Type':'text/plain;charset=utf-8'}, body: JSON.stringify(Object.assign({accion:accion, solicitante:solicitante}, extra)) });
+    let r;
+    try { r = await res.json(); } catch(e){ return { ok:false, error:'El servidor respondió algo que no es JSON válido' }; }
+    return r;
+  } catch(e){
+    return { ok:false, error:'No se pudo conectar con el servidor: '+e.message };
   }
 }
 
@@ -830,7 +863,12 @@ async function intentarLogin(){
     pinBuffer=''; pintarPinDots();
   }
 }
-function cerrarSesion(){ sesion={nombre:null,rol:null,negocio:null}; permisosSesion={}; irA('screen-select-user'); }
+function cerrarSesion(){
+  sesion={nombre:null,rol:null,negocio:null}; permisosSesion={};
+  cacheModulo = { alertas:null, cxp:null, cxc:null, programa:null, inventario:null, listaCompra:null };
+  cachePanel = {};
+  irA('screen-select-user');
+}
 
 async function guardarCambioPin(){
   const actual=document.getElementById('cp-actual').value, nuevo=document.getElementById('cp-nuevo').value, confirmar=document.getElementById('cp-confirmar').value;
@@ -959,17 +997,29 @@ function cerrarModal(){ document.getElementById('modal-bg').classList.remove('ac
 /* ===== PANEL ===== */
 const NOMBRES_MES = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
 let cachePanel = {};
-async function abrirPanel(periodo){
+async function abrirPanel(periodo, forzar){
   irA('screen-panel');
   periodo = periodo || 'actual';
+  panelPeriodoActual = periodo;
   document.querySelectorAll('#panel-periodo button').forEach(b=>b.classList.toggle('sel', b.dataset.m===periodo));
   const hoy = new Date();
   let anio = hoy.getFullYear(), mes = hoy.getMonth()+1;
   if(periodo==='anterior'){ mes -= 1; if(mes===0){ mes=12; anio-=1; } }
   const key = anio+'-'+mes;
-  const r = cachePanel[key] || await llamarAPI('obtenerPanel', {anio, mes});
+  if(forzar) cachePanel[key] = null;
+  if(cachePanel[key]){
+    // Ya tenemos este período en memoria: se pinta al instante, sin tocar el backend.
+    pintarPanel(cachePanel[key], anio, mes);
+    return;
+  }
+  // Primera vez que se pide este período: mostramos skeleton en vez de bloquear toda la pantalla.
+  document.getElementById('panel-contenido').innerHTML =
+    '<div class="kpi-row">'+skeletonCards(4).replace(/skel-card/g,'skel-kpi')+'</div>'+
+    '<div class="skel-line skel-card" style="height:220px;"></div>';
+  const r = await llamarAPISilencioso('obtenerPanel', {anio, mes});
   cachePanel[key] = r;
-  pintarPanel(r, anio, mes);
+  // Si el usuario ya navegó a otro período mientras esperaba, no pisamos su vista actual.
+  if(panelPeriodoActual===periodo) pintarPanel(r, anio, mes);
 }
 document.querySelectorAll('#panel-periodo button').forEach(b=>b.addEventListener('click', ()=>abrirPanel(b.dataset.m)));
 /* ===== Gráficos del Panel (SVG puro, sin librerías) ===== */
@@ -1139,6 +1189,7 @@ async function guardarCierreCajaFinal(){
     pedidosYa:document.getElementById('cc-pedidosya').value||0, retiro:document.getElementById('cc-retiro').value||0, responsable:sesion.nombre };
   const r = await llamarAPI('registrarCierreCaja',{data});
   if(r.ok){
+    cachePanel = {}; // el cierre cambia los KPIs del mes — invalidamos todo el Panel en memoria
     cerrarModal();
     document.getElementById('confirm-title').textContent='Cierre guardado';
     document.getElementById('confirm-msg').textContent='El registro quedó guardado correctamente.';
@@ -1295,7 +1346,11 @@ async function enviarVentaVegan(){
     factura:fg.dataset.valor||'NO', descuento, productos, total, pagos:v.pagos, estado:v.estado, abono:v.abono };
   if(!data.fecha || !productos.length){ document.getElementById('vv-error').textContent='Completa la fecha y al menos un producto'; return; }
   const r = await llamarAPI('registrarVentaVegan',{data});
-  if(r.ok){ document.getElementById('confirm-title').textContent='Venta guardada'; document.getElementById('confirm-msg').textContent='Venta Vegan Corner registrada correctamente.'+(r.saldoPendiente>0?' Saldo pendiente: '+fmt(r.saldoPendiente)+'.':''); document.getElementById('confirm-detalle').innerHTML=''; irA('screen-confirm'); }
+  if(r.ok){
+    cachePanel = {}; // la venta cambia ingresos del Panel
+    if(r.saldoPendiente>0) cacheModulo.cxc = null; // queda un cobro pendiente nuevo
+    document.getElementById('confirm-title').textContent='Venta guardada'; document.getElementById('confirm-msg').textContent='Venta Vegan Corner registrada correctamente.'+(r.saldoPendiente>0?' Saldo pendiente: '+fmt(r.saldoPendiente)+'.':''); document.getElementById('confirm-detalle').innerHTML=''; irA('screen-confirm');
+  }
   else document.getElementById('vv-error').textContent=r.error||'Error al guardar';
 }
 
@@ -1330,6 +1385,13 @@ async function recargarContraparte(naturaleza){
   });
 }
 async function cargarProveedores(){
+  if(cacheProveedores.length){
+    initSearchSelect('ss-co-proveedor', cacheProveedores.map(p=>({value:p.alias||p.nombre, label:p.alias||p.nombre})), {
+      incluirNuevo: true,
+      onSelect: (v)=>{ if(v==='__nuevo__'){ document.querySelector('#ss-co-proveedor input[type=text]').value=''; abrirModalProveedor(); } }
+    });
+    return;
+  }
   const r = await llamarAPI('listarProveedores',{});
   cacheProveedores = (r.proveedores&&r.proveedores.length)?r.proveedores:[];
   initSearchSelect('ss-co-proveedor', cacheProveedores.map(p=>({value:p.alias||p.nombre, label:p.alias||p.nombre})), {
@@ -1369,7 +1431,11 @@ async function enviarCompra(){
   if(!data.monto||data.monto<=0){ document.getElementById('co-error').textContent='Ingresa un monto válido'; return; }
   if(!data.proveedor){ document.getElementById('co-error').textContent='Selecciona la contraparte (proveedor o equipo)'; return; }
   const r = await llamarAPI('registrarCompra',{data});
-  if(r.ok){ document.getElementById('confirm-title').textContent='Compra guardada'; document.getElementById('confirm-msg').textContent='Compra/gasto registrado correctamente.'+(r.saldoPendiente>0?' Saldo pendiente: '+fmt(r.saldoPendiente)+'.':''); document.getElementById('confirm-detalle').innerHTML=''; irA('screen-confirm'); }
+  if(r.ok){
+    cachePanel = {}; // la compra cambia egresos del Panel
+    if(r.saldoPendiente>0) cacheModulo.cxp = null; // queda un pago pendiente nuevo
+    document.getElementById('confirm-title').textContent='Compra guardada'; document.getElementById('confirm-msg').textContent='Compra/gasto registrado correctamente.'+(r.saldoPendiente>0?' Saldo pendiente: '+fmt(r.saldoPendiente)+'.':''); document.getElementById('confirm-detalle').innerHTML=''; irA('screen-confirm');
+  }
   else document.getElementById('co-error').textContent=r.error||'Error al guardar';
 }
 
@@ -1538,6 +1604,8 @@ async function confirmarImport(loteAnteriorId){
   if(p.tipo==='pedidosya') r = await llamarAPI('importarPedidosYa',{data:p, reemplazar});
   if(p.tipo==='transbank') r = await llamarAPI('importarTransbank',{data:p, reemplazar});
   if(r && r.ok){
+    cachePanel = {}; // cualquier importación cambia los KPIs del mes
+    if(p.tipo==='aronium_medios') cacheModulo.alertas = null; // este import genera alertas de auditoría
     document.getElementById('confirm-title').textContent='Importación completa';
     document.getElementById('confirm-msg').textContent='El reporte se procesó correctamente.';
     document.getElementById('confirm-detalle').innerHTML='';
@@ -1546,13 +1614,11 @@ async function confirmarImport(loteAnteriorId){
 }
 
 /* ===== CUENTAS POR PAGAR ===== */
-async function abrirCuentasPorPagar(){
-  irA('screen-cxp');
-  const r = await llamarAPI('listarCuentasPorPagar',{});
+function pintarCuentasPorPagar(r){
   document.getElementById('cxp-resumen').innerHTML = '<div class="rowline" style="font-size:14px;font-weight:700;"><span>'+r.cantidad+' documento(s) pendientes</span><b>'+fmt(r.total)+'</b></div>';
   const cont = document.getElementById('cxp-lista'); cont.innerHTML='';
   (r.cuentas||[]).forEach(c=>{
-    const div = document.createElement('div'); div.className='card';
+    const div = document.createElement('div'); div.className='card'; div.dataset.fila=c.fila;
     const etiquetaParcial = c.estado==='Pago parcial' ? ' <span style="color:var(--terracotta);font-weight:600;">(parcial, de '+fmt(c.monto)+')</span>' : '';
     div.innerHTML = '<div style="display:flex;justify-content:space-between;"><strong style="font-size:13px;">'+c.proveedor+'</strong><b class="mono">'+fmt(c.saldo)+'</b></div>'+
       '<p style="font-size:11.5px;color:var(--ink-soft);">'+c.negocio+' &middot; '+c.fecha+' &middot; '+(c.descripcion||'')+etiquetaParcial+'</p>'+
@@ -1567,6 +1633,16 @@ async function abrirCuentasPorPagar(){
     cont.appendChild(div);
   });
   if(!(r.cuentas||[]).length && !(r.saldosCanje||[]).length) cont.innerHTML = '<p style="font-size:12px;color:var(--ink-soft);">No hay facturas pendientes.</p>';
+}
+async function abrirCuentasPorPagar(forzar){
+  irA('screen-cxp');
+  if(forzar) cacheModulo.cxp = null;
+  if(cacheModulo.cxp){ pintarCuentasPorPagar(cacheModulo.cxp); return; }
+  document.getElementById('cxp-resumen').innerHTML = '<div class="skel-line" style="height:24px;width:220px;"></div>';
+  document.getElementById('cxp-lista').innerHTML = skeletonCards(3);
+  const r = await llamarAPISilencioso('listarCuentasPorPagar',{});
+  cacheModulo.cxp = r;
+  if(document.getElementById('screen-cxp').classList.contains('active')) pintarCuentasPorPagar(r);
 }
 
 /* ===== Liquidación de saldo de Canje (común a Cobrar y Pagar) ===== */
@@ -1584,7 +1660,11 @@ function abrirModalLiquidarCanje(contraparte, saldo){
 async function confirmarLiquidarCanje(contraparte){
   const d = { contraparte, monto:Number(document.getElementById('lq-monto').value)||0, medioPago:document.getElementById('lq-medio').value };
   const r = await llamarAPI('liquidarSaldoCanje',{data:d});
-  if(r.ok){ cerrarModal(); if(document.getElementById('screen-cxc').classList.contains('active')) abrirCuentasPorCobrar(); else abrirCuentasPorPagar(); }
+  if(r.ok){
+    cacheModulo.cxp = null; cacheModulo.cxc = null; cachePanel = {};
+    cerrarModal();
+    if(document.getElementById('screen-cxc').classList.contains('active')) abrirCuentasPorCobrar(); else abrirCuentasPorPagar();
+  }
   else document.getElementById('lq-error').textContent=r.error||'Error al liquidar';
 }
 function abrirModalPago(fila){
@@ -1600,17 +1680,26 @@ function abrirModalPago(fila){
 async function confirmarPago(fila){
   const d = { fila, fechaPago:document.getElementById('pg-fecha').value, medioPago:document.getElementById('pg-medio').value };
   const r = await llamarAPI('registrarPagoFactura',{data:d});
-  if(r.ok){ cerrarModal(); abrirCuentasPorPagar(); } else document.getElementById('pg-error').textContent=r.error||'Error al registrar el pago';
+  if(r.ok){
+    // Re-render granular: quitamos solo la card pagada, sin re-pedir ni repintar toda la lista.
+    cachePanel = {};
+    if(cacheModulo.cxp){
+      cacheModulo.cxp.cuentas = (cacheModulo.cxp.cuentas||[]).filter(c=>c.fila!==fila);
+      cacheModulo.cxp.cantidad = cacheModulo.cxp.cuentas.length + (cacheModulo.cxp.saldosCanje||[]).length;
+    }
+    cerrarModal();
+    const card = document.querySelector('#cxp-lista .card[data-fila="'+fila+'"]');
+    if(card) card.remove(); else abrirCuentasPorPagar(true);
+    if(cacheModulo.cxp) document.getElementById('cxp-resumen').innerHTML = '<div class="rowline" style="font-size:14px;font-weight:700;"><span>'+cacheModulo.cxp.cantidad+' documento(s) pendientes</span><b>'+fmt(cacheModulo.cxp.cuentas.reduce((s,c)=>s+c.saldo,0))+'</b></div>';
+  } else document.getElementById('pg-error').textContent=r.error||'Error al registrar el pago';
 }
 
 /* ===== CUENTAS POR COBRAR ===== */
-async function abrirCuentasPorCobrar(){
-  irA('screen-cxc');
-  const r = await llamarAPI('listarCuentasPorCobrar',{});
+function pintarCuentasPorCobrar(r){
   document.getElementById('cxc-resumen').innerHTML = '<div class="rowline" style="font-size:14px;font-weight:700;"><span>'+r.cantidad+' pendiente(s)</span><b>'+fmt(r.total)+'</b></div>';
   const cont = document.getElementById('cxc-lista'); cont.innerHTML='';
   (r.cuentas||[]).forEach(c=>{
-    const div = document.createElement('div'); div.className='card';
+    const div = document.createElement('div'); div.className='card'; div.dataset.fila=c.fila;
     const etiquetaParcial = c.estado==='Pago parcial' ? ' <span style="color:var(--terracotta);font-weight:600;">(parcial, de '+fmt(c.monto)+')</span>' : '';
     div.innerHTML = '<div style="display:flex;justify-content:space-between;"><strong style="font-size:13px;">'+c.cliente+'</strong><b class="mono">'+fmt(c.saldo)+'</b></div>'+
       '<p style="font-size:11.5px;color:var(--ink-soft);">Venta &middot; '+c.fecha+etiquetaParcial+'</p>'+
@@ -1626,6 +1715,16 @@ async function abrirCuentasPorCobrar(){
   });
   if(!(r.cuentas||[]).length && !(r.saldosCanje||[]).length) cont.innerHTML = '<p style="font-size:12px;color:var(--ink-soft);">No hay cobros pendientes.</p>';
 }
+async function abrirCuentasPorCobrar(forzar){
+  irA('screen-cxc');
+  if(forzar) cacheModulo.cxc = null;
+  if(cacheModulo.cxc){ pintarCuentasPorCobrar(cacheModulo.cxc); return; }
+  document.getElementById('cxc-resumen').innerHTML = '<div class="skel-line" style="height:24px;width:220px;"></div>';
+  document.getElementById('cxc-lista').innerHTML = skeletonCards(3);
+  const r = await llamarAPISilencioso('listarCuentasPorCobrar',{});
+  cacheModulo.cxc = r;
+  if(document.getElementById('screen-cxc').classList.contains('active')) pintarCuentasPorCobrar(r);
+}
 function abrirModalCobro(fila){
   abrirModal(
     '<h3 style="font-size:15px;">Registrar cobro</h3>'+
@@ -1639,7 +1738,17 @@ function abrirModalCobro(fila){
 async function confirmarCobro(fila){
   const d = { fila, fechaCobro:document.getElementById('cb-fecha').value, medioPago:document.getElementById('cb-medio').value };
   const r = await llamarAPI('registrarCobro',{data:d});
-  if(r.ok){ cerrarModal(); abrirCuentasPorCobrar(); } else document.getElementById('cb-error').textContent=r.error||'Error al registrar el cobro';
+  if(r.ok){
+    cachePanel = {};
+    if(cacheModulo.cxc){
+      cacheModulo.cxc.cuentas = (cacheModulo.cxc.cuentas||[]).filter(c=>c.fila!==fila);
+      cacheModulo.cxc.cantidad = cacheModulo.cxc.cuentas.length + (cacheModulo.cxc.saldosCanje||[]).length;
+    }
+    cerrarModal();
+    const card = document.querySelector('#cxc-lista .card[data-fila="'+fila+'"]');
+    if(card) card.remove(); else abrirCuentasPorCobrar(true);
+    if(cacheModulo.cxc) document.getElementById('cxc-resumen').innerHTML = '<div class="rowline" style="font-size:14px;font-weight:700;"><span>'+cacheModulo.cxc.cantidad+' pendiente(s)</span><b>'+fmt(cacheModulo.cxc.cuentas.reduce((s,c)=>s+c.saldo,0))+'</b></div>';
+  } else document.getElementById('cb-error').textContent=r.error||'Error al registrar el cobro';
 }
 
 /* ===== CREDITOS ===== */
@@ -1748,13 +1857,11 @@ async function abrirF29(){
 }
 
 /* ===== ALERTAS (informativas + auditoría, sin botón para márgenes negativos) ===== */
-async function abrirAlertas(){
-  irA('screen-alertas');
-  const r = await llamarAPI('listarAlertas',{});
+function pintarAlertas(r){
   const cont = document.getElementById('lista-alertas'); cont.innerHTML='';
   (r.alertas||[]).forEach(a=>{
     const pillClass = a.severidad==='Critica'?'pill-critica':a.severidad==='Alerta'?'pill-alerta':'pill-menor';
-    const div = document.createElement('div'); div.className='card';
+    const div = document.createElement('div'); div.className='card'; div.dataset.id=a.id;
     div.innerHTML = '<div style="display:flex;justify-content:space-between;"><span style="font-size:12px;font-weight:600;">'+a.categoria+'</span><span class="pill '+pillClass+'">'+a.severidad+'</span></div>'+
       '<p style="font-size:12px;color:var(--ink-soft);margin:4px 0;">'+a.fecha+' &middot; '+a.responsable+' &middot; diferencia '+fmt(Math.abs(a.diferencia))+'</p>'+
       (a.estado==='Pendiente' ? '<button class="btn-secondary btn-small" onclick="resolverAlertaUI(\''+a.id+'\','+(a.severidad==='Critica')+')">Resolver con nota</button>' : '<span class="pill pill-menor">Resuelta</span>');
@@ -1762,21 +1869,38 @@ async function abrirAlertas(){
   });
   if(!(r.alertas||[]).length) cont.innerHTML = '<p style="font-size:12px;color:var(--ink-soft);">Sin alertas de auditoría.</p>';
 }
+async function abrirAlertas(forzar){
+  irA('screen-alertas');
+  if(forzar) cacheModulo.alertas = null;
+  if(cacheModulo.alertas){ pintarAlertas(cacheModulo.alertas); return; }
+  document.getElementById('lista-alertas').innerHTML = skeletonCards(3);
+  const r = await llamarAPISilencioso('listarAlertas',{});
+  cacheModulo.alertas = r;
+  if(document.getElementById('screen-alertas').classList.contains('active')) pintarAlertas(r);
+}
 async function resolverAlertaUI(id, requiereNota){
   let nota = '';
   if(requiereNota){ nota = prompt('Esta alerta es crítica: describe qué pasó'); if(!nota) return; }
-  await llamarAPI('resolverAlerta',{data:{id, nota}});
-  abrirAlertas();
+  const r = await llamarAPI('resolverAlerta',{data:{id, nota}});
+  if(r.ok){
+    // Re-render granular: solo cambiamos el estado de esa card, sin re-pedir toda la lista.
+    if(cacheModulo.alertas){
+      const a = (cacheModulo.alertas.alertas||[]).find(x=>x.id===id);
+      if(a) a.estado='Resuelta';
+    }
+    const card = document.querySelector('#lista-alertas .card[data-id="'+id+'"]');
+    if(card){
+      const btn = card.querySelector('button');
+      if(btn) btn.outerHTML = '<span class="pill pill-menor">Resuelta</span>';
+    } else abrirAlertas(true);
+  }
 }
 
 /* ===== PRODUCCIÓN — PROGRAMA ===== */
-async function abrirPrograma(){
-  irA('screen-programa');
-  document.getElementById('btn-nuevo-programa').style.display = tienePermisoLocal('EditarPrograma') ? '' : 'none';
-  const r = await llamarAPI('listarPrograma',{});
+function pintarPrograma(r){
   const cont = document.getElementById('lista-programa'); cont.innerHTML='';
   (r.programa||[]).forEach(p=>{
-    const div = document.createElement('div'); div.className='card';
+    const div = document.createElement('div'); div.className='card'; div.dataset.id=p.id;
     div.innerHTML = '<div style="display:flex;justify-content:space-between;"><strong style="font-size:13px;">'+p.producto+'</strong><span class="pill '+(p.estado==='Entregado'?'pill-menor':'pill-alerta')+'">'+p.estado+'</span></div>'+
       '<p style="font-size:12px;color:var(--ink-soft);">'+p.fecha+' &middot; Programado: '+p.cantidadProgramada+' &middot; '+(p.responsable||'')+'</p>'+
       (p.estado==='Programado' && tienePermisoLocal('MarcarEntregado') ? '<button class="btn-secondary btn-small" onclick="abrirModalEntrega(\''+p.id+'\',\''+p.producto+'\','+p.cantidadProgramada+')">Declarar entrega</button>' : '');
@@ -1784,11 +1908,21 @@ async function abrirPrograma(){
   });
   if(!(r.programa||[]).length) cont.innerHTML = '<p style="font-size:12px;color:var(--ink-soft);">Sin ítems en el programa todavía.</p>';
 }
+async function abrirPrograma(forzar){
+  irA('screen-programa');
+  document.getElementById('btn-nuevo-programa').style.display = tienePermisoLocal('EditarPrograma') ? '' : 'none';
+  if(forzar) cacheModulo.programa = null;
+  if(cacheModulo.programa){ pintarPrograma(cacheModulo.programa); return; }
+  document.getElementById('lista-programa').innerHTML = skeletonCards(3);
+  const r = await llamarAPISilencioso('listarPrograma',{});
+  cacheModulo.programa = r;
+  if(document.getElementById('screen-programa').classList.contains('active')) pintarPrograma(r);
+}
 async function guardarPrograma(){
   const d = { fecha:document.getElementById('pp-fecha').value, producto:valorSearchSelect('ss-pp-producto'), cantidadProgramada:document.getElementById('pp-cantidad').value, responsable:sesion.nombre };
   if(!d.fecha||!d.producto||!d.cantidadProgramada){ document.getElementById('pp-error').textContent='Completa todos los campos'; return; }
   const r = await llamarAPI('crearPrograma',{data:d});
-  if(r.ok) irA('screen-programa'), abrirPrograma(); else document.getElementById('pp-error').textContent=r.error||'Error al guardar';
+  if(r.ok){ cacheModulo.programa = null; irA('screen-programa'), abrirPrograma(); } else document.getElementById('pp-error').textContent=r.error||'Error al guardar';
 }
 function abrirModalEntrega(programaId, producto, cantidadProgramada){
   abrirModal(
@@ -1801,15 +1935,11 @@ function abrirModalEntrega(programaId, producto, cantidadProgramada){
 async function confirmarEntrega(programaId, producto){
   const cantidad = Number(document.getElementById('me-cantidad').value)||0;
   const r = await llamarAPI('marcarProgramaEntregado',{data:{programaId, entregas:[{producto, cantidadEntregada:cantidad}], responsable:sesion.nombre}});
-  if(r.ok){ cerrarModal(); abrirPrograma(); } else document.getElementById('me-error').textContent=r.error||'Error al guardar';
+  if(r.ok){ cacheModulo.programa = null; cerrarModal(); abrirPrograma(); } else document.getElementById('me-error').textContent=r.error||'Error al guardar';
 }
 
 /* ===== INVENTARIO MP ===== */
-async function abrirInventario(){
-  irA('screen-inventario');
-  await cargarCatalogo();
-  const productosUnicos = [...new Set(cacheCatalogo.map(p=>p.productoProduccion||p.nombre))];
-  const r = await llamarAPI('listarInventarioMP',{});
+function pintarInventario(r){
   const cont = document.getElementById('lista-inventario'); cont.innerHTML='';
   (r.inventario||[]).forEach(i=>{
     const bajo = i.stockActual < i.stockMinimo;
@@ -1819,18 +1949,30 @@ async function abrirInventario(){
     cont.appendChild(div);
   });
 }
+async function abrirInventario(forzar){
+  irA('screen-inventario');
+  await cargarCatalogo();
+  if(forzar) cacheModulo.inventario = null;
+  if(cacheModulo.inventario){ pintarInventario(cacheModulo.inventario); return; }
+  document.getElementById('lista-inventario').innerHTML = skeletonCards(3);
+  const r = await llamarAPISilencioso('listarInventarioMP',{});
+  cacheModulo.inventario = r;
+  if(document.getElementById('screen-inventario').classList.contains('active')) pintarInventario(r);
+}
 async function guardarInventario(){
   const d = { insumo:document.getElementById('inv-insumo').value, stockActual:document.getElementById('inv-stock').value, stockMinimo:document.getElementById('inv-minimo').value, unidad:document.getElementById('inv-unidad').value };
   if(!d.insumo){ document.getElementById('inv-error').textContent='Ingresa el nombre del insumo'; return; }
   const r = await llamarAPI('actualizarInventarioMP',{data:d});
-  if(r.ok){ document.getElementById('inv-insumo').value=''; document.getElementById('inv-stock').value=''; document.getElementById('inv-minimo').value=''; document.getElementById('inv-unidad').value=''; abrirInventario(); }
+  if(r.ok){
+    cacheModulo.inventario = null; cacheModulo.listaCompra = null;
+    document.getElementById('inv-insumo').value=''; document.getElementById('inv-stock').value=''; document.getElementById('inv-minimo').value=''; document.getElementById('inv-unidad').value='';
+    abrirInventario();
+  }
   else document.getElementById('inv-error').textContent=r.error||'Error al guardar';
 }
 
 /* ===== LISTA DE COMPRA MP ===== */
-async function abrirListaCompra(){
-  irA('screen-lista-compra');
-  const r = await llamarAPI('listaCompraMP',{});
+function pintarListaCompra(r){
   const cont = document.getElementById('lista-compra-mp'); cont.innerHTML='';
   (r.listaCompra||[]).forEach(i=>{
     const div = document.createElement('div'); div.className='card';
@@ -1838,6 +1980,15 @@ async function abrirListaCompra(){
     cont.appendChild(div);
   });
   if(!(r.listaCompra||[]).length) cont.innerHTML = '<p style="font-size:12px;color:var(--ink-soft);">Nada bajo el mínimo por ahora.</p>';
+}
+async function abrirListaCompra(forzar){
+  irA('screen-lista-compra');
+  if(forzar) cacheModulo.listaCompra = null;
+  if(cacheModulo.listaCompra){ pintarListaCompra(cacheModulo.listaCompra); return; }
+  document.getElementById('lista-compra-mp').innerHTML = skeletonCards(3);
+  const r = await llamarAPISilencioso('listaCompraMP',{});
+  cacheModulo.listaCompra = r;
+  if(document.getElementById('screen-lista-compra').classList.contains('active')) pintarListaCompra(r);
 }
 
 // Cargar dropdown de producto al abrir "Nuevo ítem de programa"
