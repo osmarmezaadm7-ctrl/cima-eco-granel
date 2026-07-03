@@ -181,6 +181,7 @@
   <div class="screen" id="screen-compra">
     <button class="back-link" onclick="irA('screen-home')"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"></path></svg> Volver</button>
     <h2 style="font-size:17px;">Compra / gasto</h2>
+    <label>Fecha</label><input type="date" id="co-fecha">
     <label>Negocio</label><div class="toggle-group" id="co-negocio-group" style="flex-wrap:wrap;"></div>
     <label>Categoría</label>
     <div class="search-select" id="ss-co-naturaleza">
@@ -1102,6 +1103,7 @@ function revisarCierreCaja(){
   const fecha = document.getElementById('cc-fecha').value;
   if(!fecha){ document.getElementById('cc-error').textContent='Selecciona la fecha'; return; }
   document.getElementById('cc-error').textContent='';
+  const saldoInicial = Number(document.getElementById('cc-saldo').value)||0;
   const vals = {
     efectivo: Number(document.getElementById('cc-efectivo').value)||0,
     debito: Number(document.getElementById('cc-debito').value)||0,
@@ -1110,15 +1112,20 @@ function revisarCierreCaja(){
     pedidosYa: Number(document.getElementById('cc-pedidosya').value)||0,
     retiro: Number(document.getElementById('cc-retiro').value)||0
   };
-  const total = vals.efectivo+vals.debito+vals.credito+vals.transferencia+vals.pedidosYa;
+  // El efectivo digitado incluye el fondo de cambio (saldo inicial) que ya estaba en caja
+  // desde el día anterior — la venta real en efectivo es Efectivo - Saldo Inicial. Mismo
+  // criterio que ya usa el backend (estadoResultados/obtenerPanel), antes este resumen
+  // mostraba el efectivo crudo y sobreestimaba el Total ventas.
+  const efectivoNeto = vals.efectivo - saldoInicial;
+  const total = efectivoNeto+vals.debito+vals.credito+vals.transferencia+vals.pedidosYa;
   const fila = (label,val)=>'<div class="rowline" style="font-size:13px;"><span>'+label+'</span><span class="mono">'+fmt(val)+'</span></div>';
   abrirModal(
     '<h3 style="font-size:15px;">Resumen del cierre</h3>'+
     '<p style="font-size:11.5px;color:var(--ink-soft);margin:2px 0 10px;">'+fecha+'</p>'+
-    fila('Efectivo', vals.efectivo)+fila('Débito', vals.debito)+fila('Crédito', vals.credito)+
+    fila('Efectivo', efectivoNeto)+fila('Débito', vals.debito)+fila('Crédito', vals.credito)+
     fila('Transferencias', vals.transferencia)+fila('Pedidos Ya', vals.pedidosYa)+
     '<div class="rowline" style="font-size:14px;font-weight:700;border-top:1px solid var(--border);margin-top:6px;padding-top:6px;"><span>Total ventas</span><span class="mono">'+fmt(total)+'</span></div>'+
-    fila('Retiro (fondo día siguiente)', vals.retiro)+
+    fila('Efectivo retirado', vals.retiro)+
     '<div class="error-msg" id="cc-modal-error"></div>'+
     '<div style="display:flex;gap:8px;margin-top:14px;"><button class="btn-secondary" onclick="cerrarModal()">Volver a revisar</button><button class="btn-primary" onclick="guardarCierreCajaFinal()">Confirmar y guardar</button></div>'
   );
@@ -1297,6 +1304,7 @@ async function enviarVentaVegan(){
 
 /* ===== COMPRA / GASTO ===== */
 function prepararCompra(){
+  document.getElementById('co-fecha').valueAsDate = new Date();
   const grupo = document.getElementById('co-negocio-group');
   const opciones = sesion.rol==='Staff' ? [sesion.negocio] : CONFIG.NEGOCIOS;
   grupo.innerHTML = opciones.map((n,i)=>'<button type="button" class="'+(i===0?'selected':'')+'" onclick="seleccionarToggle(\'co-negocio-group\',this,\''+n+'\')">'+n+'</button>').join('');
@@ -1366,7 +1374,9 @@ async function crearProveedorNuevo(){
 async function enviarCompra(){
   const v = validarPagosCliente('co');
   if(!v.ok){ document.getElementById('co-error').textContent=v.error; return; }
-  const data = { negocio:document.getElementById('co-negocio-group').dataset.valor, naturaleza:valorSearchSelect('ss-co-naturaleza'), proveedor:valorSearchSelect('ss-co-proveedor'),
+  const fecha = document.getElementById('co-fecha').value;
+  if(!fecha){ document.getElementById('co-error').textContent='Selecciona la fecha'; return; }
+  const data = { fecha, negocio:document.getElementById('co-negocio-group').dataset.valor, naturaleza:valorSearchSelect('ss-co-naturaleza'), proveedor:valorSearchSelect('ss-co-proveedor'),
     tipoDocumento:document.getElementById('co-tipo-doc').value, nDocumento:document.getElementById('co-ndoc').value, monto:document.getElementById('co-monto').value||0,
     descripcion:document.getElementById('co-desc').value, pagos:v.pagos, estado:v.estado, abono:v.abono };
   if(!data.monto||data.monto<=0){ document.getElementById('co-error').textContent='Ingresa un monto válido'; return; }
