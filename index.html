@@ -661,6 +661,7 @@ function simularAPI(accion, extra){
   if (accion === 'listarCatalogoProductos') return { ok:true, catalogo:[{codigo:'5014',nombre:'Rollito de canela',precioMayorista:1500},{codigo:'2005',nombre:'Empanada Pino Soya',precioMayorista:1500}] };
   if (accion === 'listarCreditos') return { ok:true, creditos:[] };
   if (accion === 'listarPermisos') return { ok:true, permisos:[] };
+  if (accion === 'obtenerInicio') return { ok:true, permisos:[], panel:null, programa:null };
   if (accion === 'listarAlertas') return { ok:true, alertas:[] };
   if (accion === 'listarCuentasPorPagar') return { ok:true, cuentas:[], total:0, cantidad:0 };
   if (accion === 'listarPrograma') return { ok:true, programa:[] };
@@ -882,9 +883,19 @@ async function guardarCambioPin(){
 /* ===== HOME según nivel de permiso (3 variantes) ===== */
 async function entrarAHome(){
   document.getElementById('home-nombre').textContent = sesion.nombre;
-  const rp = await llamarAPI('listarPermisos', {});
+  const esEscritorio = window.innerWidth >= 900;
+  // Una sola llamada: permisos + (panel o programa, según corresponda) — evita el segundo
+  // viaje a Apps Script que antes disparaba el auto-navegado de escritorio.
+  const ri = await llamarAPI('obtenerInicio', {esEscritorio});
   permisosSesion = {};
-  (rp.permisos||[]).filter(p=>p.nombre===sesion.nombre).forEach(p=>{ permisosSesion[p.accion]=p.permitido; });
+  (ri.permisos||[]).filter(p=>p.nombre===sesion.nombre).forEach(p=>{ permisosSesion[p.accion]=p.permitido; });
+  if(esEscritorio && ri.panel){
+    const hoy = new Date();
+    cachePanel[hoy.getFullYear()+'-'+(hoy.getMonth()+1)] = ri.panel;
+  }
+  if(esEscritorio && ri.programa){
+    cacheModulo.programa = ri.programa;
+  }
 
   const mostrarSidebar = tienePermisoLocal('VerDashboardCompleto') || tienePermisoLocal('VerResumenPropio') ||
     tienePermisoLocal('VerPrograma') || tienePermisoLocal('ConfigurarSistema') || tienePermisoLocal('RegistrarMovimiento');
@@ -930,7 +941,6 @@ async function entrarAHome(){
   // En escritorio (sidebar visible) el home con tarjetas es redundante — aterriza directo
   // en la pantalla principal de su nivel y navega por el sidebar. En móvil (sin sidebar)
   // sí necesita las tarjetas como punto de entrada.
-  const esEscritorio = window.innerWidth >= 900;
   if (esEscritorio && tienePermisoLocal('VerDashboardCompleto')) { abrirPanel(); return; }
   if (esEscritorio && tienePermisoLocal('VerPrograma')) { abrirPrograma(); return; }
   if (esEscritorio && puedeCima && tienePermisoLocal('RegistrarMovimiento')) { document.getElementById('cc-fecha').valueAsDate=new Date(); irA('screen-cierre'); return; }
