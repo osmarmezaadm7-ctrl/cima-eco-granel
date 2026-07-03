@@ -20,7 +20,7 @@
   <div class="modal-bg" id="modal-bg"><div class="modal-card" id="modal-card"></div></div>
 
   <div class="sidebar" id="sidebar">
-    <div class="brand"><div class="mark"><span></span></div><strong>Cima &amp; Vegan Corner</strong></div>
+    <div class="brand"><img src="assets/logo-cima-green.png" alt="Cima"><img src="assets/logo-vegancorner-green.png" alt="Vegan Corner"></div>
     <div id="sidebar-nav"></div>
     <div class="foot">
       <div style="font-size:11.5px;color:var(--ink-soft);padding:6px 8px;" id="sidebar-user"></div>
@@ -35,6 +35,10 @@
   <div id="banner-demo" class="banner" style="display:none;">Modo demostración — conecta CONFIG.API_URL para guardar datos reales</div>
 
   <div class="screen active" id="screen-select-user">
+    <div class="logo-row">
+      <div class="logo-chip"><img src="assets/logo-cima-white-crop.png" alt="Cima"></div>
+      <div class="logo-chip"><img src="assets/logo-vegancorner-white-crop.png" alt="Vegan Corner"></div>
+    </div>
     <div class="brand-hero"><h1>Cima Eco-Granel</h1><p>Vegan Corner · Sistema financiero</p></div>
     <div class="grain-divider"><span></span><span></span><span></span><span></span><span></span></div>
     <div class="user-grid" id="user-grid"></div>
@@ -43,8 +47,10 @@
   <div class="screen" id="screen-pin">
     <button class="back-link" onclick="irA('screen-select-user')">← Elegir otra persona</button>
     <div class="pin-box">
-      <div class="avatar" id="pin-avatar" style="margin:0 auto 10px;"></div>
-      <h2 id="pin-nombre" style="font-size:16px;"></h2>
+      <div class="selected-mini">
+        <div class="avatar" id="pin-avatar"></div>
+        <h2 id="pin-nombre" style="font-size:16px;"></h2>
+      </div>
       <p style="color:var(--ink-soft);font-size:12px;">Ingresa tu PIN</p>
       <div class="pin-dots" id="pin-dots"></div>
       <div class="pin-pad" id="pin-pad"></div>
@@ -430,6 +436,32 @@ const USUARIOS_DEMO = [
   {nombre:'Katherine Bustamante', rol:'Staff', negocio:'Vegan Corner'}
 ];
 
+/* ===== Set de íconos de línea (reemplaza los emoji en sidebar y tiles de Home) =====
+   Mismo trazo (stroke-width 1.8, viewBox 24x24) para que se vean consistentes entre sí. */
+const ICONS = {
+  panel: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="7" height="7" rx="1.5"></rect><rect x="14" y="3" width="7" height="7" rx="1.5"></rect><rect x="14" y="14" width="7" height="7" rx="1.5"></rect><rect x="3" y="14" width="7" height="7" rx="1.5"></rect></svg>',
+  caja: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 1v22"></path><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>',
+  carrito: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 4h2l2.4 12.4a2 2 0 0 0 2 1.6h7.2a2 2 0 0 0 2-1.6L20 8H6"></path><circle cx="9" cy="20" r="1"></circle><circle cx="17" cy="20" r="1"></circle></svg>',
+  recibo: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><path d="M14 2v6h6"></path></svg>',
+  importar: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M7 10l5 5 5-5"></path><path d="M4 19h16"></path></svg>',
+  cxp: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2"></rect><path d="M8 9h8M8 13h5"></path></svg>',
+  cxc: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v6a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-6"></path><path d="M16 6l-4-4-4 4"></path><path d="M12 2v13"></path></svg>',
+  resultados: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"></path><path d="M7 14l3-4 3 3 5-7"></path></svg>',
+  f29: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="7" cy="7" r="2"></circle><circle cx="17" cy="17" r="2"></circle><path d="M17 7L7 17"></path></svg>',
+  alerta: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9v4M12 17h.01M10.3 3.9L2.6 17a2 2 0 0 0 1.7 3h15.4a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"></path></svg>',
+  banco: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10h18M5 10v9M9 10v9M15 10v9M19 10v9M3 21h18M12 3l8 5H4l8-5z"></path></svg>',
+  usuarios: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3"></circle><path d="M2 20c0-3.3 3-6 7-6s7 2.7 7 6"></path><circle cx="17" cy="8" r="2.5"></circle><path d="M16 14.3c2.6.5 4.3 2.5 4.8 5.7"></path></svg>',
+  programa: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="4" width="12" height="16" rx="2"></rect><path d="M9 2h6v4H9z"></path><path d="M9 11h6M9 15h6"></path></svg>',
+  inventario: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8l-9-5-9 5 9 5 9-5z"></path><path d="M3 8v8l9 5 9-5V8"></path><path d="M12 13v8"></path></svg>',
+  produccion: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M11 20A7 7 0 0 1 4 13c0-5 5-9 12-11 0 7-2 12-5 15"></path></svg>',
+  crm: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3"></circle><path d="M2 20c0-3.3 3-6 7-6s7 2.7 7 6"></path><circle cx="17" cy="8" r="2.5"></circle><path d="M16 14.3c2.6.5 4.3 2.5 4.8 5.7"></path></svg>',
+  remuneraciones: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="13" rx="2"></rect><path d="M2 10h20"></path></svg>',
+  config: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="3"></circle><path d="M4 6h10M4 12h16M4 18h10"></path></svg>',
+  chevron: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"></path></svg>',
+  ingreso: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"></path></svg>',
+  egreso: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12l7 7 7-7"></path></svg>'
+};
+
 function irA(id){
   document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
   document.getElementById(id).classList.add('active');
@@ -641,18 +673,26 @@ document.addEventListener('click', e=>{
 });
 
 /* ===== LOGIN / PIN ===== */
+// Color del avatar por negocio — no por persona: así cualquier colaborador nuevo que
+// agregues queda coherente sin tener que definirle un color a mano.
+function colorPorNegocio(negocio){
+  if(negocio==='Vegan Corner') return 'var(--caramel)';
+  return 'var(--forest)'; // Cima Eco-Granel y Ambos
+}
 function pintarUsuarios(){
   const grid = document.getElementById('user-grid'); grid.innerHTML='';
   USUARIOS_DEMO.forEach(u=>{
     const btn = document.createElement('button'); btn.className='user-card';
-    btn.innerHTML = '<div class="avatar">'+iniciales(u.nombre)+'</div><span>'+u.nombre+'</span><small>'+u.rol+'</small>';
+    btn.innerHTML = '<div class="avatar" style="background:'+colorPorNegocio(u.negocio)+';">'+iniciales(u.nombre)+'</div><div class="u-txt"><span>'+u.nombre+'</span><small>'+u.rol+'</small></div>';
     btn.onclick = ()=>seleccionarUsuario(u);
     grid.appendChild(btn);
   });
 }
 function seleccionarUsuario(u){
   usuarioSeleccionado = u; pinBuffer='';
-  document.getElementById('pin-avatar').textContent = iniciales(u.nombre);
+  const pinAv = document.getElementById('pin-avatar');
+  pinAv.textContent = iniciales(u.nombre);
+  pinAv.style.background = colorPorNegocio(u.negocio);
   document.getElementById('pin-nombre').textContent = u.nombre;
   document.getElementById('pin-error').textContent='';
   pintarPinDots(); pintarPinPad(); irA('screen-pin');
@@ -693,7 +733,7 @@ async function intentarLogin(){
 function cerrarSesion(){
   sesion={nombre:null,rol:null,negocio:null}; permisosSesion={};
   cacheModulo = { alertas:null, cxp:null, cxc:null, programa:null, inventario:null, listaCompra:null };
-  cachePanel = {};
+  cachePanel = {}; flujoVentasCache = {}; movimientosCache = null;
   irA('screen-select-user');
 }
 
@@ -735,33 +775,33 @@ async function entrarAHome(){
   if (tienePermisoLocal('VerDashboardCompleto')){
     // Nivel 1: Panel completo (Admin / Rocío)
     cont.insertAdjacentHTML('beforeend','<div class="menu-grupo-titulo">Panel</div>');
-    cont.appendChild(crearMenuCard('📊','Ver Panel','Ingresos, gastos, IVA y alertas',()=>abrirPanel(),false));
+    cont.appendChild(crearMenuCard(ICONS.panel,'Ver Panel','Ingresos, gastos, IVA y alertas',()=>abrirPanel(),false));
     cont.insertAdjacentHTML('beforeend','<div class="menu-grupo-titulo">Registro rápido</div>');
-    if (puedeCima) cont.appendChild(crearMenuCard('💵','Cierre de caja','Registrar ventas del día',()=>{document.getElementById('cc-fecha').valueAsDate=new Date();irA('screen-cierre');},true));
-    if (tienePermisoLocal('RegistrarVentaVegan')) cont.appendChild(crearMenuCard('🥐','Venta Vegan Corner','Registrar pedido a otro negocio',()=>abrirVentaVegan(),false));
-    if (tienePermisoLocal('RegistrarCompra')) cont.appendChild(crearMenuCard('🧾','Compra / gasto','Registrar egreso o factura',()=>{prepararCompra();irA('screen-compra');},true));
+    if (puedeCima) cont.appendChild(crearMenuCard(ICONS.caja,'Cierre de caja','Registrar ventas del día',()=>{document.getElementById('cc-fecha').valueAsDate=new Date();irA('screen-cierre');},true));
+    if (tienePermisoLocal('RegistrarVentaVegan')) cont.appendChild(crearMenuCard(ICONS.carrito,'Venta Vegan Corner','Registrar pedido a otro negocio',()=>abrirVentaVegan(),false));
+    if (tienePermisoLocal('RegistrarCompra')) cont.appendChild(crearMenuCard(ICONS.recibo,'Compra / gasto','Registrar egreso o factura',()=>{prepararCompra();irA('screen-compra');},true));
     cont.insertAdjacentHTML('beforeend','<div class="menu-grupo-titulo">Reportes</div>');
-    cont.appendChild(crearMenuCard('📥','Importar reportes','Aronium, PedidosYa, Transbank',()=>irA('screen-importar'),true));
-    cont.appendChild(crearMenuCard('📑','Cuentas por pagar','Facturas pendientes de pago',()=>abrirCuentasPorPagar(),true));
-    cont.appendChild(crearMenuCard('📥','Cuentas por cobrar','Ventas y canjes pendientes',()=>abrirCuentasPorCobrar(),false));
-    cont.appendChild(crearMenuCard('📈','Estado de resultados','Por negocio, mes actual',()=>abrirEstadoResultados(),true));
-    cont.appendChild(crearMenuCard('🧾','F29','Cálculo de apoyo IVA + PPM',()=>abrirF29(),true));
-    cont.appendChild(crearMenuCard('⚠️','Alertas','Auditoría e informativas',()=>abrirAlertas(),true));
+    cont.appendChild(crearMenuCard(ICONS.importar,'Importar reportes','Aronium, PedidosYa, Transbank',()=>irA('screen-importar'),true));
+    cont.appendChild(crearMenuCard(ICONS.cxp,'Cuentas por pagar','Facturas pendientes de pago',()=>abrirCuentasPorPagar(),true));
+    cont.appendChild(crearMenuCard(ICONS.cxc,'Cuentas por cobrar','Ventas y canjes pendientes',()=>abrirCuentasPorCobrar(),false));
+    cont.appendChild(crearMenuCard(ICONS.resultados,'Estado de resultados','Por negocio, mes actual',()=>abrirEstadoResultados(),true));
+    cont.appendChild(crearMenuCard(ICONS.f29,'F29','Cálculo de apoyo IVA + PPM',()=>abrirF29(),true));
+    cont.appendChild(crearMenuCard(ICONS.alerta,'Alertas','Auditoría e informativas',()=>abrirAlertas(),true));
     if (tienePermisoLocal('ConfigurarSistema')){
       cont.insertAdjacentHTML('beforeend','<div class="menu-grupo-titulo">Configuraciones</div>');
-      cont.appendChild(crearMenuCard('🏦','Créditos','Financiamientos activos',()=>abrirCreditos(),true));
-      cont.appendChild(crearMenuCard('🧑‍🤝‍🧑','Usuarios y permisos','Accesos y restablecer PIN',()=>abrirPermisos(),true));
+      cont.appendChild(crearMenuCard(ICONS.banco,'Créditos','Financiamientos activos',()=>abrirCreditos(),true));
+      cont.appendChild(crearMenuCard(ICONS.usuarios,'Usuarios y permisos','Accesos y restablecer PIN',()=>abrirPermisos(),true));
     }
   } else if (tienePermisoLocal('VerPrograma')){
     // Nivel 2: Producción (Rosa / Katherine)
     cont.insertAdjacentHTML('beforeend','<div class="menu-grupo-titulo">Producción</div>');
-    cont.appendChild(crearMenuCard('📋','Programa de producción', tienePermisoLocal('EditarPrograma')?'Ver y editar el programa':'Ver programa y declarar entregas', ()=>abrirPrograma(),false));
-    cont.appendChild(crearMenuCard('📦','Inventario de MP','Ver y actualizar stock',()=>abrirInventario(),true));
-    cont.appendChild(crearMenuCard('🛒','Lista de compra MP','Insumos bajo su mínimo',()=>abrirListaCompra(),true));
+    cont.appendChild(crearMenuCard(ICONS.programa,'Programa de producción', tienePermisoLocal('EditarPrograma')?'Ver y editar el programa':'Ver programa y declarar entregas', ()=>abrirPrograma(),false));
+    cont.appendChild(crearMenuCard(ICONS.inventario,'Inventario de MP','Ver y actualizar stock',()=>abrirInventario(),true));
+    cont.appendChild(crearMenuCard(ICONS.carrito,'Lista de compra MP','Insumos bajo su mínimo',()=>abrirListaCompra(),true));
   } else {
     // Nivel 3: accesos rápidos (Lucas / Cecilia)
     cont.insertAdjacentHTML('beforeend','<div class="menu-grupo-titulo">Accesos rápidos</div>');
-    if (puedeCima && tienePermisoLocal('RegistrarMovimiento')) cont.appendChild(crearMenuCard('💵','Cierre de caja','Registrar ventas del día',()=>{document.getElementById('cc-fecha').valueAsDate=new Date();irA('screen-cierre');},true));
+    if (puedeCima && tienePermisoLocal('RegistrarMovimiento')) cont.appendChild(crearMenuCard(ICONS.caja,'Cierre de caja','Registrar ventas del día',()=>{document.getElementById('cc-fecha').valueAsDate=new Date();irA('screen-cierre');},true));
   }
 
   // En escritorio (sidebar visible) el home con tarjetas es redundante — aterriza directo
@@ -783,30 +823,30 @@ function pintarSidebar(){
   const item = (id,icon,label,badge)=>'<div class="nav-item" data-target="'+id+'" onclick="irA(\''+id+'\');onEntrarScreen(\''+id+'\');">'+icon+' '+label+(badge?'<span class="badge-mini">'+badge+'</span>':'')+'</div>';
   const itemProx = (icon,label)=>'<div class="nav-item proximo">'+icon+' '+label+'<span class="badge-prox">Próximamente</span></div>';
 
-  if (tienePermisoLocal('VerDashboardCompleto')) nav.insertAdjacentHTML('beforeend', item('screen-panel','📊','Panel'));
+  if (tienePermisoLocal('VerDashboardCompleto')) nav.insertAdjacentHTML('beforeend', item('screen-panel',ICONS.panel,'Panel'));
 
   let finanzasHtml='';
   const puedeCima = sesion.rol==='Admin' || sesion.negocio==='Cima Eco-Granel' || sesion.negocio==='Ambos';
-  if (tienePermisoLocal('RegistrarMovimiento') && puedeCima) finanzasHtml += item('screen-cierre','💵','Cierre de caja');
-  if (tienePermisoLocal('RegistrarVentaVegan')) finanzasHtml += item('screen-venta-vegan','🥐','Venta Vegan Corner');
-  if (tienePermisoLocal('RegistrarCompra')) finanzasHtml += item('screen-compra','🧾','Compra / gasto');
-  if (tienePermisoLocal('VerDashboardCompleto')||tienePermisoLocal('VerResumenPropio')) finanzasHtml += item('screen-importar','📥','Importar reportes');
-  if (tienePermisoLocal('VerDashboardCompleto')) finanzasHtml += item('screen-cxp','📑','Cuentas por pagar') + item('screen-cxc','📥','Cuentas por cobrar');
-  if (tienePermisoLocal('VerDashboardCompleto')||tienePermisoLocal('VerResumenPropio')) finanzasHtml += item('screen-estado-resultados','📈','Estado de resultados') + item('screen-f29','🧾','F29') + item('screen-alertas','⚠️','Alertas');
+  if (tienePermisoLocal('RegistrarMovimiento') && puedeCima) finanzasHtml += item('screen-cierre',ICONS.caja,'Cierre de caja');
+  if (tienePermisoLocal('RegistrarVentaVegan')) finanzasHtml += item('screen-venta-vegan',ICONS.carrito,'Venta Vegan Corner');
+  if (tienePermisoLocal('RegistrarCompra')) finanzasHtml += item('screen-compra',ICONS.recibo,'Compra / gasto');
+  if (tienePermisoLocal('VerDashboardCompleto')||tienePermisoLocal('VerResumenPropio')) finanzasHtml += item('screen-importar',ICONS.importar,'Importar reportes');
+  if (tienePermisoLocal('VerDashboardCompleto')) finanzasHtml += item('screen-cxp',ICONS.cxp,'Cuentas por pagar') + item('screen-cxc',ICONS.cxc,'Cuentas por cobrar');
+  if (tienePermisoLocal('VerDashboardCompleto')||tienePermisoLocal('VerResumenPropio')) finanzasHtml += item('screen-estado-resultados',ICONS.resultados,'Estado de resultados') + item('screen-f29',ICONS.f29,'F29') + item('screen-alertas',ICONS.alerta,'Alertas');
   if (finanzasHtml) nav.insertAdjacentHTML('beforeend', '<div class="grupo">Finanzas</div>'+finanzasHtml);
 
   let prodHtml='';
-  if (tienePermisoLocal('VerPrograma')) prodHtml += item('screen-programa','📋','Programa de producción');
-  if (tienePermisoLocal('GestionarInventario')) prodHtml += item('screen-inventario','📦','Inventario MP') + item('screen-lista-compra','🛒','Lista de compra MP');
+  if (tienePermisoLocal('VerPrograma')) prodHtml += item('screen-programa',ICONS.programa,'Programa de producción');
+  if (tienePermisoLocal('GestionarInventario')) prodHtml += item('screen-inventario',ICONS.inventario,'Inventario MP') + item('screen-lista-compra',ICONS.carrito,'Lista de compra MP');
   if (prodHtml) nav.insertAdjacentHTML('beforeend', '<div class="grupo">Producción</div>'+prodHtml);
-  else nav.insertAdjacentHTML('beforeend', '<div class="grupo">Producción</div>'+itemProx('🥐','Producción'));
+  else nav.insertAdjacentHTML('beforeend', '<div class="grupo">Producción</div>'+itemProx(ICONS.produccion,'Producción'));
 
-  nav.insertAdjacentHTML('beforeend', '<div class="grupo">Operaciones</div>'+itemProx('📦','Operaciones'));
-  nav.insertAdjacentHTML('beforeend', '<div class="grupo">CRM</div>'+itemProx('👥','Clientes'));
-  nav.insertAdjacentHTML('beforeend', '<div class="grupo">Remuneraciones</div>'+itemProx('🧑‍🍳','Sueldos'));
+  nav.insertAdjacentHTML('beforeend', '<div class="grupo">Operaciones</div>'+itemProx(ICONS.config,'Operaciones'));
+  nav.insertAdjacentHTML('beforeend', '<div class="grupo">CRM</div>'+itemProx(ICONS.crm,'Clientes'));
+  nav.insertAdjacentHTML('beforeend', '<div class="grupo">Remuneraciones</div>'+itemProx(ICONS.remuneraciones,'Sueldos'));
 
   let confHtml='';
-  if (tienePermisoLocal('ConfigurarSistema')) confHtml += item('screen-creditos','🏦','Créditos') + item('screen-permisos','🧑‍🤝‍🧑','Usuarios y permisos');
+  if (tienePermisoLocal('ConfigurarSistema')) confHtml += item('screen-creditos',ICONS.banco,'Créditos') + item('screen-permisos',ICONS.usuarios,'Usuarios y permisos');
   if (confHtml) nav.insertAdjacentHTML('beforeend', '<div class="grupo">Configuraciones</div>'+confHtml);
 }
 function onEntrarScreen(id){
@@ -859,21 +899,32 @@ async function abrirPanel(periodo, forzar){
 }
 document.querySelectorAll('#panel-periodo button').forEach(b=>b.addEventListener('click', ()=>abrirPanel(b.dataset.m)));
 /* ===== Gráficos del Panel (SVG puro, sin librerías) ===== */
-function svgVentasPorDia(ventasPorDia){
-  const entries = Object.entries(ventasPorDia||{}).map(([fecha,val])=>({dia:Number(String(fecha).split('/')[0]), val})).filter(e=>!isNaN(e.dia)).sort((a,b)=>a.dia-b.dia);
-  if(!entries.length) return '<p style="font-size:12px;color:var(--ink-soft);">Sin ventas registradas este período.</p>';
-  const w=700, h=170, padBottom=24, padTop=10;
-  const max = Math.max(...entries.map(e=>e.val), 1);
-  const gap = (w-20)/entries.length;
-  const barW = Math.max(3, Math.min(22, gap-4));
-  let bars='';
-  entries.forEach((e,i)=>{
-    const bh = Math.max(2, (e.val/max)*(h-padBottom-padTop));
-    const x = 10+i*gap+(gap-barW)/2, y = h-padBottom-bh;
-    bars += '<rect x="'+x.toFixed(1)+'" y="'+y.toFixed(1)+'" width="'+barW.toFixed(1)+'" height="'+bh.toFixed(1)+'" rx="2" fill="var(--forest)"><title>Día '+e.dia+': '+fmt(e.val)+'</title></rect>';
-    if(entries.length<=15 || i%3===0) bars += '<text x="'+(x+barW/2).toFixed(1)+'" y="'+(h-8)+'" font-size="8.5" fill="var(--ink-soft)" text-anchor="middle">'+e.dia+'</text>';
+// Flujo de ventas: ventana móvil de días naturales (7/30), independiente del mes del
+// Panel — viene de obtenerFlujoVentas() y ya llega pre-ordenado cronológicamente desde
+// el backend (evita el bug de ordenar por número de día, que se rompía al cruzar meses).
+function svgFlujoVentasBarras(ventasPorDia){
+  const entries = Object.entries(ventasPorDia||{});
+  if(!entries.length) return '<p style="font-size:12px;color:var(--ink-soft);">Sin ventas registradas en este rango.</p>';
+  const w=700, h=190, padLeft=42, padRight=10, padBottom=26, padTop=16;
+  const max = Math.max(...entries.map(([,v])=>v), 1);
+  const plotW = w-padLeft-padRight, plotH = h-padTop-padBottom;
+  const gap = plotW/entries.length;
+  const barW = Math.max(4, Math.min(28, gap-6));
+  let grid='';
+  [1,0.66,0.33,0].forEach((f,i)=>{
+    const y = padTop+plotH*(1-f);
+    grid += '<line x1="'+padLeft+'" y1="'+y.toFixed(1)+'" x2="'+(w-padRight)+'" y2="'+y.toFixed(1)+'" stroke="'+(f===0?'var(--border)':'#EFEBDD')+'" stroke-width="1"/>'+
+      '<text x="'+(padLeft-6)+'" y="'+(y+3).toFixed(1)+'" font-size="9" fill="var(--ink-soft)" text-anchor="end">'+fmtCompacto(max*f)+'</text>';
   });
-  return '<svg viewBox="0 0 '+w+' '+h+'" style="width:100%;height:150px;"><line x1="8" y1="'+(h-padBottom)+'" x2="'+(w-8)+'" y2="'+(h-padBottom)+'" stroke="var(--border)"/>'+bars+'</svg>';
+  let bars='';
+  const showEvery = entries.length>15 ? 3 : 1;
+  entries.forEach(([fecha,val],i)=>{
+    const bh = Math.max(1,(val/max)*plotH);
+    const x = padLeft+i*gap+(gap-barW)/2, y = padTop+plotH-bh;
+    bars += '<rect x="'+x.toFixed(1)+'" y="'+y.toFixed(1)+'" width="'+barW.toFixed(1)+'" height="'+bh.toFixed(1)+'" rx="3" fill="var(--forest)"><title>'+fecha+': '+fmt(val)+'</title></rect>';
+    if(i%showEvery===0 || i===entries.length-1) bars += '<text x="'+(x+barW/2).toFixed(1)+'" y="'+(h-8)+'" font-size="9" fill="var(--ink-soft)" text-anchor="middle">'+fecha+'</text>';
+  });
+  return '<svg viewBox="0 0 '+w+' '+h+'" style="width:100%;height:170px;">'+grid+bars+'</svg>';
 }
 function svgGastosPorCategoria(gastos){
   const entries = Object.entries(gastos||{}).sort((a,b)=>b[1]-a[1]);
@@ -883,41 +934,30 @@ function svgGastosPorCategoria(gastos){
   if(resto>0) top.push(['Otros', resto]);
   const w=700, max=Math.max(...top.map(([,v])=>v),1);
   const filaAlto=30, h=top.length*filaAlto+10;
-  let filas='';
+  let filas='<line x1="220" y1="4" x2="220" y2="'+(h-6)+'" stroke="#EFEBDD" stroke-width="1"/>';
   top.forEach(([nombre,val],i)=>{
-    const y=8+i*filaAlto, barW=Math.max(4,(val/max)*380);
+    const y=8+i*filaAlto, barW=Math.max(4,(val/max)*380), pct=Math.round(val/Object.values(gastos||{}).reduce((s,v)=>s+v,0)*100)||0;
     filas += '<text x="0" y="'+(y+13)+'" font-size="11" fill="var(--ink)">'+nombre+'</text>'+
       '<rect x="220" y="'+y+'" width="'+barW.toFixed(1)+'" height="18" rx="3" fill="var(--forest)"></rect>'+
-      '<text x="'+(226+barW).toFixed(1)+'" y="'+(y+13)+'" font-size="11" fill="var(--ink-soft)" class="mono">'+fmt(val)+'</text>';
+      '<text x="'+(226+barW).toFixed(1)+'" y="'+(y+13)+'" font-size="11" fill="var(--ink-soft)" class="mono">'+fmt(val)+' · '+pct+'%</text>';
   });
   return '<svg viewBox="0 0 '+w+' '+h+'" style="width:100%;height:'+h+'px;">'+filas+'</svg>';
 }
-function svgComparativaNegocios(cima, vegan){
-  const grupos = [
-    { lbl:'Ingresos', cima:cima.ingresos, vegan:vegan.ingresos },
-    { lbl:'Egresos', cima:cima.egresos, vegan:vegan.egresos },
-    { lbl:'Margen', cima:cima.margen, vegan:vegan.margen }
-  ];
-  const w=700, h=230, padBottom=30, padTop=52, zero=h-padBottom;
-  const max = Math.max(...grupos.flatMap(g=>[Math.abs(g.cima),Math.abs(g.vegan)]), 1);
-  const escala = (zero-padTop)/max;
-  const grupoW = w/grupos.length, barW=48;
-  let bars='';
-  grupos.forEach((g,i)=>{
-    const cx = i*grupoW+grupoW/2-barW/2-8, vx = i*grupoW+grupoW/2+8;
-    [{x:cx,val:g.cima,color:'var(--forest)'},{x:vx,val:g.vegan,color:'var(--caramel)'}].forEach(b=>{
-      const bh = Math.max(1, Math.abs(b.val)*escala);
-      const y = b.val>=0 ? zero-bh : zero;
-      const yEtiqueta = b.val>=0 ? y-6 : y+bh+13;
-      bars += '<rect x="'+b.x.toFixed(1)+'" y="'+y.toFixed(1)+'" width="'+barW+'" height="'+bh.toFixed(1)+'" rx="3" fill="'+b.color+'"></rect>'+
-        '<text x="'+(b.x+barW/2).toFixed(1)+'" y="'+yEtiqueta.toFixed(1)+'" font-size="11" font-weight="600" fill="var(--ink)" text-anchor="middle" class="mono">'+fmtCompacto(b.val)+'</text>';
-    });
-    bars += '<text x="'+(i*grupoW+grupoW/2).toFixed(1)+'" y="'+(h-8)+'" font-size="12" fill="var(--ink-soft)" text-anchor="middle">'+g.lbl+'</text>';
-  });
-  return '<svg viewBox="0 0 '+w+' '+h+'" style="width:100%;height:210px;">'+
-    '<g transform="translate(4,14)"><rect width="12" height="12" rx="3" fill="var(--forest)"/><text x="17" y="10.5" font-size="12" fill="var(--ink)">Cima Eco-Granel</text>'+
-    '<rect x="130" width="12" height="12" rx="3" fill="var(--caramel)"/><text x="147" y="10.5" font-size="12" fill="var(--ink)">Vegan Corner</text></g>'+
-    '<line x1="4" y1="'+zero+'" x2="'+(w-4)+'" y2="'+zero+'" stroke="var(--border)"/>'+bars+'</svg>';
+// Comparativa Cima vs Vegan Corner: tarjetas lado a lado (elegido sobre gráfico de barras
+// porque con margen negativo de Vegan Corner las barras "colgaban" y se leía mal).
+function renderComparativaCards(cima, vegan){
+  return '<div class="comp-cards">'+
+    '<div class="comp-card cima"><div class="comp-name">Cima Eco-Granel</div>'+
+      '<div class="rowline"><span>Ingresos</span><b>'+fmtCompacto(cima.ingresos)+'</b></div>'+
+      '<div class="rowline"><span>Egresos</span><b>'+fmtCompacto(cima.egresos)+'</b></div>'+
+      '<div class="rowline"><span>Margen</span><b style="color:'+(cima.margen<0?'var(--warn)':'inherit')+';">'+fmtCompacto(cima.margen)+'</b></div>'+
+    '</div>'+
+    '<div class="comp-card vegan"><div class="comp-name">Vegan Corner</div>'+
+      '<div class="rowline"><span>Ingresos</span><b>'+fmtCompacto(vegan.ingresos)+'</b></div>'+
+      '<div class="rowline"><span>Egresos</span><b>'+fmtCompacto(vegan.egresos)+'</b></div>'+
+      '<div class="rowline"><span>Margen</span><b style="color:'+(vegan.margen<0?'var(--warn)':'inherit')+';">'+fmtCompacto(vegan.margen)+'</b></div>'+
+    '</div>'+
+  '</div>';
 }
 
 function pintarPanel(r, anio, mes){
@@ -938,19 +978,77 @@ function pintarPanel(r, anio, mes){
       '<div class="lbl">Resultado final</div><div class="val" style="font-size:24px;">'+fmt(r.resultadoFinal)+'</div>'+
     '</div>'+
     '<div class="desktop-grid2">'+
-      '<div class="panelc"><h3>Cima vs Vegan Corner — resultado del mes</h3>'+
-        '<div class="rowline"><span>Cima Eco-Granel</span><b>'+fmt(cima.margen)+'</b></div>'+
-        '<div class="rowline"><span>Vegan Corner</span><b style="color:'+(vegan.margen<0?'var(--warn)':'inherit')+';">'+fmt(vegan.margen)+'</b></div>'+
-        svgComparativaNegocios(cima, vegan)+
-      '</div>'+
+      '<div class="panelc"><h3>Cima vs Vegan Corner — resultado del mes</h3>'+renderComparativaCards(cima, vegan)+'</div>'+
       '<div class="panelc"><h3>Alertas pendientes</h3>'+alertasHtml+
         '<h3 style="margin-top:14px;">Cuentas por pagar</h3>'+
         '<div class="rowline"><span>'+cxp.cantidad+' documento(s)</span><b>'+fmt(cxp.total)+'</b></div>'+
         '<button class="btn-secondary btn-small" style="margin-top:8px;" onclick="abrirCuentasPorPagar()">Ver Cuentas por pagar</button>'+
       '</div>'+
     '</div>'+
-    '<div class="panelc"><h3>Flujo de ventas por día</h3>'+svgVentasPorDia(r.ventasPorDia)+'</div>'+
-    '<div class="panelc"><h3>Gastos por categoría</h3>'+svgGastosPorCategoria(r.gastosPorCategoria)+'</div>';
+    '<div class="panelc">'+
+      '<div class="header-row"><h3 style="margin:0;">Flujo de ventas por día</h3>'+
+        '<div class="pillbar" id="flujo-toggle" style="margin:0;">'+
+          '<button data-d="7">Últimos 7 días</button><button data-d="30">Últimos 30 días</button>'+
+        '</div></div>'+
+      '<p class="mono" id="flujo-caption" style="font-size:11px;color:var(--ink-soft);margin:2px 0 8px;"></p>'+
+      '<div id="flujo-svg-wrap"><div class="skel-line skel-card" style="height:160px;"></div></div>'+
+    '</div>'+
+    '<div class="panelc"><h3>Gastos por categoría</h3>'+svgGastosPorCategoria(r.gastosPorCategoria)+'</div>'+
+    '<div class="panelc"><h3>Últimos movimientos</h3><div id="panel-movimientos">'+skeletonCards(3)+'</div></div>';
+
+  document.querySelectorAll('#flujo-toggle button').forEach(b=>b.addEventListener('click', ()=>cargarFlujoVentas(Number(b.dataset.d), true)));
+  cargarFlujoVentas(flujoDiasActual);
+  cargarMovimientos();
+}
+
+/* ===== Flujo de ventas — ventana móvil 7/30 días (independiente del mes del Panel) ===== */
+let flujoVentasCache = {};
+let flujoDiasActual = 7;
+async function cargarFlujoVentas(dias, forzar){
+  flujoDiasActual = dias;
+  document.querySelectorAll('#flujo-toggle button').forEach(b=>b.classList.toggle('sel', Number(b.dataset.d)===dias));
+  if(forzar) flujoVentasCache[dias] = null;
+  if(flujoVentasCache[dias]){ renderFlujoVentas(flujoVentasCache[dias]); return; }
+  const wrap = document.getElementById('flujo-svg-wrap');
+  if(wrap) wrap.innerHTML = '<div class="skel-line skel-card" style="height:160px;"></div>';
+  const r = await llamarAPISilencioso('obtenerFlujoVentas', {dias});
+  flujoVentasCache[dias] = r;
+  if(flujoDiasActual===dias) renderFlujoVentas(r);
+}
+function renderFlujoVentas(r){
+  const cap = document.getElementById('flujo-caption');
+  const wrap = document.getElementById('flujo-svg-wrap');
+  if(!cap || !wrap) return;
+  if(!r || !r.ok){ wrap.innerHTML = '<p style="font-size:12px;color:var(--danger);">'+((r&&r.error)||'Error al cargar')+'</p>'; return; }
+  cap.textContent = r.desde+' — '+r.hasta;
+  wrap.innerHTML = svgFlujoVentasBarras(r.ventasPorDia);
+}
+
+/* ===== Resumen de movimientos (Panel) ===== */
+let movimientosCache = null;
+async function cargarMovimientos(forzar){
+  if(forzar) movimientosCache = null;
+  if(movimientosCache){ pintarMovimientos(movimientosCache); return; }
+  const cont = document.getElementById('panel-movimientos');
+  if(cont) cont.innerHTML = skeletonCards(3);
+  const r = await llamarAPISilencioso('listarUltimosMovimientos', {cantidad:15});
+  movimientosCache = r;
+  pintarMovimientos(r);
+}
+function pintarMovimientos(r){
+  const cont = document.getElementById('panel-movimientos');
+  if(!cont) return;
+  if(!r || !r.ok){ cont.innerHTML = '<p style="font-size:12px;color:var(--danger);">'+((r&&r.error)||'Error al cargar')+'</p>'; return; }
+  const movs = r.movimientos||[];
+  if(!movs.length){ cont.innerHTML = '<p style="font-size:12px;color:var(--ink-soft);">Sin movimientos registrados todavía.</p>'; return; }
+  cont.innerHTML = movs.map(m=>{
+    const esIngreso = m.tipo==='Ingreso';
+    return '<div class="mov">'+
+      '<div class="mov-ico '+(esIngreso?'ingreso':'egreso')+'">'+(esIngreso?ICONS.ingreso:ICONS.egreso)+'</div>'+
+      '<div class="mov-txt"><div class="mov-cat">'+m.categoria+'</div><div class="mov-meta">'+m.negocio+(m.detalle?' · '+m.detalle:'')+'</div></div>'+
+      '<div class="mov-right"><div class="mov-monto '+(esIngreso?'pos':'neg')+'">'+(esIngreso?'+':'-')+fmt(m.monto)+'</div><div class="mov-fecha">'+m.fecha+'</div></div>'+
+    '</div>';
+  }).join('');
 }
 
 /* ===== CIERRE DE CAJA ===== */
@@ -1025,7 +1123,7 @@ async function guardarCierreCajaFinal(){
     pedidosYa:document.getElementById('cc-pedidosya').value||0, retiro:document.getElementById('cc-retiro').value||0, responsable:sesion.nombre };
   const r = await llamarAPI('registrarCierreCaja',{data});
   if(r.ok){
-    cachePanel = {}; // el cierre cambia los KPIs del mes — invalidamos todo el Panel en memoria
+    cachePanel = {}; flujoVentasCache = {}; movimientosCache = null; // el cierre cambia los KPIs del mes, el flujo de ventas y los movimientos
     cerrarModal();
     document.getElementById('confirm-title').textContent='Cierre guardado';
     document.getElementById('confirm-msg').textContent='El registro quedó guardado correctamente.';
@@ -1183,7 +1281,7 @@ async function enviarVentaVegan(){
   if(!data.fecha || !productos.length){ document.getElementById('vv-error').textContent='Completa la fecha y al menos un producto'; return; }
   const r = await llamarAPI('registrarVentaVegan',{data});
   if(r.ok){
-    cachePanel = {}; // la venta cambia ingresos del Panel
+    cachePanel = {}; movimientosCache = null; // la venta cambia ingresos del Panel y aparece en movimientos
     if(r.saldoPendiente>0) cacheModulo.cxc = null; // queda un cobro pendiente nuevo
     document.getElementById('confirm-title').textContent='Venta guardada'; document.getElementById('confirm-msg').textContent='Venta Vegan Corner registrada correctamente.'+(r.saldoPendiente>0?' Saldo pendiente: '+fmt(r.saldoPendiente)+'.':''); document.getElementById('confirm-detalle').innerHTML=''; irA('screen-confirm');
   }
@@ -1268,7 +1366,7 @@ async function enviarCompra(){
   if(!data.proveedor){ document.getElementById('co-error').textContent='Selecciona la contraparte (proveedor o equipo)'; return; }
   const r = await llamarAPI('registrarCompra',{data});
   if(r.ok){
-    cachePanel = {}; // la compra cambia egresos del Panel
+    cachePanel = {}; movimientosCache = null; // la compra cambia egresos del Panel y aparece en movimientos
     if(r.saldoPendiente>0) cacheModulo.cxp = null; // queda un pago pendiente nuevo
     document.getElementById('confirm-title').textContent='Compra guardada'; document.getElementById('confirm-msg').textContent='Compra/gasto registrado correctamente.'+(r.saldoPendiente>0?' Saldo pendiente: '+fmt(r.saldoPendiente)+'.':''); document.getElementById('confirm-detalle').innerHTML=''; irA('screen-confirm');
   }
@@ -1440,7 +1538,7 @@ async function confirmarImport(loteAnteriorId){
   if(p.tipo==='pedidosya') r = await llamarAPI('importarPedidosYa',{data:p, reemplazar});
   if(p.tipo==='transbank') r = await llamarAPI('importarTransbank',{data:p, reemplazar});
   if(r && r.ok){
-    cachePanel = {}; // cualquier importación cambia los KPIs del mes
+    cachePanel = {}; flujoVentasCache = {}; movimientosCache = null; // cualquier importación cambia los KPIs del mes
     if(p.tipo==='aronium_medios') cacheModulo.alertas = null; // este import genera alertas de auditoría
     document.getElementById('confirm-title').textContent='Importación completa';
     document.getElementById('confirm-msg').textContent='El reporte se procesó correctamente.';
