@@ -40,12 +40,11 @@
       <div class="logo-chip"><img src="assets/logo-vegancorner-white-crop.png" alt="Vegan Corner"></div>
     </div>
     <div class="brand-hero"><h1>Cima Eco-Granel</h1><p>Vegan Corner · Sistema financiero</p></div>
-    <div class="grain-divider"><span></span><span></span><span></span><span></span><span></span></div>
     <div class="user-grid" id="user-grid"></div>
   </div>
 
   <div class="screen" id="screen-pin">
-    <button class="back-link" onclick="irA('screen-select-user')">← Elegir otra persona</button>
+    <button class="back-link" onclick="irA('screen-select-user')"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"></path></svg> Elegir otra persona</button>
     <div class="pin-box">
       <div class="selected-mini">
         <div class="avatar" id="pin-avatar"></div>
@@ -61,7 +60,7 @@
   </div>
 
   <div class="screen" id="screen-pin-olvide">
-    <button class="back-link" onclick="irA('screen-pin')">← Volver</button>
+    <button class="back-link" onclick="irA('screen-pin')"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"></path></svg> Volver</button>
     <div class="pin-box">
       <div style="font-size:30px;margin-bottom:8px;">🔐</div>
       <h3 style="font-size:15px;">Pide ayuda a un Administrador</h3>
@@ -70,9 +69,8 @@
   </div>
 
   <div class="screen" id="screen-cambiar-pin">
-    <button class="back-link" onclick="irA('screen-home')">← Volver</button>
+    <button class="back-link" onclick="irA('screen-home')"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"></path></svg> Volver</button>
     <h2 style="font-size:17px;">Cambiar mi PIN</h2>
-    <div class="grain-divider"><span></span><span></span><span></span></div>
     <div class="pin-box" style="max-width:280px;">
       <label style="text-align:left;">PIN actual</label><input type="password" maxlength="4" id="cp-actual" inputmode="numeric">
       <label style="text-align:left;">PIN nuevo</label><input type="password" maxlength="4" id="cp-nuevo" inputmode="numeric">
@@ -90,18 +88,16 @@
 
   <!-- PANEL -->
   <div class="screen desktop-wide" id="screen-panel">
-    <button class="back-link" onclick="irA('screen-home')">← Volver</button>
-    <div class="header-row"><h2>Panel</h2><button class="btn-secondary btn-small" onclick="abrirPanel(panelPeriodoActual,true)">🔄 Actualizar</button></div>
-    <div class="grain-divider"><span></span><span></span><span></span></div>
+    <button class="back-link" onclick="irA('screen-home')"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"></path></svg> Volver</button>
+    <div class="header-row"><h2>Panel</h2><button class="icon-btn" title="Actualizar" onclick="abrirPanel(panelPeriodoActual,true)"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 4v6h-6"></path><path d="M1 20v-6h6"></path><path d="M3.5 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.65 4.36A9 9 0 0 0 20.5 15"></path></svg></button></div>
     <div class="pillbar" id="panel-periodo"><button class="sel" data-m="actual">Este mes</button><button data-m="anterior">Mes anterior</button></div>
     <div id="panel-contenido"></div>
   </div>
 
   <!-- CIERRE DE CAJA -->
   <div class="screen" id="screen-cierre">
-    <button class="back-link" onclick="irA('screen-home')">← Volver</button>
+    <button class="back-link" onclick="irA('screen-home')"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"></path></svg> Volver</button>
     <h2 style="font-size:17px;">Cierre de caja · Cima Eco-Granel</h2>
-    <div class="grain-divider"><span></span><span></span><span></span></div>
     <label>Fecha</label><input type="date" id="cc-fecha">
     <label>Saldo inicial <span style="font-weight:400;color:var(--ink-soft);">— Reporte Z Aronium</span></label>
     <div class="field-money"><span>$</span><input type="number" id="cc-saldo"></div>
@@ -124,9 +120,8 @@
 
   <!-- VENTA VEGAN CORNER (multi-producto, solo Osmar) -->
   <div class="screen desktop-wide" id="screen-venta-vegan">
-    <button class="back-link" onclick="irA('screen-home')">← Volver</button>
+    <button class="back-link" onclick="irA('screen-home')"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"></path></svg> Volver</button>
     <h2 style="font-size:17px;">Venta · Vegan Corner</h2>
-    <div class="grain-divider"><span></span><span></span><span></span></div>
     <label>Fecha</label><input type="date" id="vv-fecha">
     <label>Cliente</label>
     <div class="search-select" id="ss-vv-cliente">
@@ -184,9 +179,8 @@
 
   <!-- COMPRA / GASTO (Admin + Rocío) -->
   <div class="screen" id="screen-compra">
-    <button class="back-link" onclick="irA('screen-home')">← Volver</button>
+    <button class="back-link" onclick="irA('screen-home')"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"></path></svg> Volver</button>
     <h2 style="font-size:17px;">Compra / gasto</h2>
-    <div class="grain-divider"><span></span><span></span><span></span></div>
     <label>Negocio</label><div class="toggle-group" id="co-negocio-group" style="flex-wrap:wrap;"></div>
     <label>Categoría</label>
     <div class="search-select" id="ss-co-naturaleza">
@@ -232,9 +226,8 @@
 
   <!-- IMPORTAR REPORTES -->
   <div class="screen desktop-wide" id="screen-importar">
-    <button class="back-link" onclick="irA('screen-home')">← Volver</button>
+    <button class="back-link" onclick="irA('screen-home')"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"></path></svg> Volver</button>
     <h2 style="font-size:17px;">Importar reportes</h2>
-    <div class="grain-divider"><span></span><span></span><span></span></div>
     <p style="font-size:12px;color:var(--ink-soft);">Arrastra el archivo de Aronium, PedidosYa o Transbank — el sistema detecta solo qué tipo de reporte es.</p>
     <div class="dropzone" id="dropzone">Arrastra el archivo aquí, o toca para elegir<input type="file" id="file-input" style="display:none;" accept=".csv,.xls,.xlsx"></div>
     <div id="import-preview"></div>
@@ -243,37 +236,33 @@
 
   <!-- CUENTAS POR PAGAR -->
   <div class="screen desktop-wide" id="screen-cxp">
-    <button class="back-link" onclick="irA('screen-home')">← Volver</button>
-    <div class="header-row"><h2 style="font-size:17px;">Cuentas por pagar</h2><button class="btn-secondary btn-small" onclick="abrirCuentasPorPagar(true)">🔄 Actualizar</button></div>
-    <div class="grain-divider"><span></span><span></span><span></span></div>
+    <button class="back-link" onclick="irA('screen-home')"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"></path></svg> Volver</button>
+    <div class="header-row"><h2 style="font-size:17px;">Cuentas por pagar</h2><button class="icon-btn" title="Actualizar" onclick="abrirCuentasPorPagar(true)"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 4v6h-6"></path><path d="M1 20v-6h6"></path><path d="M3.5 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.65 4.36A9 9 0 0 0 20.5 15"></path></svg></button></div>
     <div id="cxp-resumen" class="panelc"></div>
     <div id="cxp-lista"></div>
   </div>
 
   <!-- CUENTAS POR COBRAR -->
   <div class="screen desktop-wide" id="screen-cxc">
-    <button class="back-link" onclick="irA('screen-home')">← Volver</button>
-    <div class="header-row"><h2 style="font-size:17px;">Cuentas por cobrar</h2><button class="btn-secondary btn-small" onclick="abrirCuentasPorCobrar(true)">🔄 Actualizar</button></div>
-    <div class="grain-divider"><span></span><span></span><span></span></div>
+    <button class="back-link" onclick="irA('screen-home')"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"></path></svg> Volver</button>
+    <div class="header-row"><h2 style="font-size:17px;">Cuentas por cobrar</h2><button class="icon-btn" title="Actualizar" onclick="abrirCuentasPorCobrar(true)"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 4v6h-6"></path><path d="M1 20v-6h6"></path><path d="M3.5 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.65 4.36A9 9 0 0 0 20.5 15"></path></svg></button></div>
     <div id="cxc-resumen" class="panelc"></div>
     <div id="cxc-lista"></div>
   </div>
 
   <!-- CREDITOS -->
   <div class="screen desktop-wide" id="screen-creditos">
-    <button class="back-link" onclick="irA('screen-home')">← Volver</button>
+    <button class="back-link" onclick="irA('screen-home')"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"></path></svg> Volver</button>
     <div style="display:flex;justify-content:space-between;align-items:center;">
       <h2 style="font-size:17px;">Créditos y financiamientos</h2>
       <button class="btn-secondary btn-small" onclick="irA('screen-credito-nuevo')">+ Nuevo</button>
     </div>
-    <div class="grain-divider"><span></span><span></span><span></span></div>
     <div id="lista-creditos"></div>
   </div>
 
   <div class="screen" id="screen-credito-nuevo">
-    <button class="back-link" onclick="irA('screen-creditos')">← Volver</button>
+    <button class="back-link" onclick="irA('screen-creditos')"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"></path></svg> Volver</button>
     <h2 style="font-size:17px;">Nuevo crédito</h2>
-    <div class="grain-divider"><span></span><span></span><span></span></div>
     <label>Acreedor</label><input type="text" id="nc-acreedor">
     <label>N° operación (opcional)</label><input type="text" id="nc-noperacion">
     <label>Monto inicial</label><div class="field-money"><span>$</span><input type="number" id="nc-monto"></div>
@@ -302,58 +291,59 @@
 
   <!-- PERMISOS -->
   <div class="screen desktop-wide" id="screen-permisos">
-    <button class="back-link" onclick="irA('screen-home')">← Volver</button>
+    <button class="back-link" onclick="irA('screen-home')"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"></path></svg> Volver</button>
     <h2 style="font-size:17px;">Usuarios y permisos</h2>
-    <div class="grain-divider"><span></span><span></span><span></span></div>
     <div id="tabla-permisos"></div>
     <div class="submit-bar"><button class="btn-primary" onclick="guardarPermisos()">Guardar cambios</button></div>
   </div>
 
   <!-- ESTADO DE RESULTADOS -->
   <div class="screen desktop-wide" id="screen-estado-resultados">
-    <button class="back-link" onclick="irA('screen-home')">← Volver</button>
+    <button class="back-link" onclick="irA('screen-home')"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"></path></svg> Volver</button>
     <h2 style="font-size:17px;">Estado de resultados</h2>
-    <div class="grain-divider"><span></span><span></span><span></span></div>
     <div class="pillbar" id="er-negocio-group"><button class="sel" onclick="cambiarNegocioER('Cima Eco-Granel', this)">Cima</button><button onclick="cambiarNegocioER('Vegan Corner', this)">Vegan Corner</button></div>
     <div id="er-contenido"></div>
   </div>
 
   <!-- F29 -->
   <div class="screen desktop-wide" id="screen-f29">
-    <button class="back-link" onclick="irA('screen-home')">← Volver</button>
+    <button class="back-link" onclick="irA('screen-home')"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"></path></svg> Volver</button>
     <h2 style="font-size:17px;">F29 estimado</h2>
-    <div class="grain-divider"><span></span><span></span><span></span></div>
     <div id="f29-contenido"></div>
     <p style="font-size:11px;color:var(--ink-soft);">Cálculo de apoyo — la declaración se presenta en sii.cl</p>
   </div>
 
   <!-- ALERTAS -->
   <div class="screen desktop-wide" id="screen-alertas">
-    <button class="back-link" onclick="irA('screen-home')">← Volver</button>
-    <div class="header-row"><h2 style="font-size:17px;">Alertas</h2><button class="btn-secondary btn-small" onclick="abrirAlertas(true)">🔄 Actualizar</button></div>
-    <div class="grain-divider"><span></span><span></span><span></span></div>
+    <button class="back-link" onclick="irA('screen-home')"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"></path></svg> Volver</button>
+    <div class="header-row"><h2 style="font-size:17px;">Alertas</h2><button class="icon-btn" title="Actualizar" onclick="abrirAlertas(true)"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 4v6h-6"></path><path d="M1 20v-6h6"></path><path d="M3.5 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.65 4.36A9 9 0 0 0 20.5 15"></path></svg></button></div>
     <p style="font-size:12px;color:var(--ink-soft);">Facturas pendientes de pago se gestionan en <button class="link-sm" onclick="abrirCuentasPorPagar()">Cuentas por pagar</button>. Los márgenes negativos son informativos y no requieren acción.</p>
     <div id="lista-alertas"></div>
   </div>
 
+  <!-- MOVIMIENTOS (todos) -->
+  <div class="screen desktop-wide" id="screen-movimientos">
+    <button class="back-link" onclick="irA('screen-panel')"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"></path></svg> Volver</button>
+    <div class="header-row"><h2>Todos los movimientos</h2><button class="icon-btn" title="Actualizar" onclick="abrirMovimientos(true)"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 4v6h-6"></path><path d="M1 20v-6h6"></path><path d="M3.5 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.65 4.36A9 9 0 0 0 20.5 15"></path></svg></button></div>
+    <div id="lista-movimientos-full"></div>
+  </div>
+
   <!-- PRODUCCIÓN — PROGRAMA -->
   <div class="screen desktop-wide" id="screen-programa">
-    <button class="back-link" onclick="irA('screen-home')">← Volver</button>
+    <button class="back-link" onclick="irA('screen-home')"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"></path></svg> Volver</button>
     <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;">
       <h2 style="font-size:17px;">Programa de producción</h2>
       <div style="display:flex;gap:8px;">
-        <button class="btn-secondary btn-small" onclick="abrirPrograma(true)">🔄 Actualizar</button>
+        <button class="icon-btn" title="Actualizar" onclick="abrirPrograma(true)"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 4v6h-6"></path><path d="M1 20v-6h6"></path><path d="M3.5 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.65 4.36A9 9 0 0 0 20.5 15"></path></svg></button>
         <button class="btn-secondary btn-small" id="btn-nuevo-programa" style="display:none;" onclick="irA('screen-programa-nuevo')">+ Nuevo</button>
       </div>
     </div>
-    <div class="grain-divider"><span></span><span></span><span></span></div>
     <div id="lista-programa"></div>
   </div>
 
   <div class="screen" id="screen-programa-nuevo">
-    <button class="back-link" onclick="irA('screen-programa')">← Volver</button>
+    <button class="back-link" onclick="irA('screen-programa')"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"></path></svg> Volver</button>
     <h2 style="font-size:17px;">Nuevo ítem de programa</h2>
-    <div class="grain-divider"><span></span><span></span><span></span></div>
     <label>Fecha</label><input type="date" id="pp-fecha">
     <label>Producto</label>
     <div class="search-select" id="ss-pp-producto">
@@ -368,9 +358,8 @@
 
   <!-- INVENTARIO MP -->
   <div class="screen desktop-wide" id="screen-inventario">
-    <button class="back-link" onclick="irA('screen-home')">← Volver</button>
-    <div class="header-row"><h2 style="font-size:17px;">Inventario de materia prima</h2><button class="btn-secondary btn-small" onclick="abrirInventario(true)">🔄 Actualizar</button></div>
-    <div class="grain-divider"><span></span><span></span><span></span></div>
+    <button class="back-link" onclick="irA('screen-home')"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"></path></svg> Volver</button>
+    <div class="header-row"><h2 style="font-size:17px;">Inventario de materia prima</h2><button class="icon-btn" title="Actualizar" onclick="abrirInventario(true)"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 4v6h-6"></path><path d="M1 20v-6h6"></path><path d="M3.5 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.65 4.36A9 9 0 0 0 20.5 15"></path></svg></button></div>
     <div class="card">
       <label>Insumo</label><input type="text" id="inv-insumo" placeholder="Ej: Harina">
       <div class="desktop-grid2">
@@ -386,9 +375,8 @@
 
   <!-- LISTA DE COMPRA MP -->
   <div class="screen desktop-wide" id="screen-lista-compra">
-    <button class="back-link" onclick="irA('screen-home')">← Volver</button>
-    <div class="header-row"><h2 style="font-size:17px;">Lista de compra — Materia Prima</h2><button class="btn-secondary btn-small" onclick="abrirListaCompra(true)">🔄 Actualizar</button></div>
-    <div class="grain-divider"><span></span><span></span><span></span></div>
+    <button class="back-link" onclick="irA('screen-home')"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"></path></svg> Volver</button>
+    <div class="header-row"><h2 style="font-size:17px;">Lista de compra — Materia Prima</h2><button class="icon-btn" title="Actualizar" onclick="abrirListaCompra(true)"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 4v6h-6"></path><path d="M1 20v-6h6"></path><path d="M3.5 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.65 4.36A9 9 0 0 0 20.5 15"></path></svg></button></div>
     <p style="font-size:12px;color:var(--ink-soft);">Insumos bajo su stock mínimo, calculado desde Inventario MP.</p>
     <div id="lista-compra-mp"></div>
   </div>
@@ -904,42 +892,44 @@ document.querySelectorAll('#panel-periodo button').forEach(b=>b.addEventListener
 // el backend (evita el bug de ordenar por número de día, que se rompía al cruzar meses).
 function svgFlujoVentasBarras(ventasPorDia){
   const entries = Object.entries(ventasPorDia||{});
-  if(!entries.length) return '<p style="font-size:12px;color:var(--ink-soft);">Sin ventas registradas en este rango.</p>';
-  const w=700, h=190, padLeft=42, padRight=10, padBottom=26, padTop=16;
+  if(!entries.length) return '<p style="font-size:13px;color:var(--ink-soft);">Sin ventas registradas en este rango.</p>';
+  const w=700, h=240, padLeft=58, padRight=10, padBottom=32, padTop=18;
   const max = Math.max(...entries.map(([,v])=>v), 1);
   const plotW = w-padLeft-padRight, plotH = h-padTop-padBottom;
   const gap = plotW/entries.length;
-  const barW = Math.max(4, Math.min(28, gap-6));
+  const barW = Math.max(6, Math.min(34, gap-6));
   let grid='';
-  [1,0.66,0.33,0].forEach((f,i)=>{
+  [1,0.66,0.33,0].forEach(f=>{
     const y = padTop+plotH*(1-f);
-    grid += '<line x1="'+padLeft+'" y1="'+y.toFixed(1)+'" x2="'+(w-padRight)+'" y2="'+y.toFixed(1)+'" stroke="'+(f===0?'var(--border)':'#EFEBDD')+'" stroke-width="1"/>'+
-      '<text x="'+(padLeft-6)+'" y="'+(y+3).toFixed(1)+'" font-size="9" fill="var(--ink-soft)" text-anchor="end">'+fmtCompacto(max*f)+'</text>';
+    grid += '<line x1="'+padLeft+'" y1="'+y.toFixed(1)+'" x2="'+(w-padRight)+'" y2="'+y.toFixed(1)+'" stroke="'+(f===0?'var(--border)':'#EFEBDD')+'" stroke-width="'+(f===0?'1.5':'1')+'"/>'+
+      '<text x="'+(padLeft-8)+'" y="'+(y+4).toFixed(1)+'" font-size="14" font-weight="600" fill="var(--ink-soft)" text-anchor="end">'+fmtCompacto(max*f)+'</text>';
   });
   let bars='';
-  const showEvery = entries.length>15 ? 3 : 1;
+  const showEvery = entries.length>15 ? 4 : 2;
   entries.forEach(([fecha,val],i)=>{
-    const bh = Math.max(1,(val/max)*plotH);
+    const bh = Math.max(2,(val/max)*plotH);
     const x = padLeft+i*gap+(gap-barW)/2, y = padTop+plotH-bh;
-    bars += '<rect x="'+x.toFixed(1)+'" y="'+y.toFixed(1)+'" width="'+barW.toFixed(1)+'" height="'+bh.toFixed(1)+'" rx="3" fill="var(--forest)"><title>'+fecha+': '+fmt(val)+'</title></rect>';
-    if(i%showEvery===0 || i===entries.length-1) bars += '<text x="'+(x+barW/2).toFixed(1)+'" y="'+(h-8)+'" font-size="9" fill="var(--ink-soft)" text-anchor="middle">'+fecha+'</text>';
+    bars += '<rect x="'+x.toFixed(1)+'" y="'+y.toFixed(1)+'" width="'+barW.toFixed(1)+'" height="'+bh.toFixed(1)+'" rx="4" fill="var(--forest)"><title>'+fecha+': '+fmt(val)+'</title></rect>';
+    if(i%showEvery===0 || i===entries.length-1) bars += '<text x="'+(x+barW/2).toFixed(1)+'" y="'+(h-8)+'" font-size="13" font-weight="600" fill="var(--ink-soft)" text-anchor="middle">'+fecha+'</text>';
   });
-  return '<svg viewBox="0 0 '+w+' '+h+'" style="width:100%;height:170px;">'+grid+bars+'</svg>';
+  return '<svg viewBox="0 0 '+w+' '+h+'" style="width:100%;height:200px;">'+grid+bars+'</svg>';
 }
 function svgGastosPorCategoria(gastos){
   const entries = Object.entries(gastos||{}).sort((a,b)=>b[1]-a[1]);
-  if(!entries.length) return '<p style="font-size:12px;color:var(--ink-soft);">Sin gastos registrados este período.</p>';
+  if(!entries.length) return '<p style="font-size:13px;color:var(--ink-soft);">Sin gastos registrados este período.</p>';
   const top = entries.slice(0,4);
   const resto = entries.slice(4).reduce((s,[,v])=>s+v,0);
   if(resto>0) top.push(['Otros', resto]);
+  const total = Object.values(gastos||{}).reduce((s,v)=>s+v,0);
   const w=700, max=Math.max(...top.map(([,v])=>v),1);
-  const filaAlto=30, h=top.length*filaAlto+10;
-  let filas='<line x1="220" y1="4" x2="220" y2="'+(h-6)+'" stroke="#EFEBDD" stroke-width="1"/>';
+  const filaAlto=66;
+  const h = top.length*filaAlto - 14;
+  let filas='';
   top.forEach(([nombre,val],i)=>{
-    const y=8+i*filaAlto, barW=Math.max(4,(val/max)*380), pct=Math.round(val/Object.values(gastos||{}).reduce((s,v)=>s+v,0)*100)||0;
-    filas += '<text x="0" y="'+(y+13)+'" font-size="11" fill="var(--ink)">'+nombre+'</text>'+
-      '<rect x="220" y="'+y+'" width="'+barW.toFixed(1)+'" height="18" rx="3" fill="var(--forest)"></rect>'+
-      '<text x="'+(226+barW).toFixed(1)+'" y="'+(y+13)+'" font-size="11" fill="var(--ink-soft)" class="mono">'+fmt(val)+' · '+pct+'%</text>';
+    const y=i*filaAlto, barW=Math.max(30,(val/max)*(w-4)), pct=Math.round(val/total*100)||0;
+    filas += '<text x="0" y="'+(y+15)+'" font-size="16" font-weight="700" fill="var(--ink)">'+nombre+'</text>'+
+      '<rect x="0" y="'+(y+22)+'" width="'+barW.toFixed(1)+'" height="32" rx="7" fill="var(--forest)"></rect>'+
+      '<text x="12" y="'+(y+43)+'" font-size="15" font-weight="700" fill="#fff">'+fmt(val)+' · '+pct+'%</text>';
   });
   return '<svg viewBox="0 0 '+w+' '+h+'" style="width:100%;height:'+h+'px;">'+filas+'</svg>';
 }
@@ -948,53 +938,52 @@ function svgGastosPorCategoria(gastos){
 function renderComparativaCards(cima, vegan){
   return '<div class="comp-cards">'+
     '<div class="comp-card cima"><div class="comp-name">Cima Eco-Granel</div>'+
-      '<div class="rowline"><span>Ingresos</span><b>'+fmtCompacto(cima.ingresos)+'</b></div>'+
-      '<div class="rowline"><span>Egresos</span><b>'+fmtCompacto(cima.egresos)+'</b></div>'+
-      '<div class="rowline"><span>Margen</span><b style="color:'+(cima.margen<0?'var(--warn)':'inherit')+';">'+fmtCompacto(cima.margen)+'</b></div>'+
+      '<div class="rowline"><span>Ingresos</span><b>'+fmt(cima.ingresos)+'</b></div>'+
+      '<div class="rowline"><span>Egresos</span><b>'+fmt(cima.egresos)+'</b></div>'+
+      '<div class="rowline"><span>Margen</span><b style="color:'+(cima.margen<0?'var(--warn)':'inherit')+';">'+fmt(cima.margen)+'</b></div>'+
     '</div>'+
     '<div class="comp-card vegan"><div class="comp-name">Vegan Corner</div>'+
-      '<div class="rowline"><span>Ingresos</span><b>'+fmtCompacto(vegan.ingresos)+'</b></div>'+
-      '<div class="rowline"><span>Egresos</span><b>'+fmtCompacto(vegan.egresos)+'</b></div>'+
-      '<div class="rowline"><span>Margen</span><b style="color:'+(vegan.margen<0?'var(--warn)':'inherit')+';">'+fmtCompacto(vegan.margen)+'</b></div>'+
+      '<div class="rowline"><span>Ingresos</span><b>'+fmt(vegan.ingresos)+'</b></div>'+
+      '<div class="rowline"><span>Egresos</span><b>'+fmt(vegan.egresos)+'</b></div>'+
+      '<div class="rowline"><span>Margen</span><b style="color:'+(vegan.margen<0?'var(--warn)':'inherit')+';">'+fmt(vegan.margen)+'</b></div>'+
     '</div>'+
   '</div>';
 }
 
 function pintarPanel(r, anio, mes){
   const c = document.getElementById('panel-contenido');
-  const alertasHtml = (r.alertas||[]).slice(0,4).map(a=>'<span class="tag-alert">⚠ '+a.categoria+' — dif. '+fmt(Math.abs(a.diferencia))+'</span>').join('') || '<span style="font-size:12px;color:var(--ink-soft);">Sin alertas pendientes.</span>';
+  const alertIcon = '<div class="a-ico"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 9v4M12 17h.01M10.3 3.9L2.6 17a2 2 0 0 0 1.7 3h15.4a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"></path></svg></div>';
+  const alertasHtml = (r.alertas||[]).slice(0,4).map(a=>'<div class="tag-alert">'+alertIcon+'<span>'+a.categoria+' — dif. '+fmt(Math.abs(a.diferencia))+'</span></div>').join('') || '<span style="font-size:13px;color:var(--ink-soft);">Sin alertas pendientes.</span>';
   const cxp = r.cuentasPorPagar||{total:0,cantidad:0};
   const cima = r.porNegocio.cima, vegan = r.porNegocio.vegan;
 
+  // Orden de prioridad acordado: 1. KPIs+Resultado, 2. Alertas, 3. Movimientos, 4. Comparativa, 5. Gráficos
   c.innerHTML =
-    '<p class="mono" style="font-size:11px;color:var(--ink-soft);margin:-4px 0 12px;">Período: '+NOMBRES_MES[mes-1]+' '+anio+'</p>'+
+    '<p class="mono" style="font-size:12px;color:var(--ink-soft);margin:-4px 0 12px;font-weight:600;">Período: '+NOMBRES_MES[mes-1]+' '+anio+'</p>'+
     '<div class="kpi-row">'+
       '<div class="kpi"><div class="lbl">Ingresos totales</div><div class="val">'+fmt(r.ingresosTotal)+'</div></div>'+
       '<div class="kpi"><div class="lbl">Egresos operacionales</div><div class="val">'+fmt(r.egresosTotal)+'</div></div>'+
       '<div class="kpi"><div class="lbl">Margen operacional</div><div class="val">'+fmt(r.margenOperacional)+'</div></div>'+
       '<div class="kpi"><div class="lbl">Retiros</div><div class="val">'+fmt(r.retiros)+'</div></div>'+
     '</div>'+
-    '<div class="kpi" style="margin-bottom:18px;background:var(--forest-soft);border-color:var(--forest);">'+
-      '<div class="lbl">Resultado final</div><div class="val" style="font-size:24px;">'+fmt(r.resultadoFinal)+'</div>'+
+    '<div class="kpi-resultado"><div class="lbl">Resultado final</div><div class="val">'+fmt(r.resultadoFinal)+'</div></div>'+
+    '<div class="panelc"><h3>Alertas pendientes</h3>'+alertasHtml+
+      '<div class="rowline" style="margin-top:10px;font-size:14px;font-weight:700;"><span>Cuentas por pagar · '+cxp.cantidad+' documento(s)</span><b>'+fmt(cxp.total)+'</b></div>'+
+      '<button class="btn-line" onclick="abrirCuentasPorPagar()">Ver cuentas por pagar</button>'+
     '</div>'+
-    '<div class="desktop-grid2">'+
-      '<div class="panelc"><h3>Cima vs Vegan Corner — resultado del mes</h3>'+renderComparativaCards(cima, vegan)+'</div>'+
-      '<div class="panelc"><h3>Alertas pendientes</h3>'+alertasHtml+
-        '<h3 style="margin-top:14px;">Cuentas por pagar</h3>'+
-        '<div class="rowline"><span>'+cxp.cantidad+' documento(s)</span><b>'+fmt(cxp.total)+'</b></div>'+
-        '<button class="btn-secondary btn-small" style="margin-top:8px;" onclick="abrirCuentasPorPagar()">Ver Cuentas por pagar</button>'+
-      '</div>'+
+    '<div class="panelc"><h3>Últimos movimientos</h3><div id="panel-movimientos">'+skeletonCards(3)+'</div>'+
+      '<button class="btn-line" onclick="abrirMovimientos()">Ver todos los movimientos</button>'+
     '</div>'+
+    '<div class="panelc"><h3>Cima vs Vegan Corner — resultado del mes</h3>'+renderComparativaCards(cima, vegan)+'</div>'+
     '<div class="panelc">'+
       '<div class="header-row"><h3 style="margin:0;">Flujo de ventas por día</h3>'+
         '<div class="pillbar" id="flujo-toggle" style="margin:0;">'+
-          '<button data-d="7">Últimos 7 días</button><button data-d="30">Últimos 30 días</button>'+
+          '<button data-d="7">7 días</button><button data-d="30">30 días</button>'+
         '</div></div>'+
-      '<p class="mono" id="flujo-caption" style="font-size:11px;color:var(--ink-soft);margin:2px 0 8px;"></p>'+
-      '<div id="flujo-svg-wrap"><div class="skel-line skel-card" style="height:160px;"></div></div>'+
+      '<p class="mono" id="flujo-caption" style="font-size:12px;color:var(--ink-soft);margin:6px 0 8px;font-weight:600;"></p>'+
+      '<div id="flujo-svg-wrap"><div class="skel-line skel-card" style="height:200px;"></div></div>'+
     '</div>'+
-    '<div class="panelc"><h3>Gastos por categoría</h3>'+svgGastosPorCategoria(r.gastosPorCategoria)+'</div>'+
-    '<div class="panelc"><h3>Últimos movimientos</h3><div id="panel-movimientos">'+skeletonCards(3)+'</div></div>';
+    '<div class="panelc"><h3>Gastos por categoría</h3>'+svgGastosPorCategoria(r.gastosPorCategoria)+'</div>';
 
   document.querySelectorAll('#flujo-toggle button').forEach(b=>b.addEventListener('click', ()=>cargarFlujoVentas(Number(b.dataset.d), true)));
   cargarFlujoVentas(flujoDiasActual);
@@ -1024,31 +1013,49 @@ function renderFlujoVentas(r){
   wrap.innerHTML = svgFlujoVentasBarras(r.ventasPorDia);
 }
 
-/* ===== Resumen de movimientos (Panel) ===== */
+/* ===== Resumen de movimientos (Panel: 5 · Pantalla completa: todos) ===== */
 let movimientosCache = null;
 async function cargarMovimientos(forzar){
   if(forzar) movimientosCache = null;
   if(movimientosCache){ pintarMovimientos(movimientosCache); return; }
   const cont = document.getElementById('panel-movimientos');
   if(cont) cont.innerHTML = skeletonCards(3);
-  const r = await llamarAPISilencioso('listarUltimosMovimientos', {cantidad:15});
+  const r = await llamarAPISilencioso('listarUltimosMovimientos', {cantidad:50});
   movimientosCache = r;
   pintarMovimientos(r);
+}
+function htmlMovimiento(m){
+  const esIngreso = m.tipo==='Ingreso';
+  return '<div class="mov">'+
+    '<div class="mov-ico '+(esIngreso?'ingreso':'egreso')+'">'+(esIngreso?ICONS.ingreso:ICONS.egreso)+'</div>'+
+    '<div class="mov-txt"><div class="mov-cat">'+m.categoria+'</div><div class="mov-meta">'+m.negocio+(m.detalle?' · '+m.detalle:'')+'</div></div>'+
+    '<div class="mov-right"><div class="mov-monto '+(esIngreso?'pos':'neg')+'">'+(esIngreso?'+':'-')+fmt(m.monto)+'</div><div class="mov-fecha">'+m.fecha+'</div></div>'+
+  '</div>';
 }
 function pintarMovimientos(r){
   const cont = document.getElementById('panel-movimientos');
   if(!cont) return;
-  if(!r || !r.ok){ cont.innerHTML = '<p style="font-size:12px;color:var(--danger);">'+((r&&r.error)||'Error al cargar')+'</p>'; return; }
+  if(!r || !r.ok){ cont.innerHTML = '<p style="font-size:13px;color:var(--danger);">'+((r&&r.error)||'Error al cargar')+'</p>'; return; }
   const movs = r.movimientos||[];
-  if(!movs.length){ cont.innerHTML = '<p style="font-size:12px;color:var(--ink-soft);">Sin movimientos registrados todavía.</p>'; return; }
-  cont.innerHTML = movs.map(m=>{
-    const esIngreso = m.tipo==='Ingreso';
-    return '<div class="mov">'+
-      '<div class="mov-ico '+(esIngreso?'ingreso':'egreso')+'">'+(esIngreso?ICONS.ingreso:ICONS.egreso)+'</div>'+
-      '<div class="mov-txt"><div class="mov-cat">'+m.categoria+'</div><div class="mov-meta">'+m.negocio+(m.detalle?' · '+m.detalle:'')+'</div></div>'+
-      '<div class="mov-right"><div class="mov-monto '+(esIngreso?'pos':'neg')+'">'+(esIngreso?'+':'-')+fmt(m.monto)+'</div><div class="mov-fecha">'+m.fecha+'</div></div>'+
-    '</div>';
-  }).join('');
+  if(!movs.length){ cont.innerHTML = '<p style="font-size:13px;color:var(--ink-soft);">Sin movimientos registrados todavía.</p>'; return; }
+  cont.innerHTML = movs.slice(0,5).map(htmlMovimiento).join('');
+}
+async function abrirMovimientos(forzar){
+  irA('screen-movimientos');
+  if(forzar) movimientosCache = null;
+  const cont = document.getElementById('lista-movimientos-full');
+  if(!movimientosCache){
+    cont.innerHTML = skeletonCards(5);
+    const r = await llamarAPISilencioso('listarUltimosMovimientos', {cantidad:50});
+    movimientosCache = r;
+    if(!document.getElementById('screen-movimientos').classList.contains('active')) return;
+  }
+  const r = movimientosCache;
+  if(!r || !r.ok){ cont.innerHTML = '<p style="font-size:13px;color:var(--danger);">'+((r&&r.error)||'Error al cargar')+'</p>'; return; }
+  const movs = r.movimientos||[];
+  cont.innerHTML = movs.length
+    ? '<div class="panelc">'+movs.map(htmlMovimiento).join('')+'</div>'
+    : '<p style="font-size:13px;color:var(--ink-soft);">Sin movimientos registrados todavía.</p>';
 }
 
 /* ===== CIERRE DE CAJA ===== */
