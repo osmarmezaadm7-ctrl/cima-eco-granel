@@ -966,14 +966,70 @@ async function abrirPanel(periodo){
   pintarPanel(r, anio, mes);
 }
 document.querySelectorAll('#panel-periodo button').forEach(b=>b.addEventListener('click', ()=>abrirPanel(b.dataset.m)));
+/* ===== Gráficos del Panel (SVG puro, sin librerías) ===== */
+function svgVentasPorDia(ventasPorDia){
+  const entries = Object.entries(ventasPorDia||{}).map(([fecha,val])=>({dia:Number(String(fecha).split('/')[0]), val})).filter(e=>!isNaN(e.dia)).sort((a,b)=>a.dia-b.dia);
+  if(!entries.length) return '<p style="font-size:12px;color:var(--ink-soft);">Sin ventas registradas este período.</p>';
+  const w=700, h=170, padBottom=24, padTop=10;
+  const max = Math.max(...entries.map(e=>e.val), 1);
+  const gap = (w-20)/entries.length;
+  const barW = Math.max(3, Math.min(22, gap-4));
+  let bars='';
+  entries.forEach((e,i)=>{
+    const bh = Math.max(2, (e.val/max)*(h-padBottom-padTop));
+    const x = 10+i*gap+(gap-barW)/2, y = h-padBottom-bh;
+    bars += '<rect x="'+x.toFixed(1)+'" y="'+y.toFixed(1)+'" width="'+barW.toFixed(1)+'" height="'+bh.toFixed(1)+'" rx="2" fill="var(--forest)"><title>Día '+e.dia+': '+fmt(e.val)+'</title></rect>';
+    if(entries.length<=15 || i%3===0) bars += '<text x="'+(x+barW/2).toFixed(1)+'" y="'+(h-8)+'" font-size="8.5" fill="var(--ink-soft)" text-anchor="middle">'+e.dia+'</text>';
+  });
+  return '<svg viewBox="0 0 '+w+' '+h+'" style="width:100%;height:150px;"><line x1="8" y1="'+(h-padBottom)+'" x2="'+(w-8)+'" y2="'+(h-padBottom)+'" stroke="var(--border)"/>'+bars+'</svg>';
+}
+function svgGastosPorCategoria(gastos){
+  const entries = Object.entries(gastos||{}).sort((a,b)=>b[1]-a[1]);
+  if(!entries.length) return '<p style="font-size:12px;color:var(--ink-soft);">Sin gastos registrados este período.</p>';
+  const top = entries.slice(0,4);
+  const resto = entries.slice(4).reduce((s,[,v])=>s+v,0);
+  if(resto>0) top.push(['Otros', resto]);
+  const w=700, max=Math.max(...top.map(([,v])=>v),1);
+  const filaAlto=30, h=top.length*filaAlto+10;
+  let filas='';
+  top.forEach(([nombre,val],i)=>{
+    const y=8+i*filaAlto, barW=Math.max(4,(val/max)*380);
+    filas += '<text x="0" y="'+(y+13)+'" font-size="11" fill="var(--ink)">'+nombre+'</text>'+
+      '<rect x="220" y="'+y+'" width="'+barW.toFixed(1)+'" height="18" rx="3" fill="var(--forest)"></rect>'+
+      '<text x="'+(226+barW).toFixed(1)+'" y="'+(y+13)+'" font-size="11" fill="var(--ink-soft)" class="mono">'+fmt(val)+'</text>';
+  });
+  return '<svg viewBox="0 0 '+w+' '+h+'" style="width:100%;height:'+h+'px;">'+filas+'</svg>';
+}
+function svgComparativaNegocios(cima, vegan){
+  const grupos = [
+    { lbl:'Ingresos', cima:cima.ingresos, vegan:vegan.ingresos },
+    { lbl:'Egresos', cima:cima.egresos, vegan:vegan.egresos },
+    { lbl:'Margen', cima:cima.margen, vegan:vegan.margen }
+  ];
+  const w=700, h=190, padBottom=26, padTop=10, zero=h-padBottom;
+  const max = Math.max(...grupos.flatMap(g=>[Math.abs(g.cima),Math.abs(g.vegan)]), 1);
+  const escala = (h-padBottom-padTop)/max;
+  const grupoW = w/grupos.length, barW=42;
+  let bars='';
+  grupos.forEach((g,i)=>{
+    const cx = i*grupoW+grupoW/2-barW/2-6, vx = i*grupoW+grupoW/2+6;
+    [{x:cx,val:g.cima,color:'var(--forest)'},{x:vx,val:g.vegan,color:'var(--terracotta)'}].forEach(b=>{
+      const bh = Math.abs(b.val)*escala, y = b.val>=0 ? zero-bh : zero;
+      bars += '<rect x="'+b.x.toFixed(1)+'" y="'+y.toFixed(1)+'" width="'+barW+'" height="'+Math.max(1,bh).toFixed(1)+'" rx="2" fill="'+b.color+'"><title>'+fmt(b.val)+'</title></rect>';
+    });
+    bars += '<text x="'+(i*grupoW+grupoW/2).toFixed(1)+'" y="'+(h-8)+'" font-size="10.5" fill="var(--ink-soft)" text-anchor="middle">'+g.lbl+'</text>';
+  });
+  return '<svg viewBox="0 0 '+w+' '+h+'" style="width:100%;height:170px;">'+
+    '<line x1="4" y1="'+zero+'" x2="'+(w-4)+'" y2="'+zero+'" stroke="var(--border)"/>'+bars+
+    '<g transform="translate('+(w-140)+',6)"><rect width="10" height="10" fill="var(--forest)" rx="2"/><text x="15" y="9" font-size="10" fill="var(--ink-soft)">Cima</text>'+
+    '<rect x="70" width="10" height="10" fill="var(--terracotta)" rx="2"/><text x="85" y="9" font-size="10" fill="var(--ink-soft)">Vegan</text></g></svg>';
+}
+
 function pintarPanel(r, anio, mes){
   const c = document.getElementById('panel-contenido');
   const alertasHtml = (r.alertas||[]).slice(0,4).map(a=>'<span class="tag-alert">⚠ '+a.categoria+' — dif. '+fmt(Math.abs(a.diferencia))+'</span>').join('') || '<span style="font-size:12px;color:var(--ink-soft);">Sin alertas pendientes.</span>';
   const cxp = r.cuentasPorPagar||{total:0,cantidad:0};
-  const medios = r.medios||{}; const totalMedios = (medios.efectivo||0)+(medios.debito||0)+(medios.credito||0)+(medios.transferencia||0)+(medios.pedidosYa||0) || 1;
-  const barraMedio = (lb,val)=>'<div class="barh"><span class="lb">'+lb+'</span><div class="tr"><i style="width:'+Math.round(val/totalMedios*100)+'%"></i></div><span class="pc">'+Math.round(val/totalMedios*100)+'%</span></div>';
-  const gastos = r.gastosPorCategoria||{};
-  const gastosOrdenados = Object.entries(gastos).sort((a,b)=>b[1]-a[1]).slice(0,6);
+  const cima = r.porNegocio.cima, vegan = r.porNegocio.vegan;
 
   c.innerHTML =
     '<p class="mono" style="font-size:11px;color:var(--ink-soft);margin:-4px 0 12px;">Período: '+NOMBRES_MES[mes-1]+' '+anio+'</p>'+
@@ -981,14 +1037,16 @@ function pintarPanel(r, anio, mes){
       '<div class="kpi"><div class="lbl">Ingresos totales</div><div class="val">'+fmt(r.ingresosTotal)+'</div></div>'+
       '<div class="kpi"><div class="lbl">Egresos operacionales</div><div class="val">'+fmt(r.egresosTotal)+'</div></div>'+
       '<div class="kpi"><div class="lbl">Margen operacional</div><div class="val">'+fmt(r.margenOperacional)+'</div></div>'+
-      '<div class="kpi"><div class="lbl">IVA a pagar</div><div class="val">'+fmt((r.iva||{}).aPagar)+'</div></div>'+
+      '<div class="kpi"><div class="lbl">Retiros</div><div class="val">'+fmt(r.retiros)+'</div></div>'+
+    '</div>'+
+    '<div class="kpi" style="margin-bottom:18px;background:var(--forest-soft);border-color:var(--forest);">'+
+      '<div class="lbl">Resultado final</div><div class="val" style="font-size:24px;">'+fmt(r.resultadoFinal)+'</div>'+
     '</div>'+
     '<div class="desktop-grid2">'+
-      '<div class="panelc"><h3>Por negocio</h3>'+
-        '<div class="rowline"><span>Cima Eco-Granel</span><b>'+fmt(r.porNegocio.cima.margen)+'</b></div>'+
-        '<div class="rowline"><span>Vegan Corner</span><b style="color:'+(r.porNegocio.vegan.margen<0?'var(--warn)':'inherit')+';">'+fmt(r.porNegocio.vegan.margen)+'</b></div>'+
-        '<h3 style="margin-top:14px;">Medios de pago — Cima</h3>'+
-        barraMedio('Débito',medios.debito)+barraMedio('Crédito',medios.credito)+barraMedio('Efectivo',medios.efectivo)+barraMedio('PedidosYa',medios.pedidosYa)+barraMedio('Transferencia',medios.transferencia)+
+      '<div class="panelc"><h3>Cima vs Vegan Corner — resultado del mes</h3>'+
+        '<div class="rowline"><span>Cima Eco-Granel</span><b>'+fmt(cima.margen)+'</b></div>'+
+        '<div class="rowline"><span>Vegan Corner</span><b style="color:'+(vegan.margen<0?'var(--warn)':'inherit')+';">'+fmt(vegan.margen)+'</b></div>'+
+        svgComparativaNegocios(cima, vegan)+
       '</div>'+
       '<div class="panelc"><h3>Alertas pendientes</h3>'+alertasHtml+
         '<h3 style="margin-top:14px;">Cuentas por pagar</h3>'+
@@ -996,9 +1054,8 @@ function pintarPanel(r, anio, mes){
         '<button class="btn-secondary btn-small" style="margin-top:8px;" onclick="abrirCuentasPorPagar()">Ver Cuentas por pagar</button>'+
       '</div>'+
     '</div>'+
-    '<div class="panelc"><h3>Gastos por categoría</h3>'+
-      gastosOrdenados.map(([k,v])=>'<div class="rowline"><span>'+k+'</span><b>'+fmt(v)+'</b></div>').join('')+
-    '</div>';
+    '<div class="panelc"><h3>Flujo de ventas por día</h3>'+svgVentasPorDia(r.ventasPorDia)+'</div>'+
+    '<div class="panelc"><h3>Gastos por categoría</h3>'+svgGastosPorCategoria(r.gastosPorCategoria)+'</div>';
 }
 
 /* ===== CIERRE DE CAJA ===== */
