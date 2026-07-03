@@ -268,6 +268,7 @@ td{padding:8px 6px;border-bottom:1px solid var(--border);}
     <div class="field-money"><span>$</span><input type="number" id="cc-saldo"></div>
     <label>Efectivo <span style="font-weight:400;color:var(--ink-soft);">— total físico en caja</span></label>
     <div class="field-money"><span>$</span><input type="number" id="cc-efectivo"></div>
+    <button type="button" class="btn-secondary btn-small" style="margin:-4px 0 10px;" onclick="abrirArqueo()">🧮 Contar por denominación</button>
     <label>Débito <span style="font-weight:400;color:var(--ink-soft);">— voucher Transbank</span></label>
     <div class="field-money"><span>$</span><input type="number" id="cc-debito"></div>
     <label>Crédito <span style="font-weight:400;color:var(--ink-soft);">— voucher Transbank</span></label>
@@ -279,7 +280,7 @@ td{padding:8px 6px;border-bottom:1px solid var(--border);}
     <label>Retiro <span style="font-weight:400;color:var(--ink-soft);">— Efectivo</span></label>
     <div class="field-money"><span>$</span><input type="number" id="cc-retiro"></div>
     <div class="error-msg" id="cc-error"></div>
-    <div class="submit-bar"><button class="btn-primary" onclick="enviarCierreCaja()">Guardar cierre de caja</button></div>
+    <div class="submit-bar"><button class="btn-primary" onclick="revisarCierreCaja()">Revisar y guardar</button></div>
   </div>
 
   <!-- VENTA VEGAN CORNER (multi-producto, solo Osmar) -->
@@ -1001,19 +1002,83 @@ function pintarPanel(r, anio, mes){
 }
 
 /* ===== CIERRE DE CAJA ===== */
-async function enviarCierreCaja(){
+/* ===== Asistente de arqueo por denominación ===== */
+const DENOMINACIONES = [
+  { valor:20000, tipo:'Billete' }, { valor:10000, tipo:'Billete' }, { valor:5000, tipo:'Billete' }, { valor:2000, tipo:'Billete' }, { valor:1000, tipo:'Billete' },
+  { valor:500, tipo:'Moneda' }, { valor:100, tipo:'Moneda' }, { valor:50, tipo:'Moneda' }, { valor:10, tipo:'Moneda' }
+];
+function abrirArqueo(){
+  const filas = DENOMINACIONES.map(d=>
+    '<div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;">'+
+      '<span style="width:56px;font-size:12px;color:var(--ink-soft);">'+d.tipo[0]+'</span>'+
+      '<span class="mono" style="width:70px;font-size:13px;">'+fmt(d.valor)+'</span>'+
+      '<span style="color:var(--ink-soft);">×</span>'+
+      '<input type="number" min="0" placeholder="0" data-den="'+d.valor+'" oninput="calcularArqueo()" style="width:70px;">'+
+      '<span class="mono" style="flex:1;text-align:right;font-size:12.5px;color:var(--ink-soft);" id="arq-sub-'+d.valor+'">$0</span>'+
+    '</div>'
+  ).join('');
+  abrirModal(
+    '<h3 style="font-size:15px;">Arqueo de caja</h3>'+
+    '<p style="font-size:11.5px;color:var(--ink-soft);margin:2px 0 10px;">Cantidad de cada billete/moneda contado</p>'+
+    filas+
+    '<div class="rowline" style="font-size:14px;font-weight:700;border-top:1px solid var(--border);margin-top:8px;padding-top:8px;"><span>Total contado</span><span class="mono" id="arq-total">$0</span></div>'+
+    '<div style="display:flex;gap:8px;margin-top:14px;"><button class="btn-secondary" onclick="cerrarModal()">Cancelar</button><button class="btn-primary" onclick="usarArqueo()">Usar este total</button></div>'
+  );
+}
+function calcularArqueo(){
+  let total = 0;
+  DENOMINACIONES.forEach(d=>{
+    const cant = Number(document.querySelector('[data-den="'+d.valor+'"]').value)||0;
+    const sub = cant*d.valor; total += sub;
+    document.getElementById('arq-sub-'+d.valor).textContent = fmt(sub);
+  });
+  document.getElementById('arq-total').textContent = fmt(total);
+}
+function usarArqueo(){
+  const total = Number((document.getElementById('arq-total').textContent||'').replace(/[^\d]/g,''))||0;
+  document.getElementById('cc-efectivo').value = total;
+  cerrarModal();
+}
+
+/* ===== Resumen previo a guardar ===== */
+function revisarCierreCaja(){
+  const fecha = document.getElementById('cc-fecha').value;
+  if(!fecha){ document.getElementById('cc-error').textContent='Selecciona la fecha'; return; }
+  document.getElementById('cc-error').textContent='';
+  const vals = {
+    efectivo: Number(document.getElementById('cc-efectivo').value)||0,
+    debito: Number(document.getElementById('cc-debito').value)||0,
+    credito: Number(document.getElementById('cc-credito').value)||0,
+    transferencia: Number(document.getElementById('cc-transferencia').value)||0,
+    pedidosYa: Number(document.getElementById('cc-pedidosya').value)||0,
+    retiro: Number(document.getElementById('cc-retiro').value)||0
+  };
+  const total = vals.efectivo+vals.debito+vals.credito+vals.transferencia+vals.pedidosYa;
+  const fila = (label,val)=>'<div class="rowline" style="font-size:13px;"><span>'+label+'</span><span class="mono">'+fmt(val)+'</span></div>';
+  abrirModal(
+    '<h3 style="font-size:15px;">Resumen del cierre</h3>'+
+    '<p style="font-size:11.5px;color:var(--ink-soft);margin:2px 0 10px;">'+fecha+'</p>'+
+    fila('Efectivo', vals.efectivo)+fila('Débito', vals.debito)+fila('Crédito', vals.credito)+
+    fila('Transferencias', vals.transferencia)+fila('Pedidos Ya', vals.pedidosYa)+
+    '<div class="rowline" style="font-size:14px;font-weight:700;border-top:1px solid var(--border);margin-top:6px;padding-top:6px;"><span>Total ventas</span><span class="mono">'+fmt(total)+'</span></div>'+
+    fila('Retiro (fondo día siguiente)', vals.retiro)+
+    '<div class="error-msg" id="cc-modal-error"></div>'+
+    '<div style="display:flex;gap:8px;margin-top:14px;"><button class="btn-secondary" onclick="cerrarModal()">Volver a revisar</button><button class="btn-primary" onclick="guardarCierreCajaFinal()">Confirmar y guardar</button></div>'
+  );
+}
+async function guardarCierreCajaFinal(){
   const data = { fecha:document.getElementById('cc-fecha').value, saldoInicial:document.getElementById('cc-saldo').value||0,
     efectivo:document.getElementById('cc-efectivo').value||0, debito:document.getElementById('cc-debito').value||0,
     credito:document.getElementById('cc-credito').value||0, transferencia:document.getElementById('cc-transferencia').value||0,
     pedidosYa:document.getElementById('cc-pedidosya').value||0, retiro:document.getElementById('cc-retiro').value||0, responsable:sesion.nombre };
-  if(!data.fecha){ document.getElementById('cc-error').textContent='Selecciona la fecha'; return; }
   const r = await llamarAPI('registrarCierreCaja',{data});
   if(r.ok){
+    cerrarModal();
     document.getElementById('confirm-title').textContent='Cierre guardado';
     document.getElementById('confirm-msg').textContent='El registro quedó guardado correctamente.';
     document.getElementById('confirm-detalle').innerHTML = '<div class="check-row check-warn">📋 No olvides actualizar la Caja Inicial en Aronium con el efectivo que queda en caja</div>';
     irA('screen-confirm');
-  } else { document.getElementById('cc-error').textContent = r.error||'Error al guardar'; }
+  } else { document.getElementById('cc-modal-error').textContent = r.error||'Error al guardar'; }
 }
 
 /* ===== VENTA VEGAN CORNER (carrito multi-producto) ===== */
