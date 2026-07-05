@@ -1480,7 +1480,31 @@ async function procesarArchivo(file){
   } catch(err){ document.getElementById('import-error').textContent = 'No se pudo leer el archivo: '+err.message; }
 }
 function filaTexto(r){ return (r||[]).join(' ').toUpperCase(); }
-function numCL(s){ return Number(String(s||'0').replace(/\./g,'').replace(',','.'))||0; }
+// Detecta cuál separador es el decimal en vez de asumir siempre "punto=miles, coma=decimal"
+// — ese supuesto fallaba cuando SheetJS entrega el número en formato inglés (coma de miles,
+// punto decimal) sin avisar, aunque el Excel se vea correctamente en formato chileno al
+// abrirlo. Bug real encontrado probando el parser de Aronium Medios de Pago (04/07/2026):
+// "87.000,00" en Excel llegaba como "87,015.00" al navegador, y la versión vieja de numCL
+// lo leía como 87.015 en vez de 87.000.
+function numCL(s){
+  s = String(s||'').trim();
+  if(!s) return 0;
+  const lastComma = s.lastIndexOf(',');
+  const lastDot = s.lastIndexOf('.');
+  if(lastComma===-1 && lastDot===-1) return Number(s)||0;
+  if(lastComma!==-1 && lastDot!==-1){
+    // el símbolo que aparece más a la derecha es el separador decimal
+    if(lastComma > lastDot) return Number(s.replace(/\./g,'').replace(',','.'))||0;
+    return Number(s.replace(/,/g,''))||0;
+  }
+  // solo aparece uno de los dos símbolos
+  const sep = lastComma!==-1 ? ',' : '.';
+  const idx = lastComma!==-1 ? lastComma : lastDot;
+  const decimales = s.length - idx - 1;
+  const ocurrencias = s.split(sep).length - 1;
+  if(ocurrencias===1 && decimales<=2) return Number(s.replace(sep,'.'))||0; // aparece 1 vez con 1-2 dígitos después: decimal
+  return Number(s.split(sep).join(''))||0; // se repite, o tiene 3+ dígitos después: separador de miles
+}
 function encontrarColumna(header, textos){
   for(let i=0;i<header.length;i++){ const h=String(header[i]).toUpperCase(); if(textos.some(t=>h.indexOf(t)!==-1)) return i; }
   return -1;
