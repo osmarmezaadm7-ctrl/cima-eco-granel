@@ -205,7 +205,7 @@ function pintarConciliacion(r){
   lista.forEach(c=>{
     const pillClase = c.estado==='Confirmada'?'pill-ok':(c.estado==='Atrasada'?'pill-critica':'pill-alerta');
     const div = document.createElement('div'); div.className='fuente-card';
-    div.onclick = () => abrirHallazgos(c.desde, c.hasta, c.fuente, c.loteId);
+    div.onclick = () => abrirRevisionDesde(c.desde, c.hasta);
     div.innerHTML =
       '<div class="f-txt"><strong>'+c.fuente+'</strong><span>'+c.desde+' al '+c.hasta+'</span></div>'+
       '<div class="f-right"><span class="pill '+pillClase+'">'+c.estado+(c.diasAtraso?(' · '+c.diasAtraso+'d'):'')+'</span>'+
@@ -298,76 +298,104 @@ async function procesarConciliacion(){
   }
 }
 
-/* ===== Hallazgos (Pantalla B) ===== */
-function claveFechaOrden(f){ const [d,m,y]=f.split('/'); return y+m.padStart(2,'0')+d.padStart(2,'0'); }
-async function abrirHallazgos(desde, hasta, fuente, loteId){
-  window.chDesde = desde; window.chHasta = hasta; window.chLoteId = loteId;
-  irA('screen-conciliacion-hallazgos');
-  document.getElementById('ch-titulo').textContent = 'Hallazgos — '+(fuente||'')+' ('+desde+' al '+hasta+')';
-  const btnGasto = document.getElementById('ch-btn-gasto');
-  btnGasto.style.display = (loteId && (fuente==='Transbank Comisión' || fuente==='PedidosYa')) ? 'block' : 'none';
-  document.getElementById('lista-hallazgos').innerHTML = skeletonCards(3);
-  const r = await llamarAPISilencioso('listarAlertas', {});
-  if(document.getElementById('screen-conciliacion-hallazgos').classList.contains('active')) pintarHallazgos(r, desde, hasta);
+/* ===================================================================
+   REVISIÓN — reemplaza a la vieja pantalla de Hallazgos con emparejamiento
+   =================================================================== */
+const NOMBRES_MEDIO = {Debito:'Débito', Credito:'Crédito', Efectivo:'Efectivo', PedidosYa:'Pedidos Ya', Transferencia:'Transferencia'};
+
+function abrirRevisionDesde(desde, hasta){
+  irA('screen-conciliacion-revision');
+  document.getElementById('rev-desde').value = valueFromCL(desde);
+  document.getElementById('rev-hasta').value = valueFromCL(hasta);
+  cargarRevision();
 }
-function pintarHallazgos(r, desde, hasta){
-  const cont = document.getElementById('lista-hallazgos'); cont.innerHTML='';
-  const cDesde = claveFechaOrden(desde), cHasta = claveFechaOrden(hasta);
-  const todas = (r.alertas||[]).filter(a=>{
-    if(a.estado!=='Pendiente') return false;
-    if(a.categoria.indexOf('Conciliación:')!==0 && a.categoria.indexOf('Diagnóstico:')!==0) return false;
-    const c = claveFechaOrden(a.fechaInicioReal);
-    return c>=cDesde && c<=cHasta;
+
+async function cargarRevision(){
+  const desde = fechaCLDesdeValue('rev-desde');
+  const hasta = fechaCLDesdeValue('rev-hasta');
+  const cont = document.getElementById('rev-contenido');
+  if(!desde || !hasta){ cont.innerHTML = '<p style="font-size:12px;color:var(--danger);">Elige ambas fechas.</p>'; return; }
+  document.getElementById('rev-titulo').textContent = 'Revisión · '+desde+' al '+hasta;
+  cont.innerHTML = skeletonCards(3);
+  const r = await llamarAPISilencioso('obtenerRevisionPeriodo', {desde, hasta});
+  if(!r.ok){ cont.innerHTML = '<p style="font-size:12px;color:var(--danger);">'+(r.error||'Error al cargar')+'</p>'; return; }
+  pintarRevision(r);
+}
+
+function pintarRevision(r){
+  const cont = document.getElementById('rev-contenido');
+  const esAncho = window.matchMedia('(min-width: 900px)').matches;
+  const kpiHtml =
+    '<div class="rev-kpi-row">'+
+      '<div class="rev-kpi verde"><div class="lbl">Cuadre</div><div class="val">'+r.resumen.cuadre+' días</div></div>'+
+      '<div class="rev-kpi amarillo"><div class="lbl">Inconsistencias</div><div class="val">'+r.resumen.inconsistencias+' días</div></div>'+
+      '<div class="rev-kpi rojo"><div class="lbl">Descuadre</div><div class="val">'+r.resumen.descuadre+' días</div></div>'+
+    '</div>'+
+    '<div class="rev-leyenda">'+
+      '<span><span class="punto verde"></span> Todo cuadra</span>'+
+      '<span><span class="punto amarillo"></span> Digitación de tarjeta/Pedidos Ya no calza</span>'+
+      '<span><span class="punto rojo"></span> El total no cuadra — posible plata real</span>'+
+    '</div>';
+  const tablaOCards = esAncho ? tablaRevisionDesktop(r.dias) : tarjetasRevisionMobile(r.dias);
+  cont.innerHTML = kpiHtml + tablaOCards +
+    '<button class="btn-primary" style="margin-top:16px;" onclick="alert(\'Hallazgos: pantalla en construcción\')">Ir a Hallazgos</button>';
+}
+
+function tablaRevisionDesktop(dias){
+  let filas = '';
+  dias.forEach(d=>{
+    if(d.sinCierre){
+      filas += '<tr class="fila-dia"><td>'+d.fecha+'</td><td colspan="3" style="text-align:left;font-style:italic;color:var(--danger);">Sin cierre de caja — venta real detectada ('+fmt(d.totalComprobado)+')</td><td style="text-align:center;"><span class="punto rojo"></span></td></tr>';
+      return;
+    }
+    const luces = (d.amarillo?'<span class="punto amarillo"></span> ':'') + (d.rojo?'<span class="punto rojo"></span>':'') + ((!d.amarillo && !d.rojo)?'<span class="punto verde"></span>':'');
+    filas += '<tr class="fila-dia" onclick="toggleFilaRevision(this)"><td>'+d.fecha+' ▾</td><td>'+fmt(d.totalAronium)+'</td><td>'+fmt(d.totalRegistro)+'</td><td>'+fmt(d.totalComprobado)+'</td><td style="text-align:center;">'+luces+'</td></tr>';
+    d.detallePorMedio.forEach(m=>{
+      const claseReg = Math.abs(m.registro-m.comprobado)>1 ? 'dif-rev' : '';
+      const claseAr = Math.abs(m.aronium-m.comprobado)>1 ? 'dif-rev-menor' : '';
+      filas += '<tr class="fila-medio" style="display:none;"><td>'+NOMBRES_MEDIO[m.medio]+'</td><td class="'+claseAr+'">'+fmt(m.aronium)+'</td><td class="'+claseReg+'">'+fmt(m.registro)+'</td><td>'+fmt(m.comprobado)+'</td><td></td></tr>';
+    });
   });
-  if(!todas.length){ cont.innerHTML='<p style="font-size:12.5px;color:var(--ink-soft);">Sin hallazgos pendientes en este período.</p>'; return; }
-  todas.forEach(a=>{
-    const div = document.createElement('div'); div.className='hallazgo'; div.dataset.id=a.id;
-    const pillClase = a.severidad==='Critica'?'pill-critica':(a.severidad==='Alerta'?'pill-alerta':'pill-menor');
-    div.innerHTML =
-      '<div class="h-top"><div><div style="font-size:11px;color:var(--ink-soft);font-weight:700;text-transform:uppercase;">'+a.fecha+'</div>'+
-      '<strong style="font-size:14px;">'+a.categoria.replace(/^(Conciliación|Diagnóstico): /,'')+'</strong></div>'+
-      '<span class="pill '+pillClase+'">'+a.severidad+'</span></div>'+
-      '<div class="rowline"><span>Digitado / esperado</span><b>'+fmt(a.esperado)+'</b></div>'+
-      '<div class="rowline"><span>Oficial / real</span><b>'+fmt(a.real)+'</b></div>'+
-      '<div class="rowline"><span>Diferencia</span><b>'+fmt(a.diferencia)+'</b></div>'+
-      '<div style="display:flex;gap:8px;margin-top:10px;">'+
-      '<button class="btn-secondary btn-small" onclick="confirmarHallazgoUI(\''+a.id+'\',\'rechazar\',\''+a.severidad+'\',\''+(a.responsable||'')+'\')">Rechazar</button>'+
-      '<button class="btn-primary" style="flex:1;" onclick="confirmarHallazgoUI(\''+a.id+'\',\'confirmar\',\''+a.severidad+'\',\''+(a.responsable||'')+'\')">Confirmar</button>'+
+  return '<table class="tabla-rev"><colgroup><col class="c-dia"><col class="c-num"><col class="c-num"><col class="c-num"><col class="c-luz"></colgroup>'+
+    '<thead><tr><th>Día</th><th>Aronium</th><th>Registro</th><th>Comprobado</th><th style="text-align:center;">●</th></tr></thead><tbody>'+filas+'</tbody></table>';
+}
+
+function toggleFilaRevision(tr){
+  tr.classList.toggle('abierta');
+  let sib = tr.nextElementSibling;
+  while(sib && sib.classList.contains('fila-medio')){
+    sib.style.display = tr.classList.contains('abierta') ? 'table-row' : 'none';
+    sib = sib.nextElementSibling;
+  }
+}
+
+function tarjetasRevisionMobile(dias){
+  let html = '';
+  dias.forEach((d,i)=>{
+    if(d.sinCierre){
+      html += '<div class="card-dia rojo"><div class="c-top"><strong>'+d.fecha+'</strong><span class="punto rojo"></span></div>'+
+        '<p style="font-size:12px;color:var(--danger);margin:4px 0 0;">Sin cierre de caja — venta real detectada ('+fmt(d.totalComprobado)+')</p></div>';
+      return;
+    }
+    const claseCard = d.rojo ? 'rojo' : (d.amarillo ? '' : 'verde');
+    const luces = (d.amarillo?'<span class="punto amarillo"></span> ':'') + (d.rojo?'<span class="punto rojo"></span>':'') + ((!d.amarillo && !d.rojo)?'<span class="punto verde"></span>':'');
+    const idDet = 'rev-mob-det-'+i;
+    let detalleHtml = '';
+    d.detallePorMedio.forEach(m=>{
+      detalleHtml += '<div class="medio-block"><div class="medio-nombre">'+NOMBRES_MEDIO[m.medio]+'</div>'+
+        '<div class="rowline"><span>Aronium</span><b>'+fmt(m.aronium)+'</b></div>'+
+        '<div class="rowline"><span>Registro</span><b'+(Math.abs(m.registro-m.comprobado)>1?' style="color:var(--danger);"':'')+'>'+fmt(m.registro)+'</b></div>'+
+        '<div class="rowline"><span>Comprobado</span><b>'+fmt(m.comprobado)+'</b></div></div>';
+    });
+    html += '<div class="card-dia '+claseCard+'" onclick="var e=document.getElementById(\''+idDet+'\');e.style.display=(e.style.display===\'block\'?\'none\':\'block\');">'+
+      '<div class="c-top"><strong>'+d.fecha+'</strong>'+luces+'</div>'+
+      '<div class="rowline"><span>Aronium</span><b>'+fmt(d.totalAronium)+'</b></div>'+
+      '<div class="rowline"><span>Registro</span><b>'+fmt(d.totalRegistro)+'</b></div>'+
+      '<div class="rowline"><span>Comprobado</span><b>'+fmt(d.totalComprobado)+'</b></div>'+
+      '<div id="'+idDet+'" style="display:none;">'+detalleHtml+'</div>'+
       '</div>';
-    cont.appendChild(div);
   });
-}
-async function confirmarHallazgoUI(id, decision, severidad, responsable){
-  let nota = '';
-  if(severidad==='Critica'){ nota = prompt('Esta alerta es crítica: describe qué pasó'); if(!nota) return; }
-  let notificarA = '';
-  if(responsable && confirm('¿Notificar a '+responsable+'?')) notificarA = responsable;
-  const r = await llamarAPI('confirmarHallazgoConciliacion', {id, decision, nota, notificarA});
-  if(r.ok){
-    const card = document.querySelector('#lista-hallazgos .hallazgo[data-id="'+id+'"]');
-    if(card) card.remove();
-  } else {
-    alert(r.error||'Error al procesar el hallazgo');
-  }
-}
-async function ejecutarComparar(){
-  if(!window.chDesde) return;
-  const r = await llamarAPI('compararPeriodo', {desde:window.chDesde, hasta:window.chHasta});
-  if(r.ok){
-    const rAlertas = await llamarAPISilencioso('listarAlertas', {});
-    pintarHallazgos(rAlertas, window.chDesde, window.chHasta);
-  } else {
-    alert(r.error||'Error al comparar');
-  }
-}
-async function confirmarGastoUI(){
-  if(!window.chLoteId) return;
-  const r = await llamarAPI('confirmarGastoComision', {loteId:window.chLoteId});
-  if(r.ok){
-    abrirModal('<h3 style="font-size:15px;">Gasto creado</h3><p style="font-size:12.5px;">Se registró el gasto de comisión correctamente.</p><button class="btn-primary" style="margin-top:10px;width:100%;" onclick="cerrarModal()">Cerrar</button>');
-  } else {
-    alert(r.error||'Error al confirmar el gasto');
-  }
+  return html;
 }
 
 /* ===================================================================
