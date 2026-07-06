@@ -18,6 +18,43 @@
 .hallazgo{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:14px 15px;margin-bottom:10px;}
 .hallazgo .h-top{display:flex;justify-content:space-between;gap:10px;margin-bottom:8px;}
 .pill-ok{background:var(--forest-soft);color:var(--forest);}
+
+/* ===== Revisión (Conciliación) ===== */
+.stepper{display:flex;align-items:center;gap:4px;margin-bottom:16px;}
+.stepper .st{display:flex;align-items:center;gap:5px;font-size:10px;font-weight:700;color:var(--border);white-space:nowrap;}
+.stepper .st .n{width:18px;height:18px;border-radius:50%;background:var(--border);color:#fff;display:flex;align-items:center;justify-content:center;font-size:9.5px;flex-shrink:0;}
+.stepper .st.done{color:var(--forest);} .stepper .st.done .n{background:var(--forest);}
+.stepper .st.now{color:var(--ink);} .stepper .st.now .n{background:var(--terracotta);}
+.stepper .line{flex:1;height:1.5px;background:var(--border);min-width:6px;}
+.punto{display:inline-block;width:9px;height:9px;border-radius:50%;flex-shrink:0;}
+.punto.verde{background:var(--success);} .punto.amarillo{background:#E0A526;} .punto.rojo{background:var(--danger);}
+.rev-kpi-row{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px;}
+.rev-kpi{background:var(--surface);border:1.5px solid var(--border);border-radius:14px;padding:13px 14px;}
+.rev-kpi .lbl{font-size:10.5px;color:var(--ink-soft);font-weight:800;text-transform:uppercase;}
+.rev-kpi .val{font-family:'JetBrains Mono',monospace;font-size:19px;font-weight:700;margin-top:4px;}
+.rev-kpi.verde .val{color:var(--success);} .rev-kpi.amarillo .val{color:#8A5A0B;} .rev-kpi.rojo .val{color:var(--danger);}
+.rev-leyenda{display:flex;gap:16px;font-size:11px;color:var(--ink-soft);margin:8px 0 16px;flex-wrap:wrap;}
+.rev-leyenda span{display:flex;align-items:center;gap:5px;}
+.tabla-rev{width:100%;border-collapse:collapse;font-size:12.5px;table-layout:fixed;}
+.tabla-rev col.c-dia{width:26%;} .tabla-rev col.c-num{width:20%;} .tabla-rev col.c-luz{width:14%;}
+.tabla-rev th{text-align:right;padding:8px 10px;color:var(--ink-soft);font-weight:700;border-bottom:1.5px solid var(--border);font-size:10px;text-transform:uppercase;}
+.tabla-rev th:first-child,.tabla-rev td:first-child{text-align:left;}
+.tabla-rev td{padding:9px 10px;border-bottom:1px solid var(--border);text-align:right;font-family:'JetBrains Mono',monospace;}
+.tabla-rev td:first-child{font-family:'Work Sans',sans-serif;}
+.fila-dia{cursor:pointer;}
+.fila-dia:hover{background:var(--forest-soft);}
+.fila-dia.abierta{background:var(--forest-soft);}
+.fila-medio td{color:var(--ink-soft);border-bottom:none;padding-top:5px;padding-bottom:5px;}
+.fila-medio td:first-child{padding-left:26px;font-weight:600;color:var(--ink);font-family:'Work Sans',sans-serif;}
+.fila-medio:last-of-type td{border-bottom:1px solid var(--border);padding-bottom:10px;}
+.dif-rev{color:var(--danger);font-weight:700;} .dif-rev-menor{color:var(--warn);font-weight:700;}
+.card-dia{background:var(--surface);border:1px solid var(--border);border-left:4px solid var(--border);border-radius:0 12px 12px 0;padding:13px 14px;margin-bottom:9px;cursor:pointer;}
+.card-dia.verde{border-left-color:var(--success);}
+.card-dia.rojo{border-left-color:var(--danger);}
+.card-dia .c-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;}
+.card-dia .c-top strong{font-size:14px;}
+.medio-block{margin-top:8px;padding-top:8px;border-top:1.5px dashed var(--border);}
+.medio-block .medio-nombre{font-size:11px;font-weight:800;color:var(--ink-soft);text-transform:uppercase;margin-bottom:2px;}
 </style>
 </head>
 <body>
@@ -418,12 +455,27 @@
   </div>
 
   <!-- CONCILIACIÓN — Hallazgos de un período -->
-  <div class="screen desktop-wide" id="screen-conciliacion-hallazgos">
+  <!-- CONCILIACIÓN — Revisión (reemplaza a la vieja pantalla de hallazgos con emparejamiento) -->
+  <div class="screen desktop-wide" id="screen-conciliacion-revision">
     <button class="back-link" onclick="irA('screen-conciliacion')"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"></path></svg> Volver</button>
-    <h2 style="font-size:17px;" id="ch-titulo">Hallazgos</h2>
-    <button class="btn-primary" style="margin-bottom:10px;" id="ch-btn-comparar" onclick="ejecutarComparar()">Comparar ahora</button>
-    <button class="btn-secondary" style="margin-bottom:14px;display:none;" id="ch-btn-gasto" onclick="confirmarGastoUI()">Confirmar gasto de comisión</button>
-    <div id="lista-hallazgos"></div>
+
+    <div class="stepper">
+      <div class="st done"><div class="n">✓</div>Período</div><div class="line"></div>
+      <div class="st done"><div class="n">✓</div>Archivos</div><div class="line"></div>
+      <div class="st now"><div class="n">3</div>Revisión</div><div class="line"></div>
+      <div class="st"><div class="n">4</div>Hallazgos</div><div class="line"></div>
+      <div class="st"><div class="n">5</div>Cerrar</div>
+    </div>
+
+    <h2 style="font-size:17px;" id="rev-titulo">Revisión</h2>
+    <p style="font-size:11.5px;color:var(--ink-soft);margin:-4px 0 12px;">Entrada temporal: mientras se construye el flujo guiado completo, el período se elige directo acá.</p>
+    <div style="display:flex;gap:10px;align-items:flex-end;margin-bottom:14px;">
+      <div style="flex:1;"><label>Desde</label><input type="date" id="rev-desde"></div>
+      <div style="flex:1;"><label>Hasta</label><input type="date" id="rev-hasta"></div>
+      <button class="btn-primary" style="width:auto;padding:11px 18px;" onclick="cargarRevision()">Ver</button>
+    </div>
+
+    <div id="rev-contenido"></div>
   </div>
 
   <!-- MOVIMIENTOS (todos) -->
@@ -633,7 +685,7 @@ function simularAPI(accion, extra){
   if (accion === 'listarConciliaciones') return { ok:true, conciliaciones:[] };
   if (accion === 'sugerirProximoPeriodo') return { ok:true, desde:'', hasta:'', primeraVez:true };
   if (accion === 'obtenerNotificacionesActivas') return { ok:true, notificaciones:[] };
-  if (accion === 'compararPeriodo') return { ok:true, alertasGeneradas:0 };
+  if (accion === 'obtenerRevisionPeriodo') return { ok:true, dias:[], resumen:{cuadre:0,inconsistencias:0,descuadre:0} };
   if (accion === 'listarCuentasPorPagar') return { ok:true, cuentas:[], total:0, cantidad:0 };
   if (accion === 'listarPrograma') return { ok:true, programa:[] };
   if (accion === 'listarInventarioMP') return { ok:true, inventario:[] };
