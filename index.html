@@ -358,6 +358,8 @@
     <h2 style="font-size:17px;">Usuarios y permisos</h2>
     <div id="tabla-permisos"></div>
     <div class="submit-bar"><button class="btn-primary" onclick="guardarPermisos()">Guardar cambios</button></div>
+    <h3 style="font-size:13px;margin:18px 0 8px;">Restablecer PIN</h3>
+    <div id="perm-restablecer"></div>
   </div>
 
   <!-- ESTADO DE RESULTADOS -->
@@ -565,10 +567,6 @@ let negocioER = 'Cima Eco-Granel';
 let carritoVegan = [];
 let programaActualId = null;
 
-/* ===== Caché de módulos secundarios (Alertas / CxP / CxC / Programa / Inventario / Lista compra) =====
-   null = "no cargado todavía, hay que pedirlo". Cualquier acción que escribe datos en uno de estos
-   módulos lo pone en null para forzar que la próxima vez que se abra la pantalla se pida de nuevo.
-   cachePanel (más abajo) es aparte porque además se indexa por período (año-mes). */
 let cacheModulo = { alertas:null, cxp:null, cxc:null, programa:null, inventario:null, listaCompra:null, conciliaciones:null };
 let panelPeriodoActual = 'actual';
 
@@ -581,8 +579,6 @@ const USUARIOS_DEMO = [
   {nombre:'Katherine Bustamante', rol:'Staff', negocio:'Vegan Corner'}
 ];
 
-/* ===== Set de íconos de línea (reemplaza los emoji en sidebar y tiles de Home) =====
-   Mismo trazo (stroke-width 1.8, viewBox 24x24) para que se vean consistentes entre sí. */
 const ICONS = {
   conciliacion: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3v18M9 21l-4-4M9 3l-4 4M15 21V3M15 3l4 4M15 21l4-4"></path></svg>',
   panel: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="7" height="7" rx="1.5"></rect><rect x="14" y="3" width="7" height="7" rx="1.5"></rect><rect x="14" y="14" width="7" height="7" rx="1.5"></rect><rect x="3" y="14" width="7" height="7" rx="1.5"></rect></svg>',
@@ -617,14 +613,6 @@ function irA(id){
 }
 
 function fmt(n){ return '$'+Math.round(n||0).toLocaleString('es-CL'); }
-// Devuelve la fecha de HOY en formato YYYY-MM-DD usando la hora LOCAL del navegador.
-// No usar input.valueAsDate = new Date() en ningún lado: esa propiedad interpreta el
-// objeto Date en UTC, no en la hora de Chile. Registrando de noche (Chile va detrás de
-// UTC), el campo de fecha se autocompletaba con el día siguiente aunque acá todavía fuera
-// el día anterior — bug real detectado el 03/07/2026 (un cierre de caja quedó guardado
-// con fecha 4 cuando en Chile aún era 3). Esta función arma el string a mano con
-// getFullYear/getMonth/getDate (todos en hora local) y se asigna con .value, nunca con
-// .valueAsDate.
 function fechaLocalISO(){
   const d = new Date();
   const y = d.getFullYear();
@@ -657,8 +645,6 @@ async function llamarAPI(accion, extra){
   }
 }
 
-/* Variante silenciosa: no muestra el overlay de pantalla completa. Se usa cuando la pantalla
-   ya está visible (con caché viejo o skeleton) y solo queremos traer datos frescos detrás de cámara. */
 async function llamarAPISilencioso(accion, extra){
   try{
     if (modoDemo){ await new Promise(r=>setTimeout(r,280)); return simularAPI(accion, extra); }
@@ -705,8 +691,6 @@ function seleccionarToggle(groupId,btn,valor){
   btn.classList.add('selected'); g.dataset.valor=valor;
 }
 
-/* ===== Pagos múltiples (Venta Vegan y Compra) =====
-   pagosState['vv'|'co'] = [{medio, monto, contraparte}]. Canje pide contraparte. */
 let pagosState = { vv: [], co: [] };
 
 function inicializarPagos(prefix, montoInicial){
@@ -790,7 +774,7 @@ function validarPagosCliente(prefix){
   const estado = document.getElementById(prefix+'-estado-group').dataset.valor || 'Pagado';
   if(estado==='Pendiente de pago' && !document.getElementById(prefix+'-parcial-check').checked) return { ok:true, pagos:[], estado, abono:0 };
   const esperado = montoEsperadoPagos(prefix);
-  if(pagosState[prefix].length===1) pagosState[prefix][0].monto = esperado; // un solo medio: usa el monto ya declarado arriba
+  if(pagosState[prefix].length===1) pagosState[prefix][0].monto = esperado;
   const contraparteFormulario = prefix==='vv' ? valorSearchSelect('ss-vv-cliente') : valorSearchSelect('ss-co-proveedor');
   const pagosLimpios = pagosState[prefix].filter(p=>p.monto>0).map(p=>
     p.medio==='Canje' ? Object.assign({}, p, { contraparte: contraparteFormulario }) : p
@@ -804,8 +788,6 @@ function validarPagosCliente(prefix){
   return { ok:true, pagos:pagosLimpios, estado:estadoFinal, abono: document.getElementById(prefix+'-parcial-check').checked ? (Number(document.getElementById(prefix+'-abono').value)||0) : undefined };
 }
 
-/* ===== Buscador / autocompletado reutilizable =====
-   Uso: initSearchSelect('ss-id', [{value,label}], {onSelect, incluirNuevo}) */
 let searchSelectData = {};
 function initSearchSelect(id, opciones, opts){
   searchSelectData[id] = { opciones, onSelect: (opts&&opts.onSelect)||null, incluirNuevo: !!(opts&&opts.incluirNuevo) };
@@ -837,12 +819,9 @@ document.addEventListener('click', e=>{
   document.querySelectorAll('.search-select-list.open').forEach(l=>{ if(!l.closest('.search-select').contains(e.target)) l.classList.remove('open'); });
 });
 
-/* ===== LOGIN / PIN ===== */
-// Color del avatar por negocio — no por persona: así cualquier colaborador nuevo que
-// agregues queda coherente sin tener que definirle un color a mano.
 function colorPorNegocio(negocio){
   if(negocio==='Vegan Corner') return 'var(--caramel)';
-  return 'var(--forest)'; // Cima Eco-Granel y Ambos
+  return 'var(--forest)';
 }
 function pintarUsuarios(){
   const grid = document.getElementById('user-grid'); grid.innerHTML='';
@@ -878,7 +857,6 @@ async function tocarTecla(t){
   if(pinBuffer.length<4){ pinBuffer+=t; pintarPinDots(); }
   if(pinBuffer.length===4) await intentarLogin();
 }
-// Teclado físico: dígitos rellenan sin auto-enviar (excepto Enter/OK) — pensado para escritorio
 document.addEventListener('keydown', (e)=>{
   if(!document.getElementById('screen-pin').classList.contains('active')) return;
   if(/^[0-9]$/.test(e.key) && pinBuffer.length<4){ pinBuffer+=e.key; pintarPinDots(); }
@@ -911,13 +889,10 @@ async function guardarCambioPin(){
   else document.getElementById('cp-error').textContent=r.error||'No se pudo cambiar el PIN';
 }
 
-/* ===== HOME según nivel de permiso (3 variantes) ===== */
 async function entrarAHome(){
   document.getElementById('home-nombre').textContent = sesion.nombre;
   cargarNotificaciones();
   const esEscritorio = window.innerWidth >= 900;
-  // Una sola llamada: permisos + (panel o programa, según corresponda) — evita el segundo
-  // viaje a Apps Script que antes disparaba el auto-navegado de escritorio.
   const ri = await llamarAPI('obtenerInicio', {esEscritorio});
   permisosSesion = {};
   (ri.permisos||[]).filter(p=>p.nombre===sesion.nombre).forEach(p=>{ permisosSesion[p.accion]=p.permitido; });
@@ -929,7 +904,7 @@ async function entrarAHome(){
     cacheModulo.programa = ri.programa;
   }
 
-  const mostrarSidebar = tienePermisoLocal('VerDashboardCompleto') || tienePermisoLocal('VerResumenPropio') ||
+  const mostrarSidebar = tienePermisoLocal('VerDashboardCompleto') || tienePermisoLocal('VisualizarReportes') ||
     tienePermisoLocal('VerPrograma') || tienePermisoLocal('ConfigurarSistema') || tienePermisoLocal('RegistrarMovimiento');
   document.getElementById('sidebar').style.display = mostrarSidebar ? '' : 'none';
   document.getElementById('sidebar-user').textContent = sesion.nombre + ' · ' + sesion.rol;
@@ -938,22 +913,25 @@ async function entrarAHome(){
   const cont = document.getElementById('home-content'); cont.innerHTML='';
   const puedeCima = sesion.rol==='Admin' || sesion.negocio==='Cima Eco-Granel' || sesion.negocio==='Ambos';
 
-  if (tienePermisoLocal('VerDashboardCompleto')){
-    // Nivel 1: Panel completo (Admin / Rocío)
-    cont.insertAdjacentHTML('beforeend','<div class="menu-grupo-titulo">Panel</div>');
-    cont.appendChild(crearMenuCard(ICONS.panel,'Ver Panel','Ingresos, gastos, IVA y alertas',()=>abrirPanel(),false));
+  if (tienePermisoLocal('VerDashboardCompleto') || tienePermisoLocal('VisualizarReportes')){
+    if (tienePermisoLocal('VerDashboardCompleto')){
+      cont.insertAdjacentHTML('beforeend','<div class="menu-grupo-titulo">Panel</div>');
+      cont.appendChild(crearMenuCard(ICONS.panel,'Ver Panel','Ingresos, gastos, IVA y alertas',()=>abrirPanel(),false));
+    }
     cont.insertAdjacentHTML('beforeend','<div class="menu-grupo-titulo">Registro rápido</div>');
-    if (puedeCima) cont.appendChild(crearMenuCard(ICONS.caja,'Cierre de caja','Registrar ventas del día',()=>{document.getElementById('cc-fecha').value = fechaLocalISO();setModoCierre('dia',document.querySelector('#cc-modo-group button'));irA('screen-cierre');},true));
+    if (puedeCima && tienePermisoLocal('RegistrarMovimiento')) cont.appendChild(crearMenuCard(ICONS.caja,'Cierre de caja','Registrar ventas del día',()=>{document.getElementById('cc-fecha').value = fechaLocalISO();setModoCierre('dia',document.querySelector('#cc-modo-group button'));irA('screen-cierre');},true));
     if (tienePermisoLocal('RegistrarVentaVegan')) cont.appendChild(crearMenuCard(ICONS.carrito,'Venta Vegan Corner','Registrar pedido a otro negocio',()=>abrirVentaVegan(),false));
     if (tienePermisoLocal('RegistrarCompra')) cont.appendChild(crearMenuCard(ICONS.recibo,'Compra / gasto','Registrar egreso o factura',()=>{prepararCompra();irA('screen-compra');},true));
-    cont.insertAdjacentHTML('beforeend','<div class="menu-grupo-titulo">Reportes</div>');
-    cont.appendChild(crearMenuCard(ICONS.importar,'Importar reportes','Aronium, PedidosYa, Transbank',()=>irA('screen-importar'),true));
-    cont.appendChild(crearMenuCard(ICONS.cxp,'Cuentas por pagar','Facturas pendientes de pago',()=>abrirCuentasPorPagar(),true));
-    cont.appendChild(crearMenuCard(ICONS.cxc,'Cuentas por cobrar','Ventas y canjes pendientes',()=>abrirCuentasPorCobrar(),false));
-    cont.appendChild(crearMenuCard(ICONS.resultados,'Estado de resultados','Por negocio, mes actual',()=>abrirEstadoResultados(),true));
-    cont.appendChild(crearMenuCard(ICONS.f29,'F29','Cálculo de apoyo IVA + PPM',()=>abrirF29(),true));
-    cont.appendChild(crearMenuCard(ICONS.alerta,'Alertas','Auditoría e informativas',()=>abrirAlertas(),true));
-    if (tienePermisoLocal('ConfigurarSistema')){
+    if (tienePermisoLocal('VisualizarReportes')){
+      cont.insertAdjacentHTML('beforeend','<div class="menu-grupo-titulo">Reportes</div>');
+      cont.appendChild(crearMenuCard(ICONS.importar,'Importar reportes','Aronium, PedidosYa, Transbank',()=>irA('screen-importar'),true));
+      cont.appendChild(crearMenuCard(ICONS.cxp,'Cuentas por pagar','Facturas pendientes de pago',()=>abrirCuentasPorPagar(),true));
+      cont.appendChild(crearMenuCard(ICONS.cxc,'Cuentas por cobrar','Ventas y canjes pendientes',()=>abrirCuentasPorCobrar(),false));
+      cont.appendChild(crearMenuCard(ICONS.resultados,'Estado de resultados','Por negocio, mes actual',()=>abrirEstadoResultados(),true));
+      cont.appendChild(crearMenuCard(ICONS.f29,'F29','Cálculo de apoyo IVA + PPM',()=>abrirF29(),true));
+      cont.appendChild(crearMenuCard(ICONS.alerta,'Alertas','Auditoría e informativas',()=>abrirAlertas(),true));
+    }
+    if (tienePermisoLocal('ProcesarConciliacion')){
       cont.appendChild(crearMenuCard(ICONS.conciliacion,'Conciliación','Transbank, PedidosYa, Aronium vs. lo registrado',()=>abrirConciliacion(),true));
     }
     if (tienePermisoLocal('ConfigurarSistema')){
@@ -962,21 +940,17 @@ async function entrarAHome(){
       cont.appendChild(crearMenuCard(ICONS.usuarios,'Usuarios y permisos','Accesos y restablecer PIN',()=>abrirPermisos(),true));
     }
   } else if (tienePermisoLocal('VerPrograma')){
-    // Nivel 2: Producción (Rosa / Katherine)
     cont.insertAdjacentHTML('beforeend','<div class="menu-grupo-titulo">Producción</div>');
     cont.appendChild(crearMenuCard(ICONS.programa,'Programa de producción', tienePermisoLocal('EditarPrograma')?'Ver y editar el programa':'Ver programa y declarar entregas', ()=>abrirPrograma(),false));
     cont.appendChild(crearMenuCard(ICONS.inventario,'Inventario de MP','Ver y actualizar stock',()=>abrirInventario(),true));
     cont.appendChild(crearMenuCard(ICONS.carrito,'Lista de compra MP','Insumos bajo su mínimo',()=>abrirListaCompra(),true));
   } else {
-    // Nivel 3: accesos rápidos (Lucas / Cecilia)
     cont.insertAdjacentHTML('beforeend','<div class="menu-grupo-titulo">Accesos rápidos</div>');
     if (puedeCima && tienePermisoLocal('RegistrarMovimiento')) cont.appendChild(crearMenuCard(ICONS.caja,'Cierre de caja','Registrar ventas del día',()=>{document.getElementById('cc-fecha').value = fechaLocalISO();setModoCierre('dia',document.querySelector('#cc-modo-group button'));irA('screen-cierre');},true));
   }
 
-  // En escritorio (sidebar visible) el home con tarjetas es redundante — aterriza directo
-  // en la pantalla principal de su nivel y navega por el sidebar. En móvil (sin sidebar)
-  // sí necesita las tarjetas como punto de entrada.
   if (esEscritorio && tienePermisoLocal('VerDashboardCompleto')) { abrirPanel(); return; }
+  if (esEscritorio && tienePermisoLocal('VisualizarReportes')) { abrirEstadoResultados(); return; }
   if (esEscritorio && tienePermisoLocal('VerPrograma')) { abrirPrograma(); return; }
   if (esEscritorio && puedeCima && tienePermisoLocal('RegistrarMovimiento')) { document.getElementById('cc-fecha').value = fechaLocalISO(); setModoCierre('dia',document.querySelector('#cc-modo-group button')); irA('screen-cierre'); return; }
   irA('screen-home');
@@ -999,13 +973,10 @@ function pintarSidebar(){
   if (tienePermisoLocal('RegistrarMovimiento') && puedeCima) finanzasHtml += item('screen-cierre',ICONS.caja,'Cierre de caja');
   if (tienePermisoLocal('RegistrarVentaVegan')) finanzasHtml += item('screen-venta-vegan',ICONS.carrito,'Venta Vegan Corner');
   if (tienePermisoLocal('RegistrarCompra')) finanzasHtml += item('screen-compra',ICONS.recibo,'Compra / gasto');
-  if (tienePermisoLocal('VerDashboardCompleto')||tienePermisoLocal('VerResumenPropio')) finanzasHtml += item('screen-importar',ICONS.importar,'Importar reportes');
-  if (tienePermisoLocal('VerDashboardCompleto')) finanzasHtml += item('screen-cxp',ICONS.cxp,'Cuentas por pagar') + item('screen-cxc',ICONS.cxc,'Cuentas por cobrar');
-  if (tienePermisoLocal('VerDashboardCompleto')||tienePermisoLocal('VerResumenPropio')) finanzasHtml += item('screen-estado-resultados',ICONS.resultados,'Estado de resultados') + item('screen-f29',ICONS.f29,'F29') + item('screen-alertas',ICONS.alerta,'Alertas');
-  // Conciliación: exclusiva de quien tiene ConfigurarSistema (hoy solo Osmar) — cuando se
-  // ordenen los ítems de Permisos en Configuración, cambiar por un permiso propio
-  // ("VerConciliacion") en vez de reusar este.
-  if (tienePermisoLocal('ConfigurarSistema')) finanzasHtml += item('screen-conciliacion',ICONS.conciliacion,'Conciliación');
+  if (tienePermisoLocal('VisualizarReportes')) finanzasHtml += item('screen-importar',ICONS.importar,'Importar reportes');
+  if (tienePermisoLocal('VisualizarReportes')) finanzasHtml += item('screen-cxp',ICONS.cxp,'Cuentas por pagar') + item('screen-cxc',ICONS.cxc,'Cuentas por cobrar');
+  if (tienePermisoLocal('VisualizarReportes')) finanzasHtml += item('screen-estado-resultados',ICONS.resultados,'Estado de resultados') + item('screen-f29',ICONS.f29,'F29') + item('screen-alertas',ICONS.alerta,'Alertas');
+  if (tienePermisoLocal('ProcesarConciliacion')) finanzasHtml += item('screen-conciliacion',ICONS.conciliacion,'Conciliación');
   if (finanzasHtml) nav.insertAdjacentHTML('beforeend', '<div class="grupo">Finanzas</div>'+finanzasHtml);
 
   let prodHtml='';
@@ -1040,11 +1011,9 @@ function onEntrarScreen(id){
   if(id==='screen-cierre'){ document.getElementById('cc-fecha').value = fechaLocalISO(); setModoCierre('dia',document.querySelector('#cc-modo-group button')); }
 }
 
-/* ===== MODAL genérico (overlay sutil) ===== */
 function abrirModal(html){ document.getElementById('modal-card').innerHTML=html; document.getElementById('modal-bg').classList.add('active'); }
 function cerrarModal(){ document.getElementById('modal-bg').classList.remove('active'); }
 
-/* ===== PANEL ===== */
 const NOMBRES_MES = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
 let cachePanel = {};
 async function abrirPanel(periodo, forzar){
@@ -1058,24 +1027,17 @@ async function abrirPanel(periodo, forzar){
   const key = anio+'-'+mes;
   if(forzar) cachePanel[key] = null;
   if(cachePanel[key]){
-    // Ya tenemos este período en memoria: se pinta al instante, sin tocar el backend.
     pintarPanel(cachePanel[key], anio, mes);
     return;
   }
-  // Primera vez que se pide este período: mostramos skeleton en vez de bloquear toda la pantalla.
   document.getElementById('panel-contenido').innerHTML =
     '<div class="kpi-row">'+skeletonCards(4).replace(/skel-card/g,'skel-kpi')+'</div>'+
     '<div class="skel-line skel-card" style="height:220px;"></div>';
   const r = await llamarAPISilencioso('obtenerPanel', {anio, mes});
   cachePanel[key] = r;
-  // Si el usuario ya navegó a otro período mientras esperaba, no pisamos su vista actual.
   if(panelPeriodoActual===periodo) pintarPanel(r, anio, mes);
 }
 document.querySelectorAll('#panel-periodo button').forEach(b=>b.addEventListener('click', ()=>abrirPanel(b.dataset.m)));
-/* ===== Gráficos del Panel (SVG puro, sin librerías) ===== */
-// Flujo de ventas: ventana móvil de días naturales (7/30), independiente del mes del
-// Panel — viene de obtenerFlujoVentas() y ya llega pre-ordenado cronológicamente desde
-// el backend (evita el bug de ordenar por número de día, que se rompía al cruzar meses).
 function svgFlujoVentasBarras(ventasPorDia){
   const entries = Object.entries(ventasPorDia||{});
   if(!entries.length) return '<p style="font-size:13px;color:var(--ink-soft);">Sin ventas registradas en este rango.</p>';
@@ -1119,8 +1081,6 @@ function svgGastosPorCategoria(gastos){
   });
   return '<svg viewBox="0 0 '+w+' '+h+'" style="width:100%;height:'+h+'px;">'+filas+'</svg>';
 }
-// Comparativa Cima vs Vegan Corner: tarjetas lado a lado (elegido sobre gráfico de barras
-// porque con margen negativo de Vegan Corner las barras "colgaban" y se leía mal).
 function renderComparativaCards(cima, vegan){
   return '<div class="comp-cards">'+
     '<div class="comp-card cima"><div class="comp-name">Cima Eco-Granel</div>'+
@@ -1143,7 +1103,6 @@ function pintarPanel(r, anio, mes){
   const cxp = r.cuentasPorPagar||{total:0,cantidad:0};
   const cima = r.porNegocio.cima, vegan = r.porNegocio.vegan;
 
-  // Orden de prioridad acordado: 1. KPIs+Resultado, 2. Alertas, 3. Movimientos, 4. Comparativa, 5. Gráficos
   c.innerHTML =
     '<p class="mono" style="font-size:12px;color:var(--ink-soft);margin:-4px 0 12px;font-weight:600;">Período: '+NOMBRES_MES[mes-1]+' '+anio+'</p>'+
     '<div class="kpi-row">'+
@@ -1176,7 +1135,6 @@ function pintarPanel(r, anio, mes){
   cargarMovimientos();
 }
 
-/* ===== Flujo de ventas — ventana móvil 7/30 días (independiente del mes del Panel) ===== */
 let flujoVentasCache = {};
 let flujoDiasActual = 7;
 async function cargarFlujoVentas(dias, forzar){
@@ -1199,7 +1157,6 @@ function renderFlujoVentas(r){
   wrap.innerHTML = svgFlujoVentasBarras(r.ventasPorDia);
 }
 
-/* ===== Resumen de movimientos (Panel: 5 · Pantalla completa: todos) ===== */
 let movimientosCache = null;
 async function cargarMovimientos(forzar){
   if(forzar) movimientosCache = null;
@@ -1244,8 +1201,6 @@ async function abrirMovimientos(forzar){
     : '<p style="font-size:13px;color:var(--ink-soft);">Sin movimientos registrados todavía.</p>';
 }
 
-/* ===== CIERRE DE CAJA ===== */
-/* ===== Asistente de arqueo por denominación ===== */
 const DENOMINACIONES = [
   { valor:20000, tipo:'Billete' }, { valor:10000, tipo:'Billete' }, { valor:5000, tipo:'Billete' }, { valor:2000, tipo:'Billete' }, { valor:1000, tipo:'Billete' },
   { valor:500, tipo:'Moneda' }, { valor:100, tipo:'Moneda' }, { valor:50, tipo:'Moneda' }, { valor:10, tipo:'Moneda' }
@@ -1283,7 +1238,6 @@ function usarArqueo(){
   cerrarModal();
 }
 
-/* ===== Tipo de cierre: un día vs. varios días ===== */
 let modoCierre = 'dia';
 function setModoCierre(modo, btn){
   modoCierre = modo;
@@ -1293,7 +1247,6 @@ function setModoCierre(modo, btn){
   document.getElementById('cc-fecha-periodo').style.display = modo==='periodo' ? 'block':'none';
 }
 
-/* ===== Resumen previo a guardar ===== */
 function revisarCierreCaja(){
   const esPeriodo = modoCierre === 'periodo';
   let fecha, fechaHasta = '';
@@ -1317,10 +1270,6 @@ function revisarCierreCaja(){
     pedidosYa: Number(document.getElementById('cc-pedidosya').value)||0,
     retiro: Number(document.getElementById('cc-retiro').value)||0
   };
-  // El efectivo digitado incluye el fondo de cambio (saldo inicial) que ya estaba en caja
-  // desde el día (o período) anterior — la venta real en efectivo es Efectivo - Saldo Inicial.
-  // En un cierre de período, ambos valores son los acumulados de todo el rango, así que la
-  // resta sigue siendo correcta sin ningún ajuste adicional.
   const efectivoNeto = vals.efectivo - saldoInicial;
   const total = efectivoNeto+vals.debito+vals.credito+vals.transferencia+vals.pedidosYa;
   const fila = (label,val)=>'<div class="rowline" style="font-size:13px;"><span>'+label+'</span><span class="mono">'+fmt(val)+'</span></div>';
@@ -1349,22 +1298,22 @@ async function guardarCierreCajaFinal(confirmarSobrescritura){
   };
   const r = await llamarAPI('registrarCierreCaja',{data});
   if(r.ok){
-    cachePanel = {}; flujoVentasCache = {}; movimientosCache = null; // el cierre cambia los KPIs del mes, el flujo de ventas y los movimientos
+    cachePanel = {}; flujoVentasCache = {}; movimientosCache = null;
     cerrarModal();
     document.getElementById('confirm-title').textContent='Cierre guardado';
     document.getElementById('confirm-msg').textContent='El registro quedó guardado correctamente.';
     document.getElementById('confirm-detalle').innerHTML = '<div class="check-row check-warn">📋 No olvides actualizar la Caja Inicial en Aronium con el efectivo que queda en caja</div>';
     irA('screen-confirm');
-  } else if (r.requiereConfirmacion) {
-    // El período se traslapa con cierres ya existentes — se advierte y se pide una segunda
-    // confirmación explícita antes de anularlos y reemplazarlos por el cierre consolidado.
+  } else if (r.requiereConfirmacion && r.puedeSobrescribir) {
     document.getElementById('cc-modal-error').innerHTML =
       '<div class="check-row check-warn" style="margin-bottom:8px;">⚠ '+r.mensaje+'</div>'+
       '<button class="btn-primary" style="background:var(--danger);width:100%;" onclick="guardarCierreCajaFinal(true)">Sí, anular y reemplazar</button>';
+  } else if (r.requiereConfirmacion && !r.puedeSobrescribir) {
+    document.getElementById('cc-modal-error').innerHTML =
+      '<div class="check-row check-warn">🔒 '+r.mensaje+'</div>';
   } else { document.getElementById('cc-modal-error').textContent = r.error||'Error al guardar'; }
 }
 
-/* ===== VENTA VEGAN CORNER (carrito multi-producto) ===== */
 async function abrirVentaVegan(){
   document.getElementById('vv-fecha').value = fechaLocalISO();
   await cargarClientes(); await cargarCatalogo(); if(!cacheProveedores.length) await cargarProveedores();
@@ -1407,8 +1356,6 @@ async function cargarCatalogo(){
   const r = await llamarAPI('listarCatalogoProductos',{});
   cacheCatalogo = r.catalogo||[];
 }
-/* Agregar productos: modal con buscador + selección múltiple. No repinta el input de búsqueda
-   al escribir (solo la lista de resultados), para que nunca pierda el foco. */
 function abrirModalAgregarProductos(){
   abrirModal(
     '<h3 style="font-size:15px;">Agregar productos</h3>'+
@@ -1450,8 +1397,6 @@ function cambiarProductoCarrito(id, codigo){
   linea.codigo = codigo; linea.nombre = p? p.nombre : codigo; linea.precioUnit = p? p.precioMayorista : 0;
   pintarCarrito(); actualizarTotales();
 }
-// Solo actualizan el dato + el subtotal de SU fila — nunca repintan todo el carrito,
-// así el campo nunca pierde el foco mientras escribes.
 function cambiarCantidadCarrito(id, val){
   const l = carritoVegan.find(x=>x.id===id); l.cantidad = Number(val)||0;
   const row = document.querySelector('.cart-row[data-rowid="'+id+'"] .sub');
@@ -1513,14 +1458,13 @@ async function enviarVentaVegan(){
   if(!data.fecha || !productos.length){ document.getElementById('vv-error').textContent='Completa la fecha y al menos un producto'; return; }
   const r = await llamarAPI('registrarVentaVegan',{data});
   if(r.ok){
-    cachePanel = {}; movimientosCache = null; // la venta cambia ingresos del Panel y aparece en movimientos
-    if(r.saldoPendiente>0) cacheModulo.cxc = null; // queda un cobro pendiente nuevo
+    cachePanel = {}; movimientosCache = null;
+    if(r.saldoPendiente>0) cacheModulo.cxc = null;
     document.getElementById('confirm-title').textContent='Venta guardada'; document.getElementById('confirm-msg').textContent='Venta Vegan Corner registrada correctamente.'+(r.saldoPendiente>0?' Saldo pendiente: '+fmt(r.saldoPendiente)+'.':''); document.getElementById('confirm-detalle').innerHTML=''; irA('screen-confirm');
   }
   else document.getElementById('vv-error').textContent=r.error||'Error al guardar';
 }
 
-/* ===== COMPRA / GASTO ===== */
 function prepararCompra(){
   document.getElementById('co-fecha').value = fechaLocalISO();
   const grupo = document.getElementById('co-negocio-group');
@@ -1538,8 +1482,6 @@ async function cargarCategoriasCompra(){
     onSelect: (v)=>recargarContraparte(v)
   });
 }
-// Contraparte configurable: la categoría define si el buscador de "Proveedor" muestra
-// tu equipo, tus proveedores comerciales, o ambos (hoja ConfigContraparte, editable sin código).
 async function recargarContraparte(naturaleza){
   document.querySelector('#ss-co-proveedor input[type=text]').value=''; document.getElementById('ss-co-proveedor-valor').value='';
   const r = await llamarAPI('listarContraparteOpciones', { naturaleza });
@@ -1601,14 +1543,13 @@ async function enviarCompra(){
   if(!data.proveedor){ document.getElementById('co-error').textContent='Selecciona la contraparte (proveedor o equipo)'; return; }
   const r = await llamarAPI('registrarCompra',{data});
   if(r.ok){
-    cachePanel = {}; movimientosCache = null; // la compra cambia egresos del Panel y aparece en movimientos
-    if(r.saldoPendiente>0) cacheModulo.cxp = null; // queda un pago pendiente nuevo
+    cachePanel = {}; movimientosCache = null;
+    if(r.saldoPendiente>0) cacheModulo.cxp = null;
     document.getElementById('confirm-title').textContent='Compra guardada'; document.getElementById('confirm-msg').textContent='Compra/gasto registrado correctamente.'+(r.saldoPendiente>0?' Saldo pendiente: '+fmt(r.saldoPendiente)+'.':''); document.getElementById('confirm-detalle').innerHTML=''; irA('screen-confirm');
   }
   else document.getElementById('co-error').textContent=r.error||'Error al guardar';
 }
 
-/* ===== IMPORTAR REPORTES (sin cambios — ya probado con datos reales) ===== */
 const dropzone = document.getElementById('dropzone');
 dropzone.addEventListener('click', ()=>document.getElementById('file-input').click());
 dropzone.addEventListener('dragover', e=>{ e.preventDefault(); dropzone.classList.add('dragover'); });
@@ -1637,12 +1578,6 @@ async function procesarArchivo(file){
   } catch(err){ document.getElementById('import-error').textContent = 'No se pudo leer el archivo: '+err.message; }
 }
 function filaTexto(r){ return (r||[]).join(' ').toUpperCase(); }
-// Detecta cuál separador es el decimal en vez de asumir siempre "punto=miles, coma=decimal"
-// — ese supuesto fallaba cuando SheetJS entrega el número en formato inglés (coma de miles,
-// punto decimal) sin avisar, aunque el Excel se vea correctamente en formato chileno al
-// abrirlo. Bug real encontrado probando el parser de Aronium Medios de Pago (04/07/2026):
-// "87.000,00" en Excel llegaba como "87,015.00" al navegador, y la versión vieja de numCL
-// lo leía como 87.015 en vez de 87.000.
 function numCL(s){
   s = String(s||'').trim();
   if(!s) return 0;
@@ -1650,17 +1585,15 @@ function numCL(s){
   const lastDot = s.lastIndexOf('.');
   if(lastComma===-1 && lastDot===-1) return Number(s)||0;
   if(lastComma!==-1 && lastDot!==-1){
-    // el símbolo que aparece más a la derecha es el separador decimal
     if(lastComma > lastDot) return Number(s.replace(/\./g,'').replace(',','.'))||0;
     return Number(s.replace(/,/g,''))||0;
   }
-  // solo aparece uno de los dos símbolos
   const sep = lastComma!==-1 ? ',' : '.';
   const idx = lastComma!==-1 ? lastComma : lastDot;
   const decimales = s.length - idx - 1;
   const ocurrencias = s.split(sep).length - 1;
-  if(ocurrencias===1 && decimales<=2) return Number(s.replace(sep,'.'))||0; // aparece 1 vez con 1-2 dígitos después: decimal
-  return Number(s.split(sep).join(''))||0; // se repite, o tiene 3+ dígitos después: separador de miles
+  if(ocurrencias===1 && decimales<=2) return Number(s.replace(sep,'.'))||0;
+  return Number(s.split(sep).join(''))||0;
 }
 function encontrarColumna(header, textos){
   for(let i=0;i<header.length;i++){ const h=String(header[i]).toUpperCase(); if(textos.some(t=>h.indexOf(t)!==-1)) return i; }
@@ -1797,8 +1730,8 @@ async function confirmarImport(loteAnteriorId){
   if(p.tipo==='pedidosya') r = await llamarAPI('importarPedidosYa',{data:p, reemplazar});
   if(p.tipo==='transbank') r = await llamarAPI('importarTransbank',{data:p, reemplazar});
   if(r && r.ok){
-    cachePanel = {}; flujoVentasCache = {}; movimientosCache = null; // cualquier importación cambia los KPIs del mes
-    if(p.tipo==='aronium_medios') cacheModulo.alertas = null; // este import genera alertas de auditoría
+    cachePanel = {}; flujoVentasCache = {}; movimientosCache = null;
+    if(p.tipo==='aronium_medios') cacheModulo.alertas = null;
     document.getElementById('confirm-title').textContent='Importación completa';
     document.getElementById('confirm-msg').textContent='El reporte se procesó correctamente.';
     document.getElementById('confirm-detalle').innerHTML='';
@@ -1806,7 +1739,6 @@ async function confirmarImport(loteAnteriorId){
   } else { document.getElementById('import-error').textContent = (r&&r.error)||'Error al importar'; }
 }
 
-/* ===== CUENTAS POR PAGAR ===== */
 function pintarCuentasPorPagar(r){
   document.getElementById('cxp-resumen').innerHTML = '<div class="rowline" style="font-size:14px;font-weight:700;"><span>'+r.cantidad+' documento(s) pendientes</span><b>'+fmt(r.total)+'</b></div>';
   const cont = document.getElementById('cxp-lista'); cont.innerHTML='';
@@ -1838,7 +1770,6 @@ async function abrirCuentasPorPagar(forzar){
   if(document.getElementById('screen-cxp').classList.contains('active')) pintarCuentasPorPagar(r);
 }
 
-/* ===== Liquidación de saldo de Canje (común a Cobrar y Pagar) ===== */
 function abrirModalLiquidarCanje(contraparte, saldo){
   const pendiente = Math.abs(saldo);
   abrirModal(
@@ -1874,7 +1805,6 @@ async function confirmarPago(fila){
   const d = { fila, fechaPago:document.getElementById('pg-fecha').value, medioPago:document.getElementById('pg-medio').value };
   const r = await llamarAPI('registrarPagoFactura',{data:d});
   if(r.ok){
-    // Re-render granular: quitamos solo la card pagada, sin re-pedir ni repintar toda la lista.
     cachePanel = {};
     if(cacheModulo.cxp){
       cacheModulo.cxp.cuentas = (cacheModulo.cxp.cuentas||[]).filter(c=>c.fila!==fila);
@@ -1887,7 +1817,6 @@ async function confirmarPago(fila){
   } else document.getElementById('pg-error').textContent=r.error||'Error al registrar el pago';
 }
 
-/* ===== CUENTAS POR COBRAR ===== */
 function pintarCuentasPorCobrar(r){
   document.getElementById('cxc-resumen').innerHTML = '<div class="rowline" style="font-size:14px;font-weight:700;"><span>'+r.cantidad+' pendiente(s)</span><b>'+fmt(r.total)+'</b></div>';
   const cont = document.getElementById('cxc-lista'); cont.innerHTML='';
@@ -1944,7 +1873,6 @@ async function confirmarCobro(fila){
   } else document.getElementById('cb-error').textContent=r.error||'Error al registrar el cobro';
 }
 
-/* ===== CREDITOS ===== */
 async function abrirCreditos(){
   irA('screen-creditos');
   const r = await llamarAPI('listarCreditos',{});
@@ -1974,27 +1902,86 @@ async function guardarCredito(){
   if(r.ok) irA('screen-creditos'), abrirCreditos(); else document.getElementById('nc-error').textContent=r.error||'Error al guardar';
 }
 
-/* ===== PERMISOS + RESTABLECER PIN ===== */
+const PERMISOS_MODULOS = [
+  { titulo: 'Finanzas', items: [
+    { clave:'VerDashboardCompleto', label:'Ver panel' },
+    { clave:'RegistrarMovimiento', label:'Registrar cierre de caja' },
+    { clave:'EditarAnular', label:'Anular cierre de caja' },
+    { clave:'RegistrarVentaVegan', label:'Registrar venta Vegan Corner' },
+    { clave:'RegistrarCompra', label:'Registrar compras y gastos' },
+    { clave:'VisualizarReportes', label:'Visualizar reportes', nuevo:true }
+  ]},
+  { titulo: 'Conciliación', items: [
+    { clave:'ProcesarConciliacion', label:'Procesar conciliación', nuevo:true }
+  ]},
+  { titulo: 'Configuraciones', items: [
+    { clave:'ConfigurarSistema', label:'Acceso a Configuraciones' }
+  ]}
+];
+const PERSONAS_PERMISOS = ['Osmar Meza','Rocío Romo','Rosa Merino','Lucas Ramos','Cecilia Yevenes','Katherine Bustamante'];
+
 async function abrirPermisos(){
   irA('screen-permisos');
+  document.getElementById('tabla-permisos').innerHTML = skeletonCards(4);
   const r = await llamarAPI('listarPermisos',{});
-  const acciones = ['RegistrarMovimiento','VerDashboardCompleto','VerResumenPropio','RegistrarCompra','RegistrarVentaVegan','VerPrograma','GestionarInventario','ConfigurarSistema'];
-  const personas = ['Osmar Meza','Rocío Romo','Rosa Merino','Lucas Ramos','Cecilia Yevenes','Katherine Bustamante'];
   const mapa = {};
   (r.permisos||[]).forEach(p=>{ mapa[p.nombre+'|'+p.accion]=p.permitido; });
-  let html = '<div style="overflow-x:auto;"><table><tr><th>Acción</th>'+personas.map(p=>'<th style="text-align:center;">'+p.split(' ')[0]+'</th>').join('')+'<th></th></tr>';
-  acciones.forEach(ac=>{
-    html += '<tr><td>'+ac+'</td>';
-    personas.forEach(nombre=>{
-      const val = mapa[nombre+'|'+ac];
-      html += '<td style="text-align:center;"><input type="checkbox" data-nombre="'+nombre+'" data-accion="'+ac+'" '+(val?'checked':'')+'></td>';
-    });
-    html += '</tr>';
-  });
-  html += '</table></div><h3 style="font-size:13px;margin:18px 0 8px;">Restablecer PIN</h3>';
-  personas.forEach(nombre=>{ html += '<div class="rowline"><span>'+nombre+'</span><button class="btn-secondary btn-small" onclick="abrirModalRestablecerPin(\''+nombre+'\')">Restablecer PIN</button></div>'; });
-  document.getElementById('tabla-permisos').innerHTML = html;
+  pintarPermisos(mapa);
+  document.getElementById('perm-restablecer').innerHTML = PERSONAS_PERMISOS.map(nombre =>
+    '<div class="rowline"><span>'+nombre+'</span><button class="btn-secondary btn-small" onclick="abrirModalRestablecerPin(\''+nombre+'\')">Restablecer PIN</button></div>'
+  ).join('');
 }
+
+function pintarPermisos(mapa){
+  const esAncho = window.matchMedia('(min-width: 900px)').matches;
+  document.getElementById('tabla-permisos').innerHTML = esAncho ? tablaPermisosDesktop(mapa) : tarjetasPermisosMobile(mapa);
+}
+
+function badgeNuevo(){ return ' <span class="badge-nuevo">nuevo</span>'; }
+
+function tablaPermisosDesktop(mapa){
+  let filas = '';
+  PERMISOS_MODULOS.forEach(mod=>{
+    filas += '<tr><td colspan="'+(PERSONAS_PERMISOS.length+1)+'" class="perm-grupo-titulo">'+mod.titulo+'</td></tr>';
+    mod.items.forEach(it=>{
+      filas += '<tr><td>'+it.label+(it.nuevo?badgeNuevo():'')+'</td>'+
+        PERSONAS_PERMISOS.map(nombre=>'<td style="text-align:center;"><input type="checkbox" data-nombre="'+nombre+'" data-accion="'+it.clave+'" '+(mapa[nombre+'|'+it.clave]?'checked':'')+'></td>').join('')+
+        '</tr>';
+    });
+  });
+  return '<div style="overflow-x:auto;"><table class="tabla-permisos"><thead><tr><th>Permiso</th>'+
+    PERSONAS_PERMISOS.map(n=>'<th style="text-align:center;">'+n.split(' ')[0]+'</th>').join('')+
+    '</tr></thead><tbody>'+filas+'</tbody></table></div>';
+}
+
+function tarjetasPermisosMobile(mapa){
+  let html = '';
+  PERMISOS_MODULOS.forEach(mod=>{
+    html += '<div class="perm-grupo-titulo" style="margin-top:16px;">'+mod.titulo+'</div>';
+    mod.items.forEach(it=>{
+      html += '<div class="perm-card">'+
+        '<div class="perm-card-titulo">'+it.label+(it.nuevo?badgeNuevo():'')+'</div>'+
+        PERSONAS_PERMISOS.map(nombre=>
+          '<label class="perm-card-fila">'+
+            '<span>'+nombre+'</span>'+
+            '<input type="checkbox" data-nombre="'+nombre+'" data-accion="'+it.clave+'" '+(mapa[nombre+'|'+it.clave]?'checked':'')+'>'+
+          '</label>'
+        ).join('')+
+      '</div>';
+    });
+  });
+  return html;
+}
+
+window.addEventListener('resize', ()=>{
+  if(document.getElementById('screen-permisos') && document.getElementById('screen-permisos').classList.contains('active')){
+    const inputs = document.querySelectorAll('#tabla-permisos input[type=checkbox]');
+    const mapa = {};
+    inputs.forEach(inp=>{ mapa[inp.dataset.nombre+'|'+inp.dataset.accion] = inp.checked; });
+    pintarPermisos(mapa);
+  }
+});
+
 async function guardarPermisos(){
   const inputs = document.querySelectorAll('#tabla-permisos input[type=checkbox]');
   for(const inp of inputs){ await llamarAPI('actualizarPermiso',{data:{nombre:inp.dataset.nombre, accion:inp.dataset.accion, permitido:inp.checked}}); }
@@ -2018,7 +2005,6 @@ async function confirmarRestablecerPin(nombre){
   if(r.ok) cerrarModal(); else document.getElementById('rp-error').textContent=r.error||'Error al restablecer';
 }
 
-/* ===== ESTADO DE RESULTADOS ===== */
 async function abrirEstadoResultados(){ irA('screen-estado-resultados'); await cargarEstadoResultados(); }
 function cambiarNegocioER(neg, btn){ negocioER=neg; [...btn.parentElement.children].forEach(c=>c.classList.remove('sel')); btn.classList.add('sel'); cargarEstadoResultados(); }
 async function cargarEstadoResultados(){
@@ -2035,7 +2021,6 @@ async function cargarEstadoResultados(){
     '<tr style="font-weight:700;font-size:14px;"><td>Resultado del período</td><td style="text-align:right;color:var(--success);">'+fmt(r.resultado)+'</td></tr></table>';
 }
 
-/* ===== F29 ===== */
 async function abrirF29(){
   irA('screen-f29');
   const hoy = new Date();
@@ -2049,12 +2034,8 @@ async function abrirF29(){
     '<tr style="font-weight:700;font-size:14px;"><td>Total a pagar F29</td><td style="text-align:right;">'+fmt(r.total)+'</td></tr></table>';
 }
 
-/* ===== ALERTAS (informativas + auditoría, sin botón para márgenes negativos) ===== */
 function pintarAlertas(r){
   const cont = document.getElementById('lista-alertas'); cont.innerHTML='';
-  // Los hallazgos de Conciliación (categoría "Conciliación:"/"Diagnóstico:") tienen su
-  // propia pantalla dedicada (Hallazgos) — acá solo se muestran las alertas de auditoría
-  // de siempre, para no duplicar ni confundir.
   const alertas = (r.alertas||[]).filter(a => a.categoria.indexOf('Conciliación:')!==0 && a.categoria.indexOf('Diagnóstico:')!==0);
   alertas.forEach(a=>{
     const pillClass = a.severidad==='Critica'?'pill-critica':a.severidad==='Alerta'?'pill-alerta':'pill-menor';
@@ -2080,7 +2061,6 @@ async function resolverAlertaUI(id, requiereNota){
   if(requiereNota){ nota = prompt('Esta alerta es crítica: describe qué pasó'); if(!nota) return; }
   const r = await llamarAPI('resolverAlerta',{data:{id, nota}});
   if(r.ok){
-    // Re-render granular: solo cambiamos el estado de esa card, sin re-pedir toda la lista.
     if(cacheModulo.alertas){
       const a = (cacheModulo.alertas.alertas||[]).find(x=>x.id===id);
       if(a) a.estado='Resuelta';
@@ -2093,8 +2073,6 @@ async function resolverAlertaUI(id, requiereNota){
   }
 }
 
-
-/* ===== PRODUCCIÓN — PROGRAMA ===== */
 function pintarPrograma(r){
   const cont = document.getElementById('lista-programa'); cont.innerHTML='';
   (r.programa||[]).forEach(p=>{
@@ -2136,7 +2114,6 @@ async function confirmarEntrega(programaId, producto){
   if(r.ok){ cacheModulo.programa = null; cerrarModal(); abrirPrograma(); } else document.getElementById('me-error').textContent=r.error||'Error al guardar';
 }
 
-/* ===== INVENTARIO MP ===== */
 function pintarInventario(r){
   const cont = document.getElementById('lista-inventario'); cont.innerHTML='';
   (r.inventario||[]).forEach(i=>{
@@ -2169,7 +2146,6 @@ async function guardarInventario(){
   else document.getElementById('inv-error').textContent=r.error||'Error al guardar';
 }
 
-/* ===== LISTA DE COMPRA MP ===== */
 function pintarListaCompra(r){
   const cont = document.getElementById('lista-compra-mp'); cont.innerHTML='';
   (r.listaCompra||[]).forEach(i=>{
@@ -2189,7 +2165,6 @@ async function abrirListaCompra(forzar){
   if(document.getElementById('screen-lista-compra').classList.contains('active')) pintarListaCompra(r);
 }
 
-// Cargar dropdown de producto al abrir "Nuevo ítem de programa"
 document.getElementById('screen-programa-nuevo').addEventListener('transitionstart', ()=>{});
 const _irAOriginal = irA;
 irA = function(id){
@@ -2208,5 +2183,6 @@ irA = function(id){
 pintarUsuarios();
 </script>
 <script src="js/conciliacion.js"></script>
+
 </body>
 </html>
