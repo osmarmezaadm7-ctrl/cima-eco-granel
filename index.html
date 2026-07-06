@@ -1984,7 +1984,9 @@ window.addEventListener('resize', ()=>{
 
 async function guardarPermisos(){
   const inputs = document.querySelectorAll('#tabla-permisos input[type=checkbox]');
-  for(const inp of inputs){ await llamarAPI('actualizarPermiso',{data:{nombre:inp.dataset.nombre, accion:inp.dataset.accion, permitido:inp.checked}}); }
+  const cambios = [...inputs].map(inp => ({ nombre:inp.dataset.nombre, accion:inp.dataset.accion, permitido:inp.checked }));
+  const r = await llamarAPI('actualizarPermisos',{data:{cambios}});
+  if(!r.ok){ alert(r.error||'Error al guardar permisos'); return; }
   irA('screen-home');
 }
 function abrirModalRestablecerPin(nombre){
