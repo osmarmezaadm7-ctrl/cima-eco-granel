@@ -212,3 +212,18 @@ td{padding:8px 6px;border-bottom:1px solid var(--border);}
 .header-row{display:flex;justify-content:space-between;align-items:center;gap:10px;}
 .icon-btn{width:44px;height:44px;border-radius:12px;border:1.5px solid var(--border);background:var(--surface);display:flex;align-items:center;justify-content:center;color:var(--ink);cursor:pointer;flex-shrink:0;}
 .icon-btn:hover{background:var(--forest-soft);}
+/* ===== Pantalla de Permisos — tabla desktop + tarjetas móvil ===== */
+.tabla-permisos{width:100%;border-collapse:collapse;font-size:12.5px;min-width:640px;}
+.tabla-permisos th{text-align:center;padding:10px 8px;color:var(--ink-soft);font-weight:700;font-size:10px;text-transform:uppercase;border-bottom:1.5px solid var(--border);}
+.tabla-permisos th:first-child{text-align:left;}
+.tabla-permisos td{padding:9px 10px;border-bottom:1px solid var(--border);}
+.tabla-permisos td:first-child{font-weight:600;}
+.tabla-permisos input[type=checkbox]{width:20px;height:20px;}
+.perm-grupo-titulo{font-size:10.5px;font-weight:800;color:var(--forest);text-transform:uppercase;letter-spacing:.4px;padding:12px 10px 6px;}
+.badge-nuevo{font-size:9px;background:var(--terracotta-soft);color:var(--terracotta);padding:1px 6px;border-radius:20px;font-weight:700;margin-left:4px;}
+
+.perm-card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:12px 14px;margin-bottom:9px;}
+.perm-card-titulo{font-size:13.5px;font-weight:700;margin-bottom:8px;}
+.perm-card-fila{display:flex;align-items:center;justify-content:space-between;padding:9px 0;border-top:1px solid var(--border);font-size:13px;cursor:pointer;min-height:44px;}
+.perm-card-fila:first-of-type{border-top:none;}
+.perm-card-fila input[type=checkbox]{width:22px;height:22px;flex-shrink:0;}
