@@ -1,5 +1,5 @@
 /* ===================================================================
-   CONCILIACIÓN — parsers de archivos
+   CONCILIACIÓN — parsers de archivos (SIN CAMBIOS respecto a la versión anterior)
    =================================================================== */
 const MESES_ES = { enero:0, febrero:1, marzo:2, abril:3, mayo:4, junio:5, julio:6, agosto:7, septiembre:8, octubre:9, noviembre:10, diciembre:11 };
 function fechaCLDesdeDate(d){ const dd=String(d.getDate()).padStart(2,'0'), mm=String(d.getMonth()+1).padStart(2,'0'); return dd+'/'+mm+'/'+d.getFullYear(); }
@@ -23,30 +23,17 @@ function leerArchivoComoFilas(file){
   });
 }
 
-// Mismo patrón de dropzone que ya usa "Importar reportes" (arrastrar o tocar para elegir).
-// Se activa una sola vez por par dropzone/input — los elementos ya existen en el HTML
-// desde el principio, solo se muestran/ocultan según la fuente elegida.
-function activarDropzone(dzId, inputId){
-  const dz = document.getElementById(dzId);
-  const input = document.getElementById(inputId);
-  if(!dz || !input) return;
-  const txt = dz.querySelector('span');
-  const original = txt.textContent;
-  const actualizar = () => { txt.textContent = input.files.length ? '📄 '+input.files[0].name : original; };
-  dz.addEventListener('dragover', e=>{ e.preventDefault(); dz.classList.add('dragover'); });
-  dz.addEventListener('dragleave', ()=>dz.classList.remove('dragover'));
-  dz.addEventListener('drop', e=>{
-    e.preventDefault(); dz.classList.remove('dragover');
-    if(e.dataTransfer.files.length){ input.files = e.dataTransfer.files; actualizar(); }
-  });
-  input.addEventListener('change', actualizar);
-}
-[['dz-cartola','nc-archivo-cartola'],['dz-debito','nc-archivo-debito'],['dz-credito','nc-archivo-credito'],
- ['dz-prepago','nc-archivo-prepago'],['dz-pedidosya','nc-archivo-pedidosya'],['dz-aronium','nc-archivo-aronium']]
- .forEach(([dz,inp])=>activarDropzone(dz,inp));
-
-// --- Transbank (montos) — Cartola de Movimientos ---
 function parsearFechaMovimientoTransbank(texto){
+  if(!texto) return null;
+  const partes = String(texto).trim().split(/\s+/);
+  if(partes.length<3) return null;
+  const dia=parseInt(partes[0],10), mes=MESES_ES[partes[1].toLowerCase()], anio=parseInt(partes[2],10);
+  if(isNaN(dia)||mes===undefined||isNaN(anio)) return null;
+  return new Date(anio,mes,dia);
+}
+// Parsea texto tipo "dd MMMM yyyy" (español, sin acentos en el archivo real de Transbank,
+// ej. "01 julio 2026") — formato distinto al de "Fecha de movimiento" (que trae hora).
+function parsearFechaAbonoTransbank(texto){
   if(!texto) return null;
   const partes = String(texto).trim().split(/\s+/);
   if(partes.length<3) return null;
@@ -69,15 +56,27 @@ function parsearCartolaTransbank(filas, periodoDeclarado){
   if(idxHeader===-1) throw new Error('No se encontró la tabla de transacciones en el archivo.');
   const header = filas[idxHeader];
   const col = nombre => header.indexOf(nombre);
-  const iTipo=col('Tipo de movimiento'), iFecha=col('Fecha de movimiento'), iMedio=col('Medio de pago'), iMonto=col('Monto venta valido para abono');
+  const iTipo=col('Tipo de movimiento'), iFecha=col('Fecha de movimiento'), iMedio=col('Medio de pago'), iMonto=col('Monto venta valido para abono'), iAbono=col('Fecha de abono');
   if([iTipo,iFecha,iMedio,iMonto].indexOf(-1)!==-1) throw new Error('El archivo no tiene las columnas esperadas. Revisa que sea la Cartola de Movimientos sin modificar.');
   const desdeD = parseFechaCLtexto(periodoDeclarado.desde), hastaD = parseFechaCLtexto(periodoDeclarado.hasta);
   const porDia = {}; const fueraDeRango = [];
+  // Período de abonos sugerido: el mínimo y máximo de "Fecha de abono" entre TODAS las filas
+  // de venta del archivo (no solo las dentro del período) — Transbank paga el abono corrido,
+  // así que el rango real de abono siempre se estira más allá del período de venta (verificado
+  // con un archivo real: Cartola 22/06–28/06 dio un período de abono de 23/06 al 02/07).
+  let abonoMin = null, abonoMax = null;
   for(let i=idxHeader+1;i<filas.length;i++){
     const f = filas[i];
     if(!f || !f[iTipo]) continue;
     const fecha = parsearFechaMovimientoTransbank(f[iFecha]);
     if(!fecha) continue;
+    if(iAbono!==-1 && f[iAbono]){
+      const fechaAbono = parsearFechaAbonoTransbank(f[iAbono]);
+      if(fechaAbono){
+        if(!abonoMin || fechaAbono<abonoMin) abonoMin = fechaAbono;
+        if(!abonoMax || fechaAbono>abonoMax) abonoMax = fechaAbono;
+      }
+    }
     if(fecha<desdeD || fecha>hastaD){ fueraDeRango.push(fechaCLDesdeDate(fecha)); continue; }
     const clave = fechaCLDesdeDate(fecha);
     if(!porDia[clave]) porDia[clave] = { fecha:clave, debito:0, credito:0 };
@@ -89,20 +88,22 @@ function parsearCartolaTransbank(filas, periodoDeclarado){
     const unicas = [...new Set(fueraDeRango)];
     advertenciaPeriodo += (advertenciaPeriodo?' ':'') + 'Se encontraron movimientos fuera del período declarado, se ignoraron: '+unicas.join(', ')+'.';
   }
-  return { desde:periodoDeclarado.desde, hasta:periodoDeclarado.hasta, dias:Object.values(porDia).sort((a,b)=>a.fecha.localeCompare(b.fecha)), advertenciaPeriodo };
+  const sugerenciaAbono = (abonoMin && abonoMax) ? { desde: fechaCLDesdeDate(abonoMin), hasta: fechaCLDesdeDate(abonoMax) } : null;
+  return { desde:periodoDeclarado.desde, hasta:periodoDeclarado.hasta, dias:Object.values(porDia).sort((a,b)=>a.fecha.localeCompare(b.fecha)), advertenciaPeriodo, sugerenciaAbono };
 }
 
-// --- Transbank Comisión — extracción masiva Débito/Crédito/Prepago (.dat) ---
-function parsearExtraccionTransbankComision(texto, periodoDeclarado){
+function parsearExtraccionTransbankComision(texto, sugerenciaAbono){
   const lineas = texto.split(/\r?\n/);
   const lineaPeriodo = lineas.find(l => l.indexOf('Periodo de consulta')===0);
   let advertenciaPeriodo = '';
-  if(lineaPeriodo){
+  if(!sugerenciaAbono){
+    advertenciaPeriodo = 'Aún no se calculó el período de abonos sugerido — te recomendamos cargar primero la Cartola de Movimientos.';
+  } else if(lineaPeriodo){
     const valor = lineaPeriodo.split(';')[1]||'';
     if(valor.indexOf(' - ')!==-1){
       const [a,b]=valor.split(' - ');
-      if(a.trim()!==periodoDeclarado.desde || b.trim()!==periodoDeclarado.hasta){
-        advertenciaPeriodo = 'El archivo declara el período de abono '+a.trim()+' al '+b.trim()+', distinto al que ingresaste ('+periodoDeclarado.desde+' al '+periodoDeclarado.hasta+').';
+      if(a.trim()!==sugerenciaAbono.desde || b.trim()!==sugerenciaAbono.hasta){
+        advertenciaPeriodo = 'El período de abonos declarado en el archivo ('+a.trim()+' al '+b.trim()+') no coincide con el sugerido ('+sugerenciaAbono.desde+' al '+sugerenciaAbono.hasta+'). Revisa el período.';
       }
     }
   }
@@ -145,7 +146,6 @@ function combinarExtraccionesTransbank(resultados, periodoDeclarado){
   return { desde:periodoDeclarado.desde, hasta:periodoDeclarado.hasta, dias:fechas.map(f=>({fecha:f, comision:Math.round(porDia[f])})), advertencias };
 }
 
-// --- PedidosYa ---
 function parsearListaPedidosYa(filas, periodoDeclarado){
   const idxHeader = filas.findIndex(f => f[0]==='Número del pedido');
   if(idxHeader===-1) throw new Error('No se encontró la tabla de pedidos. ¿Es el archivo "Lista de pedidos" correcto?');
@@ -186,6 +186,58 @@ function armarDatosPedidosYa(resultadoExcel, cuotaCredito, totalLiquidadoDeclara
   };
 }
 
+function parseAroniumMediosConciliacion(filas){
+  let headerIdx = -1;
+  for(let i=0;i<filas.length;i++){ const t=(filas[i]||[]).join(' ').toUpperCase(); if(t.indexOf('FECHA')!==-1 && t.indexOf('CR')!==-1){ headerIdx=i; break; } }
+  const dias = [];
+  let desde='', hasta='';
+  const filaPeriodo = filas.find(f => (f||[]).join(' ').toUpperCase().indexOf('PERIODO')!==-1);
+  if(filaPeriodo){
+    const full = (filaPeriodo||[]).join(' ');
+    const m = full.match(/(\d{2}[\/\-]\d{2}[\/\-]\d{4})\s*-\s*(\d{2}[\/\-]\d{2}[\/\-]\d{4})/);
+    if(m){ desde=m[1]; hasta=m[2]; }
+  }
+  if(headerIdx>=0){
+    const header = filas[headerIdx];
+    const encontrar = textos => { for(let i=0;i<header.length;i++){ const h=String(header[i]).toUpperCase(); if(textos.some(t=>h.indexOf(t)!==-1)) return i; } return -1; };
+    const idxFecha = encontrar(['FECHA']);
+    const idxCred = encontrar(['CRÉDITO','CREDITO']);
+    const idxDeb = encontrar(['DÉBITO','DEBITO']);
+    const idxEf = encontrar(['EFECTIVO']);
+    const idxPya = encontrar(['PEDIDOS YA','PEDIDOSYA']);
+    const idxTrans = encontrar(['TRANSFERENCIA']);
+    for(let i=headerIdx+1;i<filas.length;i++){
+      const r = filas[i];
+      if(!r || !r[idxFecha]) break;
+      if(!/\d{2}-\d{2}-\d{4}/.test(String(r[idxFecha]))) break;
+      dias.push({ fecha:r[idxFecha], credito:parseNumeroCL(r[idxCred]), debito:parseNumeroCL(r[idxDeb]), efectivo:parseNumeroCL(r[idxEf]), pedidosYa:parseNumeroCL(r[idxPya]), transferencia:parseNumeroCL(r[idxTrans]) });
+    }
+  }
+  return { desde, hasta, dias };
+}
+
+/* ===================================================================
+   CONCILIACIÓN — detección automática del tipo de archivo, una sola fuente de verdad
+   para el dropzone único ("Fuentes")
+   =================================================================== */
+function filaTextoConciliacion(r){ return (r||[]).join(' ').toUpperCase(); }
+
+// Devuelve 'Transbank' | 'Transbank Comisión' | 'PedidosYa' | 'Aronium Medios de Pago' | null
+function detectarFuenteDesdeNombreYContenido(nombreArchivo, filasOTexto){
+  const ext = nombreArchivo.split('.').pop().toLowerCase();
+  if(ext==='dat' || ext==='txt'){
+    const muestra = String(filasOTexto).slice(0,2000);
+    if(muestra.indexOf('Tipo de movimiento')!==-1 && muestra.indexOf(';')!==-1) return 'Transbank Comisión';
+    return null;
+  }
+  const muestra = filasOTexto.slice(0,15).map(filaTextoConciliacion).join(' ');
+  if(muestra.indexOf('FECHA DE MOVIMIENTO')!==-1 && muestra.indexOf('TIPO DE MOVIMIENTO')!==-1) return 'Transbank';
+  if(muestra.indexOf('NÚMERO DEL PEDIDO')!==-1 || muestra.indexOf('NUMERO DEL PEDIDO')!==-1) return 'PedidosYa';
+  if(muestra.indexOf('VENTAS SEG')!==-1 && muestra.indexOf('MEDIOS')!==-1) return 'Aronium Medios de Pago';
+  if(muestra.indexOf('FECHA')!==-1 && muestra.indexOf('CR')!==-1) return 'Aronium Medios de Pago';
+  return null;
+}
+
 /* ===================================================================
    CONCILIACIÓN — pantallas
    =================================================================== */
@@ -201,105 +253,229 @@ async function abrirConciliacion(forzar){
 function pintarConciliacion(r){
   const cont = document.getElementById('lista-conciliacion'); cont.innerHTML='';
   const lista = r.conciliaciones||[];
-  if(!lista.length){ cont.innerHTML='<p style="font-size:12px;color:var(--ink-soft);">Todavía no se ha conciliado ninguna fuente.</p>'; return; }
-  lista.forEach(c=>{
-    const pillClase = c.estado==='Confirmada'?'pill-ok':(c.estado==='Atrasada'?'pill-critica':'pill-alerta');
+  if(r.atraso){
+    cont.insertAdjacentHTML('beforeend', '<div class="check-row check-warn" style="margin-bottom:12px;">⚠ Van '+r.atraso.diasAtraso+' día(s) de atraso desde el último período conciliado.</div>');
+  }
+  if(!lista.length){ cont.innerHTML+='<p style="font-size:12px;color:var(--ink-soft);">Todavía no se ha iniciado ninguna conciliación.</p>'; return; }
+  lista.forEach(p=>{
+    const pillClase = p.estado==='Completo' ? 'pill-ok' : 'pill-alerta';
     const div = document.createElement('div'); div.className='fuente-card';
-    div.onclick = () => abrirRevisionDesde(c.desde, c.hasta);
+    div.onclick = () => irAFuentesDesde(p.desde, p.hasta);
     div.innerHTML =
-      '<div class="f-txt"><strong>'+c.fuente+'</strong><span>'+c.desde+' al '+c.hasta+'</span></div>'+
-      '<div class="f-right"><span class="pill '+pillClase+'">'+c.estado+(c.diasAtraso?(' · '+c.diasAtraso+'d'):'')+'</span>'+
-      (c.fechaImportacion?'<div class="fecha">Importado '+c.fechaImportacion+'</div>':'')+'</div>';
+      '<div class="f-txt"><strong>'+p.desde+' al '+p.hasta+'</strong><span>'+p.progreso+' de '+p.totalFuentes+' fuentes cargadas</span></div>'+
+      '<div class="f-right"><span class="pill '+pillClase+'">'+p.estado+'</span>'+
+      (p.fechaCreacion?'<div class="fecha">Iniciado '+p.fechaCreacion+'</div>':'')+'</div>';
     cont.appendChild(div);
   });
 }
 
+const FUENTES_CONCILIACION_UI = [
+  { clave:'Transbank', label:'Cartola de Movimientos Transbank' },
+  { clave:'Transbank Comisión', label:'Abonos Transbank' },
+  { clave:'PedidosYa', label:'PedidosYa — Lista de pedidos' },
+  { clave:'Aronium Medios de Pago', label:'Aronium Medios de Pago' }
+];
+
 function irANuevaConciliacion(){
   document.getElementById('nc-error').textContent='';
-  document.getElementById('nc-fuente').value='Transbank';
-  ['nc-archivo-cartola','nc-archivo-debito','nc-archivo-credito','nc-archivo-prepago','nc-archivo-pedidosya','nc-archivo-aronium','nc-cuota-credito','nc-total-liquidado'].forEach(id=>{ const el=document.getElementById(id); if(el) el.value=''; });
+  document.getElementById('nc-desde').value='';
+  document.getElementById('nc-hasta').value='';
+  document.getElementById('archivosComisionAcumulados_temp'); // noop, solo documenta la variable de abajo
+  archivosComisionAcumulados = [];
   irA('screen-conciliacion-nueva');
-  onFuenteConciliacionChange();
+  cargarSugerenciaPeriodo();
 }
-async function onFuenteConciliacionChange(){
-  const fuente = document.getElementById('nc-fuente').value;
-  const mapaDiv = {'Transbank':'nc-campos-transbank','Transbank Comisión':'nc-campos-transbank-comision','PedidosYa':'nc-campos-pedidosya','Aronium Medios de Pago':'nc-campos-aronium'};
-  Object.values(mapaDiv).forEach(id=>document.getElementById(id).style.display='none');
-  document.getElementById(mapaDiv[fuente]).style.display='block';
-  document.getElementById('nc-sugerencia').textContent='Calculando sugerencia...';
-  const r = await llamarAPISilencioso('sugerirProximoPeriodo', {fuente});
+function irAFuentesDesde(desde, hasta){
+  document.getElementById('nc-error').textContent='';
+  document.getElementById('nc-desde').value = valueFromCL(desde);
+  document.getElementById('nc-hasta').value = valueFromCL(hasta);
+  archivosComisionAcumulados = [];
+  irA('screen-conciliacion-nueva');
+  cargarEstadoFuentes();
+}
+async function cargarSugerenciaPeriodo(){
+  document.getElementById('nc-sugerencia').textContent = 'Calculando sugerencia...';
+  sugerenciaAbonoActual = null;
+  const r = await llamarAPISilencioso('sugerirProximoPeriodo', {});
   if(r.ok && r.desde && r.hasta){
     document.getElementById('nc-desde').value = valueFromCL(r.desde);
     document.getElementById('nc-hasta').value = valueFromCL(r.hasta);
-    document.getElementById('nc-sugerencia').textContent = 'Sugerido en base al último período conciliado de esta fuente — puedes ajustarlo.';
+    document.getElementById('nc-sugerencia').textContent = 'Sugerido en base al último período conciliado — puedes ajustarlo.';
   } else {
-    document.getElementById('nc-sugerencia').textContent = 'Primera vez que se concilia esta fuente — elige el período manualmente.';
+    document.getElementById('nc-sugerencia').textContent = 'Primera vez que se concilia — elige el período manualmente.';
   }
+  pintarEstadoFuentes({ 'Transbank':'Pendiente','Transbank Comisión':'Pendiente','PedidosYa':'Pendiente','Aronium Medios de Pago':'Pendiente' });
 }
-function mostrarResultadoImport(fuente, periodoDeclarado, advertencias){
-  cacheModulo.conciliaciones = null;
-  const lista = [...new Set((advertencias||[]).filter(Boolean))]; // sin duplicados
-  const bloque = lista.length ? lista.map(a=>'<div class="check-row check-warn" style="margin-bottom:6px;">⚠ '+a+'</div>').join('') : '<p style="font-size:12.5px;color:var(--ink-soft);">Sin advertencias.</p>';
-  abrirModal(
-    '<h3 style="font-size:15px;">Importado correctamente</h3>'+
-    '<p style="font-size:12px;color:var(--ink-soft);margin:2px 0 10px;">'+fuente+' · '+periodoDeclarado.desde+' al '+periodoDeclarado.hasta+'</p>'+
-    bloque+
-    '<button class="btn-primary" style="margin-top:14px;width:100%;" onclick="cerrarModal();irA(\'screen-conciliacion\');abrirConciliacion(true);">Aceptar</button>'
-  );
+async function onPeriodoConciliacionChange(){
+  archivosComisionAcumulados = [];
+  await cargarEstadoFuentes();
 }
-async function procesarConciliacion(){
-  const fuente = document.getElementById('nc-fuente').value;
+async function cargarEstadoFuentes(){
   const desde = fechaCLDesdeValue('nc-desde'), hasta = fechaCLDesdeValue('nc-hasta');
+  if(!desde || !hasta){ sugerenciaAbonoActual=null; pintarEstadoFuentes({ 'Transbank':'Pendiente','Transbank Comisión':'Pendiente','PedidosYa':'Pendiente','Aronium Medios de Pago':'Pendiente' }); return; }
+  const r = await llamarAPISilencioso('obtenerEstadoProceso', {desde, hasta});
+  sugerenciaAbonoActual = r.sugerenciaAbono || null;
+  pintarEstadoFuentes(r.fuentes||{});
+}
+function pintarEstadoFuentes(fuentes){
+  const cargadas = Object.values(fuentes).filter(v=>v==='Cargado').length;
+  const total = FUENTES_CONCILIACION_UI.length;
+  const pct = Math.round(cargadas/total*100);
+  document.getElementById('progreso-texto').textContent = cargadas+' de '+total+' fuentes cargadas';
+  document.getElementById('progreso-pct').textContent = pct+'%';
+  document.getElementById('progreso-fill').style.width = pct+'%';
+
+  const cont = document.getElementById('lista-fuentes-estado'); cont.innerHTML='';
+  FUENTES_CONCILIACION_UI.forEach(fu=>{
+    const cargado = fuentes[fu.clave]==='Cargado';
+    const div = document.createElement('div');
+    div.className = 'fuente-status-card'+(cargado?' cargado':'');
+    div.innerHTML =
+      '<div class="fuente-status-ico">'+(cargado?'✓':'')+'</div>'+
+      '<div class="fuente-status-txt"><p class="titulo">'+fu.label+'</p><p class="sub">'+(cargado?'Cargado':'Pendiente')+'</p></div>';
+    cont.appendChild(div);
+    // Tarjeta destacada de período de abonos, justo después de la Cartola — no es un
+    // error, es información necesaria para saber qué fechas pedirle a Transbank.
+    if(fu.clave==='Transbank' && sugerenciaAbonoActual){
+      const info = document.createElement('div');
+      info.className = 'aviso-abono';
+      info.innerHTML =
+        '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"></rect><path d="M16 2v4M8 2v4M3 10h18"></path><path d="M9 16l2 2 4-4"></path></svg>'+
+        '<div><p class="titulo">Período de abonos: '+sugerenciaAbonoActual.desde+' al '+sugerenciaAbonoActual.hasta+'</p>'+
+        '<p class="sub">Usa estas fechas al descargar la extracción masiva en el sitio de Transbank.</p></div>';
+      cont.appendChild(info);
+    }
+  });
+
+  const btn = document.getElementById('btn-ir-revision');
+  if(cargadas===total){ btn.disabled=false; btn.textContent='Ir a Revisión'; }
+  else{ btn.disabled=true; btn.textContent='Ir a Revisión — faltan '+(total-cargadas)+' fuente'+((total-cargadas)===1?'':'s'); }
+}
+
+// Acumula archivos .dat de Transbank Comisión entre gotas sucesivas (se puede soltar
+// Débito, Crédito y Prepago en cualquier orden, de a uno o varios juntos).
+let archivosComisionAcumulados = [];
+// Período de abonos sugerido, calculado al cargar la Cartola — se usa para avisar si el
+// archivo de Comisión declara un período distinto (ver parsearExtraccionTransbankComision).
+let sugerenciaAbonoActual = null;
+
+async function procesarArchivoConciliacion(file){
   const errEl = document.getElementById('nc-error'); errEl.textContent='';
-  if(!desde || !hasta){ errEl.textContent='Elige el período (Desde y Hasta)'; return; }
+  const desde = fechaCLDesdeValue('nc-desde'), hasta = fechaCLDesdeValue('nc-hasta');
+  if(!desde || !hasta){ errEl.textContent='Elige el período (Desde y Hasta) antes de subir un archivo'; return; }
   const periodoDeclarado = {desde, hasta};
+
   try{
+    const ext = file.name.split('.').pop().toLowerCase();
+    let fuente, filasOTexto;
+    if(ext==='dat' || ext==='txt'){
+      filasOTexto = await file.text();
+      fuente = detectarFuenteDesdeNombreYContenido(file.name, filasOTexto);
+    } else {
+      filasOTexto = await leerArchivoComoFilas(file);
+      fuente = detectarFuenteDesdeNombreYContenido(file.name, filasOTexto);
+    }
+    if(!fuente){ errEl.textContent='No se pudo identificar el tipo de archivo ("'+file.name+'"). Verifica que sea Cartola Transbank, Comisión, PedidosYa o Aronium.'; return; }
+
     let resultado;
     if(fuente==='Transbank'){
-      const file = document.getElementById('nc-archivo-cartola').files[0];
-      if(!file){ errEl.textContent='Elige el archivo de la Cartola de Movimientos'; return; }
-      const filas = await leerArchivoComoFilas(file);
-      const datos = parsearCartolaTransbank(filas, periodoDeclarado);
+      const datos = parsearCartolaTransbank(filasOTexto, periodoDeclarado);
       resultado = await llamarAPI('importarTransbankMontos', {data:datos});
-      if(resultado.ok) return mostrarResultadoImport(fuente, periodoDeclarado, [datos.advertenciaPeriodo]);
+      if(resultado.ok){
+        sugerenciaAbonoActual = datos.sugerenciaAbono || null;
+        mostrarResultadoImport(fuente, [datos.advertenciaPeriodo]);
+      }
 
     } else if(fuente==='Transbank Comisión'){
-      const archivos = [document.getElementById('nc-archivo-debito').files[0], document.getElementById('nc-archivo-credito').files[0], document.getElementById('nc-archivo-prepago').files[0]].filter(Boolean);
-      if(!archivos.length){ errEl.textContent='Sube al menos un archivo (Débito, Crédito o Prepago)'; return; }
-      const resultados = [];
-      for(const f of archivos){ resultados.push(parsearExtraccionTransbankComision(await f.text(), periodoDeclarado)); }
+      archivosComisionAcumulados.push(filasOTexto);
+      const resultados = archivosComisionAcumulados.map(txt => parsearExtraccionTransbankComision(txt, sugerenciaAbonoActual));
       const combinado = combinarExtraccionesTransbank(resultados, periodoDeclarado);
       resultado = await llamarAPI('importarTransbankComision', {data:combinado});
-      if(resultado.ok) return mostrarResultadoImport(fuente, periodoDeclarado, combinado.advertencias);
+      if(resultado.ok) mostrarResultadoImport(fuente, combinado.advertencias);
 
     } else if(fuente==='PedidosYa'){
-      const file = document.getElementById('nc-archivo-pedidosya').files[0];
-      if(!file){ errEl.textContent='Elige el Excel de "Lista de pedidos"'; return; }
-      const cuota = Number(document.getElementById('nc-cuota-credito').value)||0;
-      const totalLiquidado = Number(document.getElementById('nc-total-liquidado').value)||0;
-      const filas = await leerArchivoComoFilas(file);
-      const resExcel = parsearListaPedidosYa(filas, periodoDeclarado);
-      const datos = armarDatosPedidosYa(resExcel, cuota, totalLiquidado);
-      resultado = await llamarAPI('importarPedidosYaMontos', {data:datos});
-      if(resultado.ok) return mostrarResultadoImport(fuente, periodoDeclarado, [datos.advertenciaPeriodo, datos.advertenciaAutocheque]);
+      abrirModalDatosPedidosYa(filasOTexto, periodoDeclarado);
+      return;
 
     } else if(fuente==='Aronium Medios de Pago'){
-      const file = document.getElementById('nc-archivo-aronium').files[0];
-      if(!file){ errEl.textContent='Elige el Excel de Aronium'; return; }
-      const filas = await leerArchivoComoFilas(file);
-      const archivo = parseAroniumMedios(filas);
-      if(!archivo.dias.length){ errEl.textContent='No se encontraron días en el archivo.'; return; }
+      const archivo = parseAroniumMediosConciliacion(filasOTexto);
+      if(!archivo.dias.length){ errEl.textContent='No se encontraron días en el archivo de Aronium.'; return; }
       resultado = await llamarAPI('importarAroniumMediosConciliacion', {data:{periodoDeclarado, archivo}});
-      if(resultado.ok) return mostrarResultadoImport(fuente, periodoDeclarado, resultado.advertencias);
+      if(resultado.ok) mostrarResultadoImport(fuente, resultado.advertencias||[]);
     }
     if(resultado && !resultado.ok) errEl.textContent = resultado.error || 'Error al importar';
   }catch(err){
-    errEl.textContent = 'Error: ' + err.message;
+    errEl.textContent = 'Error leyendo "'+file.name+'": ' + err.message;
   }
 }
 
+// PedidosYa necesita 2 números que no vienen en el Excel (cuota de crédito y total
+// liquidado, del PDF del estado de cuenta) — se piden en un modal chico apenas se detecta
+// el archivo, en vez de tener campos sueltos en la pantalla todo el tiempo.
+function abrirModalDatosPedidosYa(filas, periodoDeclarado){
+  abrirModal(
+    '<h3 style="font-size:15px;">PedidosYa — datos del PDF</h3>'+
+    '<p style="font-size:12px;color:var(--ink-soft);margin:2px 0 10px;">Del estado de cuenta, para el autochequeo.</p>'+
+    '<label>Cuota de crédito descontada</label><div class="field-money"><span>$</span><input type="number" id="pya-cuota-credito" value="0"></div>'+
+    '<label>Total liquidado del período</label><div class="field-money"><span>$</span><input type="number" id="pya-total-liquidado" value="0"></div>'+
+    '<div class="error-msg" id="pya-modal-error"></div>'+
+    '<div style="display:flex;gap:8px;margin-top:14px;"><button class="btn-secondary" onclick="cerrarModal()">Cancelar</button><button class="btn-primary" onclick="confirmarDatosPedidosYa()">Procesar e importar</button></div>'
+  );
+  window._pyaFilasPendiente = filas;
+  window._pyaPeriodoPendiente = periodoDeclarado;
+}
+async function confirmarDatosPedidosYa(){
+  const cuota = Number(document.getElementById('pya-cuota-credito').value)||0;
+  const totalLiquidado = Number(document.getElementById('pya-total-liquidado').value)||0;
+  try{
+    const resExcel = parsearListaPedidosYa(window._pyaFilasPendiente, window._pyaPeriodoPendiente);
+    const datos = armarDatosPedidosYa(resExcel, cuota, totalLiquidado);
+    const resultado = await llamarAPI('importarPedidosYaMontos', {data:datos});
+    if(resultado.ok){ cerrarModal(); mostrarResultadoImport('PedidosYa', [datos.advertenciaPeriodo, datos.advertenciaAutocheque]); }
+    else document.getElementById('pya-modal-error').textContent = resultado.error||'Error al importar';
+  }catch(err){
+    document.getElementById('pya-modal-error').textContent = 'Error: '+err.message;
+  }
+}
+
+function mostrarResultadoImport(fuente, advertencias){
+  cacheModulo.conciliaciones = null;
+  const lista = [...new Set((advertencias||[]).filter(Boolean))];
+  if(lista.length){
+    lista.forEach(a=>{
+      const div = document.createElement('div'); div.className='check-row check-warn'; div.style.marginBottom='8px';
+      div.textContent = '⚠ '+a;
+      document.getElementById('lista-fuentes-estado').insertAdjacentElement('beforebegin', div);
+    });
+  }
+  cargarEstadoFuentes();
+}
+
+function irARevisionDesdeFuentes(){
+  const desde = fechaCLDesdeValue('nc-desde'), hasta = fechaCLDesdeValue('nc-hasta');
+  abrirRevisionDesde(desde, hasta);
+}
+
+// Dropzone único — reemplaza a los 6 dropzones separados por fuente.
+document.addEventListener('DOMContentLoaded', ()=>{
+  const dz = document.getElementById('dz-conciliacion');
+  const input = document.getElementById('nc-archivo-unico');
+  if(!dz || !input) return;
+  dz.addEventListener('click', ()=>input.click());
+  dz.addEventListener('dragover', e=>{ e.preventDefault(); dz.classList.add('dragover'); });
+  dz.addEventListener('dragleave', ()=>dz.classList.remove('dragover'));
+  dz.addEventListener('drop', e=>{
+    e.preventDefault(); dz.classList.remove('dragover');
+    [...(e.dataTransfer.files||[])].forEach(f => procesarArchivoConciliacion(f));
+  });
+  input.addEventListener('change', e=>{
+    [...(e.target.files||[])].forEach(f => procesarArchivoConciliacion(f));
+    input.value = '';
+  });
+});
+
 /* ===================================================================
-   REVISIÓN — reemplaza a la vieja pantalla de Hallazgos con emparejamiento
+   REVISIÓN — sin cambios respecto a la versión anterior
    =================================================================== */
 const NOMBRES_MEDIO = {Debito:'Débito', Credito:'Crédito', Efectivo:'Efectivo', PedidosYa:'Pedidos Ya', Transferencia:'Transferencia'};
 
