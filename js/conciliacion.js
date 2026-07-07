@@ -171,20 +171,6 @@ function parsearListaPedidosYa(filas, periodoDeclarado){
   if(fueraDeRango.length){ const unicas=[...new Set(fueraDeRango)]; advertenciaPeriodo = 'Hay pedidos fuera del período declarado, se ignoraron: '+unicas.join(', ')+'. Revisa si es el archivo correcto.'; }
   return { desde:periodoDeclarado.desde, hasta:periodoDeclarado.hasta, dias:fechas.map(f=>({fecha:f, totalUsuario:Math.round(porDia[f])})), comisionTotal:Math.round(comisionTotal), reintegroTotal:Math.round(reintegroTotal), advertenciaPeriodo };
 }
-function armarDatosPedidosYa(resultadoExcel, cuotaCredito, totalLiquidadoDeclarado){
-  const totalUsuarioSuma = resultadoExcel.dias.reduce((s,d)=>s+d.totalUsuario,0);
-  const iva = Math.round((resultadoExcel.comisionTotal - resultadoExcel.reintegroTotal) * 0.19);
-  const subtotal = totalUsuarioSuma - resultadoExcel.comisionTotal + resultadoExcel.reintegroTotal - iva;
-  const totalCalculado = subtotal - Number(cuotaCredito||0);
-  const diferencia = Math.round(totalCalculado - Number(totalLiquidadoDeclarado||0));
-  return {
-    desde:resultadoExcel.desde, hasta:resultadoExcel.hasta, dias:resultadoExcel.dias,
-    comision:resultadoExcel.comisionTotal, reintegro:resultadoExcel.reintegroTotal, iva,
-    cuotaCredito:Number(cuotaCredito||0), totalLiquidadoDeclarado:Number(totalLiquidadoDeclarado||0), totalCalculado,
-    advertenciaPeriodo: resultadoExcel.advertenciaPeriodo||'',
-    advertenciaAutocheque: Math.abs(diferencia)>1 ? ('El total calculado ($'+Math.round(totalCalculado).toLocaleString('es-CL')+') no coincide con el total liquidado que escribiste ($'+Math.round(totalLiquidadoDeclarado).toLocaleString('es-CL')+'). Revisa los números del PDF.') : ''
-  };
-}
 
 function parseAroniumMediosConciliacion(filas){
   let headerIdx = -1;
@@ -230,7 +216,7 @@ function detectarFuenteDesdeNombreYContenido(nombreArchivo, filasOTexto){
     if(muestra.indexOf('Tipo de movimiento')!==-1 && muestra.indexOf(';')!==-1) return 'Transbank Comisión';
     return null;
   }
-  const muestra = filasOTexto.slice(0,15).map(filaTextoConciliacion).join(' ');
+  const muestra = filasOTexto.map(filaTextoConciliacion).join(' ');
   if(muestra.indexOf('FECHA DE MOVIMIENTO')!==-1 && muestra.indexOf('TIPO DE MOVIMIENTO')!==-1) return 'Transbank';
   if(muestra.indexOf('NÚMERO DEL PEDIDO')!==-1 || muestra.indexOf('NUMERO DEL PEDIDO')!==-1) return 'PedidosYa';
   if(muestra.indexOf('VENTAS SEG')!==-1 && muestra.indexOf('MEDIOS')!==-1) return 'Aronium Medios de Pago';
@@ -278,15 +264,16 @@ const FUENTES_CONCILIACION_UI = [
 
 function irANuevaConciliacion(){
   document.getElementById('nc-error').textContent='';
+  document.getElementById('avisos-fuentes').innerHTML='';
   document.getElementById('nc-desde').value='';
   document.getElementById('nc-hasta').value='';
-  document.getElementById('archivosComisionAcumulados_temp'); // noop, solo documenta la variable de abajo
   archivosComisionAcumulados = [];
   irA('screen-conciliacion-nueva');
   cargarSugerenciaPeriodo();
 }
 function irAFuentesDesde(desde, hasta){
   document.getElementById('nc-error').textContent='';
+  document.getElementById('avisos-fuentes').innerHTML='';
   document.getElementById('nc-desde').value = valueFromCL(desde);
   document.getElementById('nc-hasta').value = valueFromCL(hasta);
   archivosComisionAcumulados = [];
@@ -308,6 +295,7 @@ async function cargarSugerenciaPeriodo(){
 }
 async function onPeriodoConciliacionChange(){
   archivosComisionAcumulados = [];
+  document.getElementById('avisos-fuentes').innerHTML='';
   await cargarEstadoFuentes();
 }
 async function cargarEstadoFuentes(){
@@ -394,8 +382,9 @@ async function procesarArchivoConciliacion(file){
       if(resultado.ok) mostrarResultadoImport(fuente, combinado.advertencias);
 
     } else if(fuente==='PedidosYa'){
-      abrirModalDatosPedidosYa(filasOTexto, periodoDeclarado);
-      return;
+      const datos = parsearListaPedidosYa(filasOTexto, periodoDeclarado);
+      resultado = await llamarAPI('importarPedidosYaMontos', {data:datos});
+      if(resultado.ok) mostrarResultadoImport(fuente, [datos.advertenciaPeriodo]);
 
     } else if(fuente==='Aronium Medios de Pago'){
       const archivo = parseAroniumMediosConciliacion(filasOTexto);
@@ -409,45 +398,16 @@ async function procesarArchivoConciliacion(file){
   }
 }
 
-// PedidosYa necesita 2 números que no vienen en el Excel (cuota de crédito y total
-// liquidado, del PDF del estado de cuenta) — se piden en un modal chico apenas se detecta
-// el archivo, en vez de tener campos sueltos en la pantalla todo el tiempo.
-function abrirModalDatosPedidosYa(filas, periodoDeclarado){
-  abrirModal(
-    '<h3 style="font-size:15px;">PedidosYa — datos del PDF</h3>'+
-    '<p style="font-size:12px;color:var(--ink-soft);margin:2px 0 10px;">Del estado de cuenta, para el autochequeo.</p>'+
-    '<label>Cuota de crédito descontada</label><div class="field-money"><span>$</span><input type="number" id="pya-cuota-credito" value="0"></div>'+
-    '<label>Total liquidado del período</label><div class="field-money"><span>$</span><input type="number" id="pya-total-liquidado" value="0"></div>'+
-    '<div class="error-msg" id="pya-modal-error"></div>'+
-    '<div style="display:flex;gap:8px;margin-top:14px;"><button class="btn-secondary" onclick="cerrarModal()">Cancelar</button><button class="btn-primary" onclick="confirmarDatosPedidosYa()">Procesar e importar</button></div>'
-  );
-  window._pyaFilasPendiente = filas;
-  window._pyaPeriodoPendiente = periodoDeclarado;
-}
-async function confirmarDatosPedidosYa(){
-  const cuota = Number(document.getElementById('pya-cuota-credito').value)||0;
-  const totalLiquidado = Number(document.getElementById('pya-total-liquidado').value)||0;
-  try{
-    const resExcel = parsearListaPedidosYa(window._pyaFilasPendiente, window._pyaPeriodoPendiente);
-    const datos = armarDatosPedidosYa(resExcel, cuota, totalLiquidado);
-    const resultado = await llamarAPI('importarPedidosYaMontos', {data:datos});
-    if(resultado.ok){ cerrarModal(); mostrarResultadoImport('PedidosYa', [datos.advertenciaPeriodo, datos.advertenciaAutocheque]); }
-    else document.getElementById('pya-modal-error').textContent = resultado.error||'Error al importar';
-  }catch(err){
-    document.getElementById('pya-modal-error').textContent = 'Error: '+err.message;
-  }
-}
-
 function mostrarResultadoImport(fuente, advertencias){
   cacheModulo.conciliaciones = null;
+  const cont = document.getElementById('avisos-fuentes');
+  cont.innerHTML = '';
   const lista = [...new Set((advertencias||[]).filter(Boolean))];
-  if(lista.length){
-    lista.forEach(a=>{
-      const div = document.createElement('div'); div.className='check-row check-warn'; div.style.marginBottom='8px';
-      div.textContent = '⚠ '+a;
-      document.getElementById('lista-fuentes-estado').insertAdjacentElement('beforebegin', div);
-    });
-  }
+  lista.forEach(a=>{
+    const div = document.createElement('div'); div.className='check-row check-warn'; div.style.marginBottom='8px';
+    div.textContent = '⚠ '+a;
+    cont.appendChild(div);
+  });
   cargarEstadoFuentes();
 }
 
