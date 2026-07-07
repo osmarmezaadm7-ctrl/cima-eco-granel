@@ -19,13 +19,13 @@
 .hallazgo .h-top{display:flex;justify-content:space-between;gap:10px;margin-bottom:8px;}
 .pill-ok{background:var(--forest-soft);color:var(--forest);}
 
-/* ===== Revisión (Conciliación) ===== */
-.stepper{display:flex;align-items:center;gap:4px;margin-bottom:16px;}
-.stepper .st{display:flex;align-items:center;gap:5px;font-size:10px;font-weight:700;color:var(--border);white-space:nowrap;}
-.stepper .st .n{width:18px;height:18px;border-radius:50%;background:var(--border);color:#fff;display:flex;align-items:center;justify-content:center;font-size:9.5px;flex-shrink:0;}
+/* ===== Revisión / Fuentes (Conciliación) ===== */
+.stepper{display:flex;align-items:center;gap:6px;margin-bottom:24px;}
+.stepper .st{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:700;color:var(--ink-soft);white-space:nowrap;}
+.stepper .st .n{width:26px;height:26px;border-radius:50%;background:var(--border);color:#fff;display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0;}
 .stepper .st.done{color:var(--forest);} .stepper .st.done .n{background:var(--forest);}
 .stepper .st.now{color:var(--ink);} .stepper .st.now .n{background:var(--terracotta);}
-.stepper .line{flex:1;height:1.5px;background:var(--border);min-width:6px;}
+.stepper .line{flex:1;height:2px;background:var(--border);min-width:10px;}
 .punto{display:inline-block;width:9px;height:9px;border-radius:50%;flex-shrink:0;}
 .punto.verde{background:var(--success);} .punto.amarillo{background:#E0A526;} .punto.rojo{background:var(--danger);}
 .rev-kpi-row{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px;}
@@ -55,6 +55,25 @@
 .card-dia .c-top strong{font-size:14px;}
 .medio-block{margin-top:8px;padding-top:8px;border-top:1.5px dashed var(--border);}
 .medio-block .medio-nombre{font-size:11px;font-weight:800;color:var(--ink-soft);text-transform:uppercase;margin-bottom:2px;}
+
+/* Pantalla Fuentes — progreso + dropzone único + 4 tarjetas de estado */
+.progreso-fuentes-card{background:var(--surface);border:1.5px solid var(--border);border-radius:14px;padding:16px 18px;margin-bottom:18px;}
+.progreso-fuentes-row{display:flex;justify-content:space-between;font-size:14px;font-weight:700;margin-bottom:9px;}
+.progreso-barra{height:9px;background:var(--forest-soft);border-radius:6px;overflow:hidden;}
+.progreso-barra-fill{height:100%;background:var(--forest);transition:width .3s ease;}
+.dropzone-lg{padding:34px 16px;font-size:14px;margin-bottom:16px;}
+.dropzone-sub{display:block;font-size:12.5px;margin-top:4px;}
+.fuente-status-card{display:flex;align-items:center;gap:14px;background:var(--surface);border:1px solid var(--border);border-left:4px solid var(--border);border-radius:0 12px 12px 0;padding:14px 16px;margin-bottom:10px;}
+.fuente-status-card.cargado{border-left-color:var(--success);}
+.fuente-status-ico{width:40px;height:40px;border-radius:10px;background:var(--paper);color:var(--ink-soft);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:18px;font-weight:700;}
+.fuente-status-card.cargado .fuente-status-ico{background:var(--forest-soft);color:var(--forest);}
+.fuente-status-txt .titulo{font-size:15px;font-weight:600;margin:0;}
+.fuente-status-txt .sub{font-size:13px;color:var(--ink-soft);margin:3px 0 0;}
+.aviso-abono{display:flex;align-items:flex-start;gap:12px;background:var(--forest-soft);border-radius:12px;padding:14px 16px;margin-bottom:10px;}
+.aviso-abono svg{color:var(--forest);flex-shrink:0;margin-top:1px;}
+.aviso-abono .titulo{font-size:14.5px;font-weight:700;color:var(--forest);margin:0;}
+.aviso-abono .sub{font-size:13px;color:var(--forest);margin:3px 0 0;}
+
 </style>
 </head>
 <body>
@@ -398,63 +417,43 @@
     <div id="lista-conciliacion"></div>
   </div>
 
-  <!-- CONCILIACIÓN — Nueva: elegir fuente/período y subir archivo(s) -->
+  <!-- CONCILIACIÓN — Fuentes: elegir período y cargar las 4 fuentes en un solo dropzone -->
   <div class="screen" id="screen-conciliacion-nueva">
     <button class="back-link" onclick="irA('screen-conciliacion')"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"></path></svg> Volver</button>
-    <h2 style="font-size:17px;">Nueva conciliación</h2>
-    <p style="font-size:12px;color:var(--ink-soft);margin:-6px 0 14px;">Paso 1: elige la fuente y confirma el período. Paso 2: sube el archivo correspondiente.</p>
 
-    <label>Fuente</label>
-    <select id="nc-fuente" onchange="onFuenteConciliacionChange()">
-      <option value="Transbank">Transbank (montos — Cartola de Movimientos)</option>
-      <option value="Transbank Comisión">Transbank Comisión (Débito/Crédito/Prepago)</option>
-      <option value="PedidosYa">PedidosYa (montos y comisión)</option>
-      <option value="Aronium Medios de Pago">Aronium Medios de Pago</option>
-    </select>
-
-    <div style="display:flex;gap:10px;">
-      <div style="flex:1;"><label>Desde</label><input type="date" id="nc-desde"></div>
-      <div style="flex:1;"><label>Hasta</label><input type="date" id="nc-hasta"></div>
-    </div>
-    <p id="nc-sugerencia" style="font-size:11px;color:var(--ink-soft);margin-top:4px;"></p>
-
-    <div id="nc-campos-transbank" style="display:none;">
-      <label>Cartola de Movimientos (Excel)</label>
-      <div class="dropzone" id="dz-cartola" onclick="document.getElementById('nc-archivo-cartola').click()"><span>Arrastra el archivo aquí, o toca para elegir</span></div>
-      <input type="file" id="nc-archivo-cartola" accept=".xlsx,.xls" style="display:none;">
+    <div class="stepper">
+      <div class="st now"><div class="n">1</div>Fuentes</div><div class="line"></div>
+      <div class="st"><div class="n">2</div>Revisión</div><div class="line"></div>
+      <div class="st"><div class="n">3</div>Hallazgos</div><div class="line"></div>
+      <div class="st"><div class="n">4</div>Cerrar</div>
     </div>
 
-    <div id="nc-campos-transbank-comision" style="display:none;">
-      <label>Extracción Débito (.dat)</label>
-      <div class="dropzone" id="dz-debito" onclick="document.getElementById('nc-archivo-debito').click()"><span>Arrastra el archivo aquí, o toca para elegir</span></div>
-      <input type="file" id="nc-archivo-debito" accept=".dat,.txt" style="display:none;">
-      <label>Extracción Crédito (.dat)</label>
-      <div class="dropzone" id="dz-credito" onclick="document.getElementById('nc-archivo-credito').click()"><span>Arrastra el archivo aquí, o toca para elegir</span></div>
-      <input type="file" id="nc-archivo-credito" accept=".dat,.txt" style="display:none;">
-      <label>Extracción Prepago (.dat)</label>
-      <div class="dropzone" id="dz-prepago" onclick="document.getElementById('nc-archivo-prepago').click()"><span>Arrastra el archivo aquí, o toca para elegir</span></div>
-      <input type="file" id="nc-archivo-prepago" accept=".dat,.txt" style="display:none;">
+    <h2 style="font-size:19px;">Nueva conciliación</h2>
+    <p style="font-size:13.5px;color:var(--ink-soft);margin:0 0 16px;">Elige el período y arrastra las 4 fuentes — detectamos el tipo automáticamente.</p>
+
+    <div style="display:flex;gap:12px;">
+      <div style="flex:1;"><label>Desde</label><input type="date" id="nc-desde" onchange="onPeriodoConciliacionChange()"></div>
+      <div style="flex:1;"><label>Hasta</label><input type="date" id="nc-hasta" onchange="onPeriodoConciliacionChange()"></div>
+    </div>
+    <p id="nc-sugerencia" style="font-size:12px;color:var(--ink-soft);margin:4px 0 18px;"></p>
+
+    <div class="progreso-fuentes-card">
+      <div class="progreso-fuentes-row"><span id="progreso-texto">0 de 4 fuentes cargadas</span><span id="progreso-pct">0%</span></div>
+      <div class="progreso-barra"><div class="progreso-barra-fill" id="progreso-fill" style="width:0%;"></div></div>
     </div>
 
-    <div id="nc-campos-pedidosya" style="display:none;">
-      <label>Lista de pedidos (Excel)</label>
-      <div class="dropzone" id="dz-pedidosya" onclick="document.getElementById('nc-archivo-pedidosya').click()"><span>Arrastra el archivo aquí, o toca para elegir</span></div>
-      <input type="file" id="nc-archivo-pedidosya" accept=".xlsx,.xls" style="display:none;">
-      <label>Cuota de crédito descontada (del PDF)</label>
-      <div class="field-money"><span>$</span><input type="number" id="nc-cuota-credito"></div>
-      <label>Total liquidado del período (del PDF, para autochequeo)</label>
-      <div class="field-money"><span>$</span><input type="number" id="nc-total-liquidado"></div>
+    <div class="dropzone dropzone-lg" id="dz-conciliacion">
+      Arrastra el archivo aquí, o toca para elegir
+      <span class="dropzone-sub">Cartola Transbank · Comisión Transbank · PedidosYa · Aronium</span>
     </div>
+    <input type="file" id="nc-archivo-unico" accept=".xlsx,.xls,.dat,.txt" multiple style="display:none;">
 
-    <div id="nc-campos-aronium" style="display:none;">
-      <label>Ventas según medios de pago (Excel)</label>
-      <div class="dropzone" id="dz-aronium" onclick="document.getElementById('nc-archivo-aronium').click()"><span>Arrastra el archivo aquí, o toca para elegir</span></div>
-      <input type="file" id="nc-archivo-aronium" accept=".xlsx,.xls" style="display:none;">
-    </div>
+    <div id="lista-fuentes-estado" style="margin-top:14px;"></div>
 
     <div class="error-msg" id="nc-error"></div>
-    <div class="submit-bar"><button class="btn-primary" onclick="procesarConciliacion()">Procesar e importar</button></div>
+    <div class="submit-bar"><button class="btn-primary" id="btn-ir-revision" disabled onclick="irARevisionDesdeFuentes()">Ir a Revisión — faltan 4 fuentes</button></div>
   </div>
+
 
   <!-- CONCILIACIÓN — Hallazgos de un período -->
   <!-- CONCILIACIÓN — Revisión (reemplaza a la vieja pantalla de hallazgos con emparejamiento) -->
@@ -462,11 +461,10 @@
     <button class="back-link" onclick="irA('screen-conciliacion')"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"></path></svg> Volver</button>
 
     <div class="stepper">
-      <div class="st done"><div class="n">✓</div>Período</div><div class="line"></div>
-      <div class="st done"><div class="n">✓</div>Archivos</div><div class="line"></div>
-      <div class="st now"><div class="n">3</div>Revisión</div><div class="line"></div>
-      <div class="st"><div class="n">4</div>Hallazgos</div><div class="line"></div>
-      <div class="st"><div class="n">5</div>Cerrar</div>
+      <div class="st done"><div class="n">✓</div>Fuentes</div><div class="line"></div>
+      <div class="st now"><div class="n">2</div>Revisión</div><div class="line"></div>
+      <div class="st"><div class="n">3</div>Hallazgos</div><div class="line"></div>
+      <div class="st"><div class="n">4</div>Cerrar</div>
     </div>
 
     <h2 style="font-size:17px;" id="rev-titulo">Revisión</h2>
