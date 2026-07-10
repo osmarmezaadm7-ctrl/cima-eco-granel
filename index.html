@@ -73,6 +73,9 @@
 .aviso-abono svg{color:var(--forest);flex-shrink:0;margin-top:1px;}
 .aviso-abono .titulo{font-size:14.5px;font-weight:700;color:var(--forest);margin:0;}
 .aviso-abono .sub{font-size:13px;color:var(--forest);margin:3px 0 0;}
+.archivo-comision-fila{display:flex;align-items:center;justify-content:space-between;gap:10px;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px 12px;margin-bottom:6px;font-size:13px;}
+.btn-quitar-archivo{background:none;border:none;color:var(--ink-soft);font-size:16px;line-height:1;cursor:pointer;padding:4px 8px;min-width:44px;min-height:44px;}
+.btn-quitar-archivo:hover{color:var(--danger);}
 
 </style>
 </head>
@@ -453,6 +456,7 @@
     <input type="file" id="nc-archivo-unico" accept=".xlsx,.xls,.dat,.txt" multiple style="display:none;">
 
     <div id="lista-fuentes-estado" style="margin-top:14px;"></div>
+    <div id="lista-archivos-comision"></div>
 
     <div class="error-msg" id="nc-error"></div>
     <div class="submit-bar"><button class="btn-primary" id="btn-ir-revision" disabled onclick="irARevisionDesdeFuentes()">Ir a Revisión — faltan 4 fuentes</button></div>
