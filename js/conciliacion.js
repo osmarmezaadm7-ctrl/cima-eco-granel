@@ -509,8 +509,8 @@ function pintarRevision(r){
     '</div>'+
     '<div class="rev-leyenda">'+
       '<span><span class="punto verde"></span> Todo cuadra</span>'+
-      '<span><span class="punto amarillo"></span> Digitación de tarjeta/Pedidos Ya no calza</span>'+
-      '<span><span class="punto rojo"></span> El total no cuadra — posible plata real</span>'+
+      '<span><span class="punto amarillo"></span> Digitación no calza, o error de medio de pago en Aronium</span>'+
+      '<span><span class="punto rojo"></span> Descuadre de caja (Efectivo/Transferencia) — posible plata real</span>'+
     '</div>';
   const tablaOCards = esAncho ? tablaRevisionDesktop(r.dias) : tarjetasRevisionMobile(r.dias);
   cont.innerHTML = kpiHtml + tablaOCards +
