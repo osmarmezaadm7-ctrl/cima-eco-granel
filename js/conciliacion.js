@@ -208,7 +208,13 @@ function parseAroniumMediosConciliacion(filas){
    =================================================================== */
 function filaTextoConciliacion(r){ return (r||[]).join(' ').toUpperCase(); }
 
-// Devuelve 'Transbank' | 'Transbank Comisión' | 'PedidosYa' | 'Aronium Medios de Pago' | null
+// Devuelve el medio de pago que el propio archivo declara ('Debito'/'Credito'/'Prepago'),
+// para poder mostrarle al usuario cuál de los 3 .dat detectó cada vez.
+function extraerMedioComision(texto){
+  const lineas = texto.split(/\r?\n/);
+  const linea = lineas.find(l => l.indexOf('Medio de pago')===0);
+  return linea ? (linea.split(';')[1]||'').trim() : 'Desconocido';
+}
 function detectarFuenteDesdeNombreYContenido(nombreArchivo, filasOTexto){
   const ext = nombreArchivo.split('.').pop().toLowerCase();
   if(ext==='dat' || ext==='txt'){
@@ -270,6 +276,7 @@ function irANuevaConciliacion(){
   archivosComisionAcumulados = [];
   irA('screen-conciliacion-nueva');
   cargarSugerenciaPeriodo();
+  pintarArchivosComision();
 }
 function irAFuentesDesde(desde, hasta){
   document.getElementById('nc-error').textContent='';
@@ -279,6 +286,7 @@ function irAFuentesDesde(desde, hasta){
   archivosComisionAcumulados = [];
   irA('screen-conciliacion-nueva');
   cargarEstadoFuentes();
+  pintarArchivosComision();
 }
 async function cargarSugerenciaPeriodo(){
   document.getElementById('nc-sugerencia').textContent = 'Calculando sugerencia...';
@@ -295,6 +303,7 @@ async function cargarSugerenciaPeriodo(){
 }
 async function onPeriodoConciliacionChange(){
   archivosComisionAcumulados = [];
+  pintarArchivosComision();
   document.getElementById('avisos-fuentes').innerHTML='';
   await cargarEstadoFuentes();
 }
@@ -341,7 +350,8 @@ function pintarEstadoFuentes(fuentes){
 }
 
 // Acumula archivos .dat de Transbank Comisión entre gotas sucesivas (se puede soltar
-// Débito, Crédito y Prepago en cualquier orden, de a uno o varios juntos).
+// Débito, Crédito y Prepago en cualquier orden, de a uno, o varios juntos — ahora se
+// procesan en secuencia, no en paralelo). Cada entrada: {nombreArchivo, medio, texto}.
 let archivosComisionAcumulados = [];
 // Período de abonos sugerido, calculado al cargar la Cartola — se usa para avisar si el
 // archivo de Comisión declara un período distinto (ver parsearExtraccionTransbankComision).
@@ -375,11 +385,11 @@ async function procesarArchivoConciliacion(file){
       }
 
     } else if(fuente==='Transbank Comisión'){
-      archivosComisionAcumulados.push(filasOTexto);
-      const resultados = archivosComisionAcumulados.map(txt => parsearExtraccionTransbankComision(txt, sugerenciaAbonoActual));
-      const combinado = combinarExtraccionesTransbank(resultados, periodoDeclarado);
-      resultado = await llamarAPI('importarTransbankComision', {data:combinado});
-      if(resultado.ok) mostrarResultadoImport(fuente, combinado.advertencias);
+      const medio = extraerMedioComision(filasOTexto);
+      const yaEstaba = archivosComisionAcumulados.find(a => a.nombreArchivo===file.name && a.medio===medio);
+      if(yaEstaba){ errEl.textContent = 'Este archivo ("'+file.name+'", medio '+medio+') ya estaba agregado — no se sumó dos veces.'; return; }
+      archivosComisionAcumulados.push({ nombreArchivo:file.name, medio, texto:filasOTexto });
+      resultado = await guardarYPintarComision();
 
     } else if(fuente==='PedidosYa'){
       const datos = parsearListaPedidosYa(filasOTexto, periodoDeclarado);
@@ -398,6 +408,36 @@ async function procesarArchivoConciliacion(file){
   }
 }
 
+async function guardarYPintarComision(){
+  const desde = fechaCLDesdeValue('nc-desde'), hasta = fechaCLDesdeValue('nc-hasta');
+  const resultados = archivosComisionAcumulados.map(a => parsearExtraccionTransbankComision(a.texto, sugerenciaAbonoActual));
+  const combinado = combinarExtraccionesTransbank(resultados, {desde, hasta});
+  const resultado = await llamarAPI('importarTransbankComision', {data:combinado});
+  if(resultado.ok) mostrarResultadoImport('Transbank Comisión', combinado.advertencias);
+  pintarArchivosComision();
+  return resultado;
+}
+function pintarArchivosComision(){
+  const cont = document.getElementById('lista-archivos-comision');
+  if(!cont) return;
+  if(!archivosComisionAcumulados.length){ cont.innerHTML=''; return; }
+  cont.innerHTML = '<p class="titulo" style="font-size:12px;color:var(--ink-soft);margin:10px 0 4px;">Archivos de Abonos Transbank cargados:</p>' +
+    archivosComisionAcumulados.map((a,i)=>
+      '<div class="archivo-comision-fila">'+
+        '<span>✓ '+a.medio+' — '+a.nombreArchivo+'</span>'+
+        '<button type="button" class="btn-quitar-archivo" onclick="quitarArchivoComision('+i+')" title="Quitar este archivo">✕</button>'+
+      '</div>'
+    ).join('');
+}
+async function quitarArchivoComision(i){
+  archivosComisionAcumulados.splice(i,1);
+  if(!archivosComisionAcumulados.length){
+    pintarArchivosComision();
+    document.getElementById('nc-error').textContent = 'Quitaste el último archivo de Abonos Transbank — el total guardado quedó desactualizado. Sube al menos 1 archivo para volver a calcularlo.';
+    return;
+  }
+  await guardarYPintarComision();
+}
 function mostrarResultadoImport(fuente, advertencias){
   cacheModulo.conciliaciones = null;
   const cont = document.getElementById('avisos-fuentes');
@@ -424,12 +464,12 @@ document.addEventListener('DOMContentLoaded', ()=>{
   dz.addEventListener('click', ()=>input.click());
   dz.addEventListener('dragover', e=>{ e.preventDefault(); dz.classList.add('dragover'); });
   dz.addEventListener('dragleave', ()=>dz.classList.remove('dragover'));
-  dz.addEventListener('drop', e=>{
+  dz.addEventListener('drop', async e=>{
     e.preventDefault(); dz.classList.remove('dragover');
-    [...(e.dataTransfer.files||[])].forEach(f => procesarArchivoConciliacion(f));
+    for(const f of [...(e.dataTransfer.files||[])]) await procesarArchivoConciliacion(f);
   });
-  input.addEventListener('change', e=>{
-    [...(e.target.files||[])].forEach(f => procesarArchivoConciliacion(f));
+  input.addEventListener('change', async e=>{
+    for(const f of [...(e.target.files||[])]) await procesarArchivoConciliacion(f);
     input.value = '';
   });
 });
