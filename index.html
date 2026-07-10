@@ -139,9 +139,9 @@
     <button class="back-link" onclick="irA('screen-home')"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"></path></svg> Volver</button>
     <h2 style="font-size:17px;">Cambiar mi PIN</h2>
     <div class="pin-box" style="max-width:280px;">
-      <label style="text-align:left;">PIN actual</label><input type="password" maxlength="4" id="cp-actual" inputmode="numeric">
-      <label style="text-align:left;">PIN nuevo</label><input type="password" maxlength="4" id="cp-nuevo" inputmode="numeric">
-      <label style="text-align:left;">Confirmar PIN nuevo</label><input type="password" maxlength="4" id="cp-confirmar" inputmode="numeric">
+      <label style="text-align:left;">PIN actual</label><input type="tel" class="pin-mask" maxlength="4" id="cp-actual" inputmode="numeric" autocomplete="off">
+      <label style="text-align:left;">PIN nuevo</label><input type="tel" class="pin-mask" maxlength="4" id="cp-nuevo" inputmode="numeric" autocomplete="off">
+      <label style="text-align:left;">Confirmar PIN nuevo</label><input type="tel" class="pin-mask" maxlength="4" id="cp-confirmar" inputmode="numeric" autocomplete="off">
       <div class="error-msg" id="cp-error"></div>
       <button class="btn-primary" style="margin-top:12px;" onclick="guardarCambioPin()">Guardar nuevo PIN</button>
     </div>
@@ -172,29 +172,29 @@
       <button type="button" onclick="setModoCierre('periodo',this)">Varios días</button>
     </div>
     <div id="cc-fecha-dia">
-      <label>Fecha</label><input type="date" id="cc-fecha">
+      <label>Fecha</label><input type="date" id="cc-fecha" autocomplete="off">
     </div>
     <div id="cc-fecha-periodo" style="display:none;">
       <div style="display:flex;gap:10px;">
-        <div style="flex:1;"><label>Desde</label><input type="date" id="cc-fecha-desde"></div>
-        <div style="flex:1;"><label>Hasta</label><input type="date" id="cc-fecha-hasta"></div>
+        <div style="flex:1;"><label>Desde</label><input type="date" id="cc-fecha-desde" autocomplete="off"></div>
+        <div style="flex:1;"><label>Hasta</label><input type="date" id="cc-fecha-hasta" autocomplete="off"></div>
       </div>
     </div>
     <label>Saldo inicial <span style="font-weight:400;color:var(--ink-soft);">— Reporte Z Aronium</span></label>
-    <div class="field-money"><span>$</span><input type="number" id="cc-saldo"></div>
+    <div class="field-money"><span>$</span><input type="number" id="cc-saldo" autocomplete="off"></div>
     <label>Efectivo <span style="font-weight:400;color:var(--ink-soft);">— total físico en caja</span></label>
-    <div class="field-money"><span>$</span><input type="number" id="cc-efectivo"></div>
+    <div class="field-money"><span>$</span><input type="number" id="cc-efectivo" autocomplete="off"></div>
     <button type="button" class="btn-secondary btn-small" style="margin:-4px 0 10px;" onclick="abrirArqueo()">🧮 Contar por denominación</button>
     <label>Débito <span style="font-weight:400;color:var(--ink-soft);">— voucher Transbank</span></label>
-    <div class="field-money"><span>$</span><input type="number" id="cc-debito"></div>
+    <div class="field-money"><span>$</span><input type="number" id="cc-debito" autocomplete="off"></div>
     <label>Crédito <span style="font-weight:400;color:var(--ink-soft);">— voucher Transbank</span></label>
-    <div class="field-money"><span>$</span><input type="number" id="cc-credito"></div>
+    <div class="field-money"><span>$</span><input type="number" id="cc-credito" autocomplete="off"></div>
     <label>Transferencias <span style="font-weight:400;color:var(--ink-soft);">— Reporte Z Aronium</span></label>
-    <div class="field-money"><span>$</span><input type="number" id="cc-transferencia"></div>
+    <div class="field-money"><span>$</span><input type="number" id="cc-transferencia" autocomplete="off"></div>
     <label>Pedidos Ya <span style="font-weight:400;color:var(--ink-soft);">— total POS Pedidos Ya</span></label>
-    <div class="field-money"><span>$</span><input type="number" id="cc-pedidosya"></div>
+    <div class="field-money"><span>$</span><input type="number" id="cc-pedidosya" autocomplete="off"></div>
     <label>Retiro <span style="font-weight:400;color:var(--ink-soft);">— Efectivo</span></label>
-    <div class="field-money"><span>$</span><input type="number" id="cc-retiro"></div>
+    <div class="field-money"><span>$</span><input type="number" id="cc-retiro" autocomplete="off"></div>
     <div class="error-msg" id="cc-error"></div>
     <div class="submit-bar"><button class="btn-primary" onclick="revisarCierreCaja()">Revisar y guardar</button></div>
   </div>
@@ -262,7 +262,7 @@
   <div class="screen" id="screen-compra">
     <button class="back-link" onclick="irA('screen-home')"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"></path></svg> Volver</button>
     <h2 style="font-size:17px;">Compra / gasto</h2>
-    <label>Fecha</label><input type="date" id="co-fecha">
+    <label>Fecha</label><input type="date" id="co-fecha" autocomplete="off">
     <label>Negocio</label><div class="toggle-group" id="co-negocio-group" style="flex-wrap:wrap;"></div>
     <label>Categoría</label>
     <div class="search-select" id="ss-co-naturaleza">
@@ -278,9 +278,9 @@
     </div>
     <label>Tipo de documento</label>
     <select id="co-tipo-doc"><option>Factura</option><option>Boleta</option><option>Nota de Crédito</option><option>Sin documento</option><option>Otro</option></select>
-    <label>N° de documento</label><input type="text" id="co-ndoc">
-    <label>Monto</label><div class="field-money"><span>$</span><input type="number" id="co-monto"></div>
-    <label>Descripción</label><input type="text" id="co-desc"></input>
+    <label>N° de documento</label><input type="text" id="co-ndoc" autocomplete="off">
+    <label>Monto</label><div class="field-money"><span>$</span><input type="number" id="co-monto" autocomplete="off"></div>
+    <label>Descripción</label><input type="text" id="co-desc" autocomplete="off"></input>
     <label>Estado</label>
     <div class="toggle-group" id="co-estado-group">
       <button type="button" onclick="seleccionarEstadoPago('co',this,'Pagado')">Pagado</button>
@@ -292,16 +292,18 @@
       </label>
       <div id="co-abono-wrap" style="display:none;">
         <label>Abono ahora</label>
-        <div class="field-money"><span>$</span><input type="number" id="co-abono" oninput="actualizarResumenPagos('co')"></div>
+        <div class="field-money"><span>$</span><input type="number" id="co-abono" oninput="actualizarResumenPagos('co')" autocomplete="off"></div>
       </div>
     </div>
 
-    <label style="margin-top:10px;">Medios de pago</label>
-    <div id="co-pagos-lista"></div>
-    <label style="display:flex;align-items:center;gap:7px;margin-top:2px;font-weight:400;">
-      <input type="checkbox" id="co-multi-check" onchange="toggleSegundoPago('co')">Agregar otro medio de pago
-    </label>
-    <div id="co-pagos-resumen" style="font-size:12px;margin-top:6px;"></div>
+    <div id="co-medios-wrap">
+      <label style="margin-top:10px;">Medios de pago</label>
+      <div id="co-pagos-lista"></div>
+      <label style="display:flex;align-items:center;gap:7px;margin-top:2px;font-weight:400;">
+        <input type="checkbox" id="co-multi-check" onchange="toggleSegundoPago('co')">Agregar otro medio de pago
+      </label>
+      <div id="co-pagos-resumen" style="font-size:12px;margin-top:6px;"></div>
+    </div>
     <div class="error-msg" id="co-error"></div>
     <div class="submit-bar"><button class="btn-primary" onclick="enviarCompra()">Guardar compra/gasto</button></div>
   </div>
@@ -545,7 +547,10 @@
     <h2 id="confirm-title" style="font-size:18px;">Registro guardado</h2>
     <p id="confirm-msg" style="color:var(--ink-soft);font-size:13px;max-width:280px;"></p>
     <div id="confirm-detalle" style="width:100%;"></div>
-    <div class="submit-bar" style="width:100%;"><button class="btn-primary" onclick="irA('screen-home')">Volver al inicio</button></div>
+    <div class="submit-bar" style="width:100%;display:flex;flex-direction:column;gap:8px;">
+      <button class="btn-secondary" id="confirm-btn-otro" style="display:none;" onclick="confirmAccionOtro && confirmAccionOtro()"></button>
+      <button class="btn-primary" onclick="irA('screen-home')">Volver al inicio</button>
+    </div>
   </div>
 
   </div>
@@ -558,6 +563,17 @@ const modoDemo = CONFIG.API_URL.indexOf('PEGA_AQUI') !== -1;
 if (modoDemo) document.getElementById('banner-demo').style.display = 'block';
 
 let sesion = { nombre:null, rol:null, negocio:null };
+let confirmAccionOtro = null;
+function configurarBotonOtro(label, accion){
+  confirmAccionOtro = accion;
+  const btn = document.getElementById('confirm-btn-otro');
+  btn.textContent = label;
+  btn.style.display = 'block';
+}
+function ocultarBotonOtro(){
+  confirmAccionOtro = null;
+  document.getElementById('confirm-btn-otro').style.display = 'none';
+}
 let permisosSesion = {};
 let pinBuffer = ''; let usuarioSeleccionado = null;
 let cacheProveedores = []; let cacheClientes = []; let cacheCategorias = []; let cacheCatalogo = [];
@@ -702,7 +718,15 @@ function inicializarPagos(prefix, montoInicial){
   const eg = document.getElementById(prefix+'-estado-group');
   [...eg.children].forEach(c=>c.classList.remove('selected'));
   eg.children[0].classList.add('selected'); eg.dataset.valor='Pagado';
+  actualizarVisibilidadMedios(prefix);
   pintarPagos(prefix);
+}
+function actualizarVisibilidadMedios(prefix){
+  const wrap = document.getElementById(prefix+'-medios-wrap');
+  if(!wrap) return;
+  const estado = document.getElementById(prefix+'-estado-group').dataset.valor || 'Pagado';
+  const parcial = document.getElementById(prefix+'-parcial-check').checked;
+  wrap.style.display = (estado==='Pendiente de pago' && !parcial) ? 'none' : 'block';
 }
 function seleccionarEstadoPago(prefix, btn, valor){
   seleccionarToggle(prefix+'-estado-group', btn, valor);
@@ -711,11 +735,13 @@ function seleccionarEstadoPago(prefix, btn, valor){
     document.getElementById(prefix+'-parcial-check').checked=false;
     document.getElementById(prefix+'-abono-wrap').style.display='none';
   }
+  actualizarVisibilidadMedios(prefix);
   actualizarResumenPagos(prefix);
 }
 function togglePagoParcial(prefix){
   const on = document.getElementById(prefix+'-parcial-check').checked;
   document.getElementById(prefix+'-abono-wrap').style.display = on?'block':'none';
+  actualizarVisibilidadMedios(prefix);
   actualizarResumenPagos(prefix);
 }
 function toggleSegundoPago(prefix){
@@ -1211,7 +1237,7 @@ function abrirArqueo(){
       '<span style="width:56px;font-size:12px;color:var(--ink-soft);">'+d.tipo[0]+'</span>'+
       '<span class="mono" style="width:70px;font-size:13px;">'+fmt(d.valor)+'</span>'+
       '<span style="color:var(--ink-soft);">×</span>'+
-      '<input type="number" min="0" placeholder="0" data-den="'+d.valor+'" oninput="calcularArqueo()" style="width:70px;">'+
+      '<input type="number" min="0" placeholder="0" data-den="'+d.valor+'" oninput="calcularArqueo()" autocomplete="off" style="width:70px;">'+
       '<span class="mono" style="flex:1;text-align:right;font-size:12.5px;color:var(--ink-soft);" id="arq-sub-'+d.valor+'">$0</span>'+
     '</div>'
   ).join('');
@@ -1300,9 +1326,11 @@ async function guardarCierreCajaFinal(confirmarSobrescritura){
   if(r.ok){
     cachePanel = {}; flujoVentasCache = {}; movimientosCache = null;
     cerrarModal();
+    const montoAronium = (Number(data.efectivo)||0) - (Number(data.retiro)||0);
+    ocultarBotonOtro();
     document.getElementById('confirm-title').textContent='Cierre guardado';
     document.getElementById('confirm-msg').textContent='El registro quedó guardado correctamente.';
-    document.getElementById('confirm-detalle').innerHTML = '<div class="check-row check-warn">📋 No olvides actualizar la Caja Inicial en Aronium con el efectivo que queda en caja</div>';
+    document.getElementById('confirm-detalle').innerHTML = '<div class="check-row check-warn">📋 Actualiza la Caja Inicial en Aronium con <strong>'+fmt(montoAronium)+'</strong> (Efectivo − Retiro)</div>';
     irA('screen-confirm');
   } else if (r.requiereConfirmacion && r.puedeSobrescribir) {
     document.getElementById('cc-modal-error').innerHTML =
@@ -1460,6 +1488,7 @@ async function enviarVentaVegan(){
   if(r.ok){
     cachePanel = {}; movimientosCache = null;
     if(r.saldoPendiente>0) cacheModulo.cxc = null;
+    configurarBotonOtro('Registrar otra venta', abrirVentaVegan);
     document.getElementById('confirm-title').textContent='Venta guardada'; document.getElementById('confirm-msg').textContent='Venta Vegan Corner registrada correctamente.'+(r.saldoPendiente>0?' Saldo pendiente: '+fmt(r.saldoPendiente)+'.':''); document.getElementById('confirm-detalle').innerHTML=''; irA('screen-confirm');
   }
   else document.getElementById('vv-error').textContent=r.error||'Error al guardar';
@@ -1473,6 +1502,11 @@ function prepararCompra(){
   grupo.dataset.valor = opciones[0];
   document.querySelector('#ss-co-naturaleza input[type=text]').value=''; document.getElementById('ss-co-naturaleza-valor').value='';
   document.querySelector('#ss-co-proveedor input[type=text]').value=''; document.getElementById('ss-co-proveedor-valor').value='';
+  document.getElementById('co-tipo-doc').selectedIndex = 0;
+  document.getElementById('co-ndoc').value = '';
+  document.getElementById('co-monto').value = '';
+  document.getElementById('co-desc').value = '';
+  document.getElementById('co-error').textContent = '';
   document.getElementById('co-monto').oninput = ()=>actualizarResumenPagos('co');
   cargarCategoriasCompra(); cargarProveedores().then(()=>inicializarPagos('co', 0));
 }
@@ -1545,6 +1579,7 @@ async function enviarCompra(){
   if(r.ok){
     cachePanel = {}; movimientosCache = null;
     if(r.saldoPendiente>0) cacheModulo.cxp = null;
+    configurarBotonOtro('Registrar otro egreso', ()=>{ prepararCompra(); irA('screen-compra'); });
     document.getElementById('confirm-title').textContent='Compra guardada'; document.getElementById('confirm-msg').textContent='Compra/gasto registrado correctamente.'+(r.saldoPendiente>0?' Saldo pendiente: '+fmt(r.saldoPendiente)+'.':''); document.getElementById('confirm-detalle').innerHTML=''; irA('screen-confirm');
   }
   else document.getElementById('co-error').textContent=r.error||'Error al guardar';
@@ -1735,6 +1770,7 @@ async function confirmarImport(loteAnteriorId){
     document.getElementById('confirm-title').textContent='Importación completa';
     document.getElementById('confirm-msg').textContent='El reporte se procesó correctamente.';
     document.getElementById('confirm-detalle').innerHTML='';
+    ocultarBotonOtro();
     cancelarImport(); irA('screen-confirm');
   } else { document.getElementById('import-error').textContent = (r&&r.error)||'Error al importar'; }
 }
@@ -1993,8 +2029,8 @@ function abrirModalRestablecerPin(nombre){
   abrirModal(
     '<h3 style="font-size:15px;">Restablecer PIN — '+nombre+'</h3>'+
     '<p style="font-size:11.5px;color:var(--ink-soft);margin:2px 0 6px;">Se sobrescribe directo. Comunícaselo de palabra — no hay aviso automático.</p>'+
-    '<label>PIN nuevo</label><input type="password" maxlength="4" id="rp-nuevo" inputmode="numeric">'+
-    '<label>Confirmar PIN nuevo</label><input type="password" maxlength="4" id="rp-confirmar" inputmode="numeric">'+
+    '<label>PIN nuevo</label><input type="tel" class="pin-mask" maxlength="4" id="rp-nuevo" inputmode="numeric" autocomplete="off">'+
+    '<label>Confirmar PIN nuevo</label><input type="tel" class="pin-mask" maxlength="4" id="rp-confirmar" inputmode="numeric" autocomplete="off">'+
     '<div class="error-msg" id="rp-error"></div>'+
     '<div style="display:flex;gap:8px;margin-top:14px;"><button class="btn-secondary" onclick="cerrarModal()">Cancelar</button><button class="btn-primary" onclick="confirmarRestablecerPin(\''+nombre+'\')">Guardar</button></div>'
   );
