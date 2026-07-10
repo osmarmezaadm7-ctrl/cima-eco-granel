@@ -81,7 +81,7 @@ function parsearCartolaTransbank(filas, periodoDeclarado){
     const clave = fechaCLDesdeDate(fecha);
     if(!porDia[clave]) porDia[clave] = { fecha:clave, debito:0, credito:0 };
     const signo = (f[iTipo]==='Anulación') ? -1 : 1;
-    const monto = signo * (Number(f[iMonto])||0);
+    const monto = signo * numCL(f[iMonto]);
     if(String(f[iMedio]||'')==='Crédito') porDia[clave].credito += monto; else porDia[clave].debito += monto;
   }
   if(fueraDeRango.length){
@@ -161,9 +161,9 @@ function parsearListaPedidosYa(filas, periodoDeclarado){
     const fecha = String(f[iFecha]).trim();
     const fechaObj = parseFechaCLtexto(fecha);
     if(fechaObj && (fechaObj<desdeD || fechaObj>hastaD)){ fueraDeRango.push(fecha); continue; }
-    porDia[fecha] = (porDia[fecha]||0) + (Number(f[iTotalUsuario])||0);
-    comisionTotal += Number(f[iComision])||0;
-    reintegroTotal += Number(f[iReintegro])||0;
+    porDia[fecha] = (porDia[fecha]||0) + numCL(f[iTotalUsuario]);
+    comisionTotal += numCL(f[iComision]);
+    reintegroTotal += numCL(f[iReintegro]);
   }
   const fechas = Object.keys(porDia).sort((a,b)=>claveOrdenCL(a).localeCompare(claveOrdenCL(b)));
   if(!fechas.length) throw new Error('No se encontraron pedidos dentro del período declarado.');
@@ -196,7 +196,7 @@ function parseAroniumMediosConciliacion(filas){
       const r = filas[i];
       if(!r || !r[idxFecha]) break;
       if(!/\d{2}-\d{2}-\d{4}/.test(String(r[idxFecha]))) break;
-      dias.push({ fecha:r[idxFecha], credito:parseNumeroCL(r[idxCred]), debito:parseNumeroCL(r[idxDeb]), efectivo:parseNumeroCL(r[idxEf]), pedidosYa:parseNumeroCL(r[idxPya]), transferencia:parseNumeroCL(r[idxTrans]) });
+      dias.push({ fecha:r[idxFecha], credito:numCL(r[idxCred]), debito:numCL(r[idxDeb]), efectivo:numCL(r[idxEf]), pedidosYa:numCL(r[idxPya]), transferencia:numCL(r[idxTrans]) });
     }
   }
   return { desde, hasta, dias };
