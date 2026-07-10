@@ -98,6 +98,7 @@ input:focus,select:focus{outline:none;border-color:var(--forest);}
 .field-money{position:relative;}
 .field-money span{position:absolute;left:11px;top:12px;color:var(--ink-soft);font-family:'JetBrains Mono',monospace;}
 .field-money input{padding-left:23px;}
+.pin-mask{-webkit-text-security:disc;text-security:disc;letter-spacing:4px;}
 .toggle-group{display:flex;gap:8px;}
 .toggle-group button{flex:1;padding:10px;border:1.5px solid var(--border);border-radius:9px;background:#fff;font-weight:600;color:var(--ink-soft);font-size:12.5px;cursor:pointer;}
 .toggle-group button.selected{background:var(--forest);color:#fff;border-color:var(--forest);}
