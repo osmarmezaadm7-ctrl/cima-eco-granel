@@ -1614,7 +1614,7 @@ async function procesarArchivo(file){
 }
 function filaTexto(r){ return (r||[]).join(' ').toUpperCase(); }
 function numCL(s){
-  s = String(s||'').trim();
+  s = String(s||'').replace(/[$\s]/g,'').trim();
   if(!s) return 0;
   const lastComma = s.lastIndexOf(',');
   const lastDot = s.lastIndexOf('.');
