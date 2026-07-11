@@ -682,7 +682,7 @@ const ACCION_TEXTO_HALLAZGO = {
   'Conciliación: Crédito Transbank vs digitado':'Confirmar y corregir',
   'Conciliación: Pedidos Ya vs digitado':'Confirmar y corregir',
   'Conciliación: Swap medio de pago Aronium':'Marcar revisado',
-  'Conciliación: Descuadre de caja':'Confirmar',
+  'Conciliación: Descuadre de caja':'Marcar revisado',
   'Conciliación: Sin cierre de caja':'Confirmar'
 };
 
@@ -844,10 +844,10 @@ function tarjetaHallazgo(h){
   }
 
   const notifLineaHtml = h.responsable ?
-    '<p style="font-size:11.5px;color:var(--ink-soft);margin:0 0 8px;">Se notificará a '+h.responsable+'</p>' :
+    '<label style="display:flex;align-items:center;gap:6px;font-size:11.5px;color:var(--ink-soft);margin:0 0 8px;cursor:pointer;"><input type="checkbox" id="notif-chk-'+idDom+'" checked style="width:auto;margin:0;"> Notificar a '+h.responsable+'</label>' :
     '<p style="font-size:11.5px;color:var(--ink-soft);margin:0 0 8px;">Sin responsable de jornada — no se notifica</p>';
 
-  const sinCierre = h.categoria === 'Conciliación: Sin cierre de caja';
+  const sinRechazo = h.categoria === 'Conciliación: Sin cierre de caja' || h.categoria === 'Conciliación: Descuadre de caja';
 
   // Colapsada por defecto — el resumen de una línea ya dice qué pasó, sin abrir la tarjeta.
   return '<div class="hallazgo'+claseCritica+'">'+
@@ -862,7 +862,7 @@ function tarjetaHallazgo(h){
       notifLineaHtml+
       '<textarea id="nota-'+idDom+'" placeholder="Nota ('+(critica?'obligatoria':'opcional')+')" style="min-height:34px;margin-bottom:'+(critica?'5':'9')+'px;'+(critica?'border-color:var(--danger);':'')+'"></textarea>'+
       (critica ? '<p style="font-size:11px;color:var(--danger);margin:0 0 9px;">La nota es obligatoria para confirmar un hallazgo crítico.</p>' : '')+
-      (sinCierre ? '' : '<button class="btn-secondary" style="margin-bottom:6px;" onclick="responderHallazgo(\''+idJs+'\',\'rechazar\')">Rechazar</button>')+
+      (sinRechazo ? '' : '<button class="btn-secondary" style="margin-bottom:6px;" onclick="responderHallazgo(\''+idJs+'\',\'rechazar\')">Rechazar</button>')+
       '<button class="btn-primary" style="'+(critica?'background:var(--danger);':'')+'" onclick="responderHallazgo(\''+idJs+'\',\'confirmar\')">'+ACCION_TEXTO_HALLAZGO[h.categoria]+'</button>'+
     '</div>'+
   '</div>';
@@ -875,7 +875,9 @@ async function responderHallazgo(id, accion){
   const notaEl = document.getElementById('nota-'+idDom);
   const nota = notaEl ? notaEl.value.trim() : '';
   if(h.severidad==='Critica' && !nota){ alert('Este hallazgo es crítico — escribe una nota antes de confirmarlo.'); return; }
-  const r = await llamarAPI('confirmarHallazgoConciliacion', {procesoId: procesoActualGlobal, hallazgo: h, accion, nota});
+  const chkNotif = document.getElementById('notif-chk-'+idDom);
+  const notificar = chkNotif ? chkNotif.checked : true; // sin checkbox (sin responsable) -> no aplica, el backend lo ignora
+  const r = await llamarAPI('confirmarHallazgoConciliacion', {procesoId: procesoActualGlobal, hallazgo: h, accionHallazgo: accion, nota, notificar});
   if(!r.ok){ alert(r.error||'No se pudo guardar'); return; }
   cargarHallazgos(procesoActualGlobal);
 }
