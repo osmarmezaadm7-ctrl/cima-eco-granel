@@ -1,6 +1,11 @@
 /* ===================================================================
    CONCILIACIÓN — parsers de archivos (SIN CAMBIOS respecto a la versión anterior)
    =================================================================== */
+// Proceso actualmente abierto (Fuentes/Revisión/Hallazgos) — se fija al entrar a
+// cualquiera de esas 3 pantallas, así "Ir a Hallazgos" y el footer de notificaciones
+// siempre saben a qué proceso pertenecen sin tener que volver a preguntarlo.
+let procesoActualGlobal = null;
+
 const MESES_ES = { enero:0, febrero:1, marzo:2, abril:3, mayo:4, junio:5, julio:6, agosto:7, septiembre:8, octubre:9, noviembre:10, diciembre:11 };
 function fechaCLDesdeDate(d){ const dd=String(d.getDate()).padStart(2,'0'), mm=String(d.getMonth()+1).padStart(2,'0'); return dd+'/'+mm+'/'+d.getFullYear(); }
 function claveOrdenCL(fechaTxt){ const [d,m,y]=fechaTxt.split('/'); return y+m.padStart(2,'0')+d.padStart(2,'0'); }
@@ -248,17 +253,58 @@ function pintarConciliacion(r){
   if(r.atraso){
     cont.insertAdjacentHTML('beforeend', '<div class="check-row check-warn" style="margin-bottom:12px;">⚠ Van '+r.atraso.diasAtraso+' día(s) de atraso desde el último período conciliado.</div>');
   }
-  if(!lista.length){ cont.innerHTML+='<p style="font-size:12px;color:var(--ink-soft);">Todavía no se ha iniciado ninguna conciliación.</p>'; return; }
+  if(!lista.length){ cont.innerHTML+='<p style="font-size:12px;color:var(--ink-soft);">No hay conciliaciones para mostrar.</p>'; return; }
   lista.forEach(p=>{
-    const pillClase = p.estado==='Completo' ? 'pill-ok' : 'pill-alerta';
+    // Cerrada: gris, es historia. Completa: verde, ya se reparó al menos 1 hallazgo.
+    // En proceso: ámbar, todavía se puede tocar de punta a punta.
+    const pillClase = p.estado==='Cerrada' ? 'pill-menor' : (p.estado==='Completa' ? 'pill-ok' : 'pill-alerta');
     const div = document.createElement('div'); div.className='fuente-card';
-    div.onclick = () => irAFuentesDesde(p.desde, p.hasta);
+    div.onclick = () => abrirProcesoEnEtapaPendiente(p); // CAMBIÓ — antes siempre abría en Fuentes
     div.innerHTML =
       '<div class="f-txt"><strong>'+p.desde+' al '+p.hasta+'</strong><span>'+p.progreso+' de '+p.totalFuentes+' fuentes cargadas</span></div>'+
       '<div class="f-right"><span class="pill '+pillClase+'">'+p.estado+'</span>'+
       (p.fechaCreacion?'<div class="fecha">Iniciado '+p.fechaCreacion+'</div>':'')+'</div>';
     cont.appendChild(div);
   });
+}
+
+// Enrutamiento real de la tarjeta — reemplaza el "siempre abre en Fuentes" de antes.
+// etapa es de uso interno (no se pinta como texto en ningún lado), solo decide la pantalla.
+function abrirProcesoEnEtapaPendiente(p){
+  if(p.etapa==='Hallazgos' || p.etapa==='Resumen' || p.estado==='Cerrada'){
+    // Resumen todavía no existe como pantalla propia — mientras se construye, un proceso
+    // Cerrada o en etapa Resumen entra a Hallazgos (de solo consulta: el backend ya
+    // bloquea confirmarHallazgoConciliacion si el proceso está Cerrada).
+    abrirHallazgosDesde(p.procesoId, p.desde, p.hasta);
+  } else if(p.etapa==='Revision'){
+    abrirRevisionDesde(p.procesoId, p.desde, p.hasta);
+  } else {
+    irAFuentesDesde(p.desde, p.hasta);
+  }
+}
+
+// Filtro por período — 100% en el cliente, sobre la lista que ya está en caché (0
+// llamadas nuevas a GAS). "Traslapa con el rango elegido", no "coincide exacto".
+function filtrarConciliaciones(){
+  const base = cacheModulo.conciliaciones;
+  if(!base) return;
+  const desdeVal = document.getElementById('conc-filtro-desde').value;
+  const hastaVal = document.getElementById('conc-filtro-hasta').value;
+  if(!desdeVal && !hastaVal){ pintarConciliacion(base); return; }
+  const desdeF = desdeVal ? new Date(desdeVal+'T00:00:00') : null;
+  const hastaF = hastaVal ? new Date(hastaVal+'T00:00:00') : null;
+  const filtradas = (base.conciliaciones||[]).filter(p=>{
+    const pd = parseFechaCLtexto(p.desde), ph = parseFechaCLtexto(p.hasta);
+    if(desdeF && ph && ph < desdeF) return false;
+    if(hastaF && pd && pd > hastaF) return false;
+    return true;
+  });
+  pintarConciliacion(Object.assign({}, base, {conciliaciones: filtradas, atraso:null}));
+}
+function limpiarFiltroConciliaciones(){
+  document.getElementById('conc-filtro-desde').value='';
+  document.getElementById('conc-filtro-hasta').value='';
+  if(cacheModulo.conciliaciones) pintarConciliacion(cacheModulo.conciliaciones);
 }
 
 const FUENTES_CONCILIACION_UI = [
@@ -309,9 +355,10 @@ async function onPeriodoConciliacionChange(){
 }
 async function cargarEstadoFuentes(){
   const desde = fechaCLDesdeValue('nc-desde'), hasta = fechaCLDesdeValue('nc-hasta');
-  if(!desde || !hasta){ sugerenciaAbonoActual=null; pintarEstadoFuentes({ 'Transbank':'Pendiente','Transbank Comisión':'Pendiente','PedidosYa':'Pendiente','Aronium Medios de Pago':'Pendiente' }); return; }
+  if(!desde || !hasta){ sugerenciaAbonoActual=null; procesoActualGlobal=null; pintarEstadoFuentes({ 'Transbank':'Pendiente','Transbank Comisión':'Pendiente','PedidosYa':'Pendiente','Aronium Medios de Pago':'Pendiente' }); return; }
   const r = await llamarAPISilencioso('obtenerEstadoProceso', {desde, hasta});
   sugerenciaAbonoActual = r.sugerenciaAbono || null;
+  procesoActualGlobal = r.procesoId || null; // NUEVO — lo necesita irARevisionDesdeFuentes
   pintarEstadoFuentes(r.fuentes||{});
 }
 function pintarEstadoFuentes(fuentes){
@@ -453,7 +500,7 @@ function mostrarResultadoImport(fuente, advertencias){
 
 function irARevisionDesdeFuentes(){
   const desde = fechaCLDesdeValue('nc-desde'), hasta = fechaCLDesdeValue('nc-hasta');
-  abrirRevisionDesde(desde, hasta);
+  abrirRevisionDesde(procesoActualGlobal, desde, hasta);
 }
 
 // Dropzone único — reemplaza a los 6 dropzones separados por fuente.
@@ -479,7 +526,8 @@ document.addEventListener('DOMContentLoaded', ()=>{
    =================================================================== */
 const NOMBRES_MEDIO = {Debito:'Débito', Credito:'Crédito', Efectivo:'Efectivo', PedidosYa:'Pedidos Ya', Transferencia:'Transferencia'};
 
-function abrirRevisionDesde(desde, hasta){
+function abrirRevisionDesde(procesoId, desde, hasta){
+  procesoActualGlobal = procesoId;
   irA('screen-conciliacion-revision');
   document.getElementById('rev-desde').value = valueFromCL(desde);
   document.getElementById('rev-hasta').value = valueFromCL(hasta);
@@ -514,7 +562,7 @@ function pintarRevision(r){
     '</div>';
   const tablaOCards = esAncho ? tablaRevisionDesktop(r.dias) : tarjetasRevisionMobile(r.dias);
   cont.innerHTML = kpiHtml + tablaOCards +
-    '<button class="btn-primary" style="margin-top:16px;" onclick="alert(\'Hallazgos: pantalla en construcción\')">Ir a Hallazgos</button>';
+    '<button class="btn-primary" style="margin-top:16px;" onclick="irAHallazgosDesdeRevision()">Ir a Hallazgos</button>';
 }
 
 function tablaRevisionDesktop(dias){
@@ -574,8 +622,187 @@ function tarjetasRevisionMobile(dias){
   return html;
 }
 
+function irAHallazgosDesdeRevision(){
+  const desde = fechaCLDesdeValue('rev-desde'), hasta = fechaCLDesdeValue('rev-hasta');
+  abrirHallazgosDesde(procesoActualGlobal, desde, hasta);
+}
+
 /* ===================================================================
-   NOTIFICACIONES — aviso opcional al confirmar un hallazgo
+   HALLAZGOS — etapa 3 del flujo de Conciliación (11/07/2026)
+   Se calculan en vivo en el backend (obtenerHallazgosProceso) — acá solo se pintan y se
+   guarda su resolución. cacheHallazgosActual guarda el objeto hallazgo completo por id,
+   así los botones no tienen que reserializar un objeto dentro de un onclick="".
+   =================================================================== */
+let cacheHallazgosActual = {};
+let ultimoHallazgosResp = null;
+let filtroHallazgos = 'Pendiente';
+
+const CATEGORIA_CORTA_HALLAZGO = {
+  'Conciliación: Débito Transbank vs digitado':'Débito Transbank vs digitado',
+  'Conciliación: Crédito Transbank vs digitado':'Crédito Transbank vs digitado',
+  'Conciliación: Pedidos Ya vs digitado':'Pedidos Ya vs digitado',
+  'Conciliación: Swap medio de pago Aronium':'Swap medio de pago Aronium',
+  'Conciliación: Descuadre de caja':'Descuadre de caja',
+  'Conciliación: Sin cierre de caja':'Sin cierre de caja'
+};
+const ACCION_TEXTO_HALLAZGO = {
+  'Conciliación: Débito Transbank vs digitado':'Confirmar y corregir',
+  'Conciliación: Crédito Transbank vs digitado':'Confirmar y corregir',
+  'Conciliación: Pedidos Ya vs digitado':'Confirmar y corregir',
+  'Conciliación: Swap medio de pago Aronium':'Marcar revisado',
+  'Conciliación: Descuadre de caja':'Confirmar',
+  'Conciliación: Sin cierre de caja':'Confirmar'
+};
+
+function abrirHallazgosDesde(procesoId, desde, hasta){
+  procesoActualGlobal = procesoId;
+  irA('screen-conciliacion-hallazgos');
+  document.getElementById('hall-titulo').textContent = 'Hallazgos · '+(desde||'')+' al '+(hasta||'');
+  cargarHallazgos(procesoId);
+}
+
+async function cargarHallazgos(procesoId){
+  filtroHallazgos = 'Pendiente';
+  const cont = document.getElementById('hall-contenido');
+  if(!procesoId){ cont.innerHTML = '<p style="font-size:12px;color:var(--danger);">Este período todavía no tiene un proceso de conciliación creado.</p>'; document.getElementById('hall-footer').innerHTML=''; return; }
+  cont.innerHTML = skeletonCards(3);
+  document.getElementById('hall-footer').innerHTML = '';
+  const r = await llamarAPISilencioso('obtenerHallazgosProceso', {procesoId});
+  if(!r.ok){ cont.innerHTML = '<p style="font-size:12px;color:var(--danger);">'+(r.error||'Error al cargar')+'</p>'; return; }
+  document.getElementById('hall-titulo').textContent = 'Hallazgos · '+r.desde+' al '+r.hasta;
+  // Deja registrado que se entró a Hallazgos — no bloquea el pintado si falla o tarda.
+  llamarAPISilencioso('avanzarEtapa', {procesoId, etapa:'Hallazgos'}).catch(()=>{});
+  pintarHallazgos(r);
+}
+
+function valorHallazgo_(v){ return (v===null || v===undefined) ? 0 : Number(v); }
+
+function pintarHallazgos(r){
+  ultimoHallazgosResp = r;
+  cacheHallazgosActual = {};
+  r.hallazgos.forEach(h => cacheHallazgosActual[h.id] = h);
+
+  const pendientes = r.hallazgos.filter(h=>h.estado==='Pendiente');
+  const resueltas = r.hallazgos.filter(h=>h.estado!=='Pendiente');
+  const criticas = pendientes.filter(h=>h.severidad==='Critica');
+
+  const kpiHtml =
+    '<div class="rev-kpi-row">'+
+      '<div class="rev-kpi"><div class="lbl">Pendientes</div><div class="val">'+pendientes.length+'</div></div>'+
+      '<div class="rev-kpi rojo"><div class="lbl">Críticas</div><div class="val">'+criticas.length+'</div></div>'+
+      '<div class="rev-kpi"><div class="lbl">Resueltas</div><div class="val">'+resueltas.length+'</div></div>'+
+    '</div>'+
+    '<div class="pillbar">'+
+      '<button class="'+(filtroHallazgos==='Pendiente'?'sel':'')+'" onclick="filtroHallazgos=\'Pendiente\';pintarHallazgos(ultimoHallazgosResp)">Pendientes</button>'+
+      '<button class="'+(filtroHallazgos==='Resuelta'?'sel':'')+'" onclick="filtroHallazgos=\'Resuelta\';pintarHallazgos(ultimoHallazgosResp)">Resueltas</button>'+
+    '</div>';
+
+  const lista = filtroHallazgos==='Pendiente' ? pendientes : resueltas;
+  let listaHtml = '';
+  if(!r.hallazgos.length){
+    listaHtml = '<p style="font-size:13px;color:var(--ink-soft);">Sin hallazgos en este período — todo cuadra.</p>';
+  } else if(!lista.length){
+    listaHtml = '<p style="font-size:12.5px;color:var(--ink-soft);">'+(filtroHallazgos==='Pendiente' ? 'Sin hallazgos pendientes.' : 'Todavía no se resolvió ningún hallazgo.')+'</p>';
+  } else {
+    let fechaAnterior = '';
+    lista.forEach(h=>{
+      if(h.fechaInicioReal !== fechaAnterior){
+        listaHtml += '<p style="font-size:11.5px;color:var(--ink-soft);font-weight:700;text-transform:uppercase;margin:14px 0 8px;">'+h.fechaInicioReal+'</p>';
+        fechaAnterior = h.fechaInicioReal;
+      }
+      listaHtml += tarjetaHallazgo(h);
+    });
+  }
+
+  document.getElementById('hall-contenido').innerHTML = kpiHtml + listaHtml;
+  pintarFooterNotificarHallazgos(r);
+}
+
+function tarjetaHallazgo(h){
+  const resuelta = h.estado !== 'Pendiente';
+  const critica = h.severidad==='Critica';
+  const claseCritica = critica ? ' critica' : '';
+  const pillClase = critica ? 'pill-critica' : 'pill-alerta';
+  const idDom = h.id.replace(/[^a-zA-Z0-9]/g,'_');
+  const idJs = h.id.replace(/'/g,"\\'");
+
+  let montosHtml;
+  if(h.categoria === 'Conciliación: Sin cierre de caja'){
+    montosHtml = '<p style="font-size:12.5px;color:var(--ink-soft);margin:0 0 8px;">No hay cierre de caja digitado — se detectó '+fmt(h.real)+' en Débito/Crédito/Pedidos Ya ese día.</p>';
+  } else {
+    const dif = Math.abs(valorHallazgo_(h.real) - valorHallazgo_(h.esperado));
+    const colorDif = critica ? 'var(--danger)' : 'var(--warn)';
+    montosHtml = '<div style="display:flex;gap:20px;margin-bottom:8px;" class="mono">'+
+      '<div><div style="font-size:11px;color:var(--ink-soft);font-family:\'Work Sans\',sans-serif;">Digitado</div>'+fmt(h.esperado)+'</div>'+
+      '<div><div style="font-size:11px;color:var(--ink-soft);font-family:\'Work Sans\',sans-serif;">Comprobado</div>'+fmt(h.real)+'</div>'+
+      '<div><div style="font-size:11px;color:'+colorDif+';font-family:\'Work Sans\',sans-serif;">Diferencia</div><span style="color:'+colorDif+';">'+fmt(dif)+'</span></div>'+
+      '</div>';
+  }
+
+  if(resuelta){
+    const notaHtml = h.nota ? ' — "'+h.nota+'"' : '';
+    const notifHtml = h.responsable ? (' · '+h.responsable+(h.notificado?' · notificado':' · sin notificar todavía')) : '';
+    return '<div class="hallazgo'+claseCritica+'">'+
+      '<div class="h-top"><strong style="font-size:14.5px;">'+CATEGORIA_CORTA_HALLAZGO[h.categoria]+'</strong><span class="pill '+pillClase+'">'+(critica?'Crítica':'Alerta')+'</span></div>'+
+      montosHtml+
+      '<p style="font-size:12px;color:var(--ink-soft);margin:0;">✓ Resuelto'+notaHtml+notifHtml+'</p>'+
+      '</div>';
+  }
+
+  const notifLineaHtml = h.responsable ?
+    '<p style="font-size:11.5px;color:var(--ink-soft);margin:0 0 8px;">Se notificará a '+h.responsable+'</p>' :
+    '<p style="font-size:11.5px;color:var(--ink-soft);margin:0 0 8px;">Sin responsable de jornada — no se notifica</p>';
+
+  const sinCierre = h.categoria === 'Conciliación: Sin cierre de caja';
+
+  return '<div class="hallazgo'+claseCritica+'">'+
+    '<div class="h-top"><strong style="font-size:14.5px;">'+CATEGORIA_CORTA_HALLAZGO[h.categoria]+'</strong><span class="pill '+pillClase+'">'+(critica?'Crítica':'Alerta')+'</span></div>'+
+    montosHtml+
+    notifLineaHtml+
+    '<textarea id="nota-'+idDom+'" placeholder="Nota ('+(critica?'obligatoria':'opcional')+')" style="min-height:34px;margin-bottom:'+(critica?'5':'9')+'px;'+(critica?'border-color:var(--danger);':'')+'"></textarea>'+
+    (critica ? '<p style="font-size:11px;color:var(--danger);margin:0 0 9px;">La nota es obligatoria para confirmar un hallazgo crítico.</p>' : '')+
+    (sinCierre ? '' : '<button class="btn-secondary" style="margin-bottom:6px;" onclick="responderHallazgo(\''+idJs+'\',\'rechazar\')">Rechazar</button>')+
+    '<button class="btn-primary" style="'+(critica?'background:var(--danger);':'')+'" onclick="responderHallazgo(\''+idJs+'\',\'confirmar\')">'+ACCION_TEXTO_HALLAZGO[h.categoria]+'</button>'+
+    '</div>';
+}
+
+async function responderHallazgo(id, accion){
+  const h = cacheHallazgosActual[id];
+  if(!h) return;
+  const idDom = id.replace(/[^a-zA-Z0-9]/g,'_');
+  const notaEl = document.getElementById('nota-'+idDom);
+  const nota = notaEl ? notaEl.value.trim() : '';
+  if(h.severidad==='Critica' && !nota){ alert('Este hallazgo es crítico — escribe una nota antes de confirmarlo.'); return; }
+  const r = await llamarAPI('confirmarHallazgoConciliacion', {procesoId: procesoActualGlobal, hallazgo: h, accion, nota});
+  if(!r.ok){ alert(r.error||'No se pudo guardar'); return; }
+  cargarHallazgos(procesoActualGlobal);
+}
+
+// Footer fijo "Enviar notificaciones" — solo aparece si hay algo Resuelto sin notificar
+// todavía. Nunca se envía solo al confirmar; es una acción aparte, agrupada por persona.
+function pintarFooterNotificarHallazgos(r){
+  const pendientesNotif = r.hallazgos.filter(h => h.estado!=='Pendiente' && h.responsable && !h.notificado);
+  const footer = document.getElementById('hall-footer');
+  if(!pendientesNotif.length){ footer.innerHTML=''; return; }
+  const personas = [...new Set(pendientesNotif.map(h=>h.responsable))];
+  footer.innerHTML =
+    '<div class="hall-footer-notif">'+
+      '<div><strong style="font-size:13.5px;">'+pendientesNotif.length+' hallazgo(s) listos para notificar</strong>'+
+      '<p style="font-size:11.5px;color:var(--ink-soft);margin:2px 0 0;">Se avisará a '+personas.join(', ')+'</p></div>'+
+      '<button class="btn-primary" style="width:auto;padding:11px 16px;" onclick="enviarNotificacionesProceso()">Enviar notificaciones</button>'+
+    '</div>';
+}
+
+async function enviarNotificacionesProceso(){
+  const r = await llamarAPI('enviarNotificacionesConciliacion', {procesoId: procesoActualGlobal});
+  if(!r.ok){ alert(r.error||'No se pudo enviar'); return; }
+  cargarHallazgos(procesoActualGlobal);
+}
+
+/* ===================================================================
+   NOTIFICACIONES — aviso consolidado al responsable, sin expiración por tiempo (11/07/2026)
+   Cada notificación ya viene consolidada desde el backend (1 por persona, agrupando todos
+   sus hallazgos reparados de un proceso) — acá solo se pinta y se marca como vista.
    =================================================================== */
 async function cargarNotificaciones(){
   const cont = document.getElementById('notif-home');
@@ -584,9 +811,18 @@ async function cargarNotificaciones(){
   cont.innerHTML='';
   (r.notificaciones||[]).forEach(n=>{
     const div = document.createElement('div');
-    div.className = 'check-row check-warn';
-    div.style.marginBottom = '8px';
-    div.innerHTML = '<span>🔔 '+n.mensaje+'</span>';
+    div.className = 'notif-card';
+    div.innerHTML =
+      '<div class="n-top"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;margin-top:1px;color:var(--ink-soft);"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>'+
+      '<p style="font-size:13.5px;margin:0;">'+n.mensaje+'</p></div>'+
+      '<button class="btn-primary" onclick="marcarNotificacionComoVista(this,\''+n.id+'\')">Marcar como vista</button>';
     cont.appendChild(div);
   });
+}
+
+async function marcarNotificacionComoVista(btn, id){
+  btn.disabled = true; btn.textContent='...';
+  const r = await llamarAPISilencioso('marcarNotificacionVista', {id});
+  if(r.ok){ btn.closest('.notif-card').remove(); }
+  else { btn.disabled=false; btn.textContent='Marcar como vista'; alert(r.error||'No se pudo marcar'); }
 }
