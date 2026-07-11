@@ -752,6 +752,80 @@ function pintarHallazgos(r){
   pintarFooterNotificarHallazgos(r);
 }
 
+function fmtSigno(n){ n = Math.round(n||0); return (n>=0?'+':'-')+fmt(Math.abs(n)); }
+
+function toggleHallazgo(idDom){
+  const el = document.getElementById('hbody-'+idDom);
+  if(!el) return;
+  el.style.display = el.style.display==='none' ? 'block' : 'none';
+}
+
+// Resumen de una línea, visible con la tarjeta colapsada — tiene que decir algo útil
+// sin necesidad de expandir.
+function resumenHallazgo_(h){
+  const d = h.detalle || {};
+  if(h.categoria === 'Conciliación: Sin cierre de caja') return 'Se detectó '+fmt(h.real)+' en Débito/Crédito/Pedidos Ya ese día';
+  if(h.categoria === 'Conciliación: Swap medio de pago Aronium') return 'Caja '+fmtSigno(d.deltaCaja)+' · Tarjetas '+fmtSigno(d.deltaTarjetas);
+  if(h.categoria === 'Conciliación: Descuadre de caja') return 'Diferencia '+fmt(Math.abs(d.deltaCaja||0))+' sin explicar';
+  return 'Diferencia '+fmt(Math.abs(valorHallazgo_(h.real) - valorHallazgo_(h.esperado)));
+}
+
+function filaTablaHallazgo_(nombre, aronium, comprobado){
+  const delta = valorHallazgo_(aronium) - valorHallazgo_(comprobado);
+  return '<tr><td style="padding:6px 0;font-size:12.5px;color:var(--ink);">'+nombre+'</td>'+
+    '<td style="text-align:right;font-size:12.5px;color:var(--ink);">'+fmt(aronium)+'</td>'+
+    '<td style="text-align:right;font-size:12.5px;color:var(--ink);">'+fmt(comprobado)+'</td>'+
+    '<td style="text-align:right;font-size:12.5px;font-weight:600;color:var(--warn);">'+fmtSigno(delta)+'</td></tr>';
+}
+function th_(txt, alinDer){
+  return '<th style="text-align:'+(alinDer?'right':'left')+';font-size:10.5px;font-weight:400;color:var(--ink-soft);padding:4px 0;border-bottom:0.5px solid var(--border);">'+txt+'</th>';
+}
+
+// Tabla real Aronium/Comprobado por medio de pago — reemplaza el par abstracto
+// esperado/real. Cada categoría muestra los medios que le corresponden.
+function tablaHallazgo_(h){
+  const d = h.detalle || {};
+  if(h.categoria === 'Conciliación: Sin cierre de caja') return '';
+  if(h.categoria === 'Conciliación: Swap medio de pago Aronium'){
+    return '<table style="width:100%;border-collapse:collapse;margin:10px 0;"><thead><tr>'+th_('Medio')+th_('Aronium',1)+th_('Comprobado',1)+th_('Delta',1)+'</tr></thead><tbody>'+
+      filaTablaHallazgo_('Caja (Efect.+Transf.)', d.cajaAronium, d.cajaComprobado)+
+      filaTablaHallazgo_('Tarjetas (Déb.+Créd.)', d.tarjetasAronium, d.tarjetasComprobado)+
+      '</tbody></table>';
+  }
+  if(h.categoria === 'Conciliación: Descuadre de caja'){
+    return '<table style="width:100%;border-collapse:collapse;margin:10px 0;"><thead><tr>'+th_('Medio')+th_('Aronium',1)+th_('Comprobado',1)+th_('Delta',1)+'</tr></thead><tbody>'+
+      filaTablaHallazgo_('Efectivo', d.efectivoAronium, d.efectivoComprobado)+
+      filaTablaHallazgo_('Transferencia', d.transferenciaAronium, d.transferenciaComprobado)+
+      '</tbody></table>';
+  }
+  // Digitación (Débito/Crédito/Pedidos Ya vs digitado) — Aronium es solo referencia, no
+  // forma parte de la comparación oficial de esta categoría (esa es Digitado vs Comprobado).
+  const medioNombre = h.categoria.indexOf('Débito')!==-1 ? 'Débito' : (h.categoria.indexOf('Crédito')!==-1 ? 'Crédito' : 'Pedidos Ya');
+  return '<table style="width:100%;border-collapse:collapse;margin:10px 0;"><thead><tr>'+th_('Medio')+th_('Aronium',1)+th_('Digitado',1)+th_('Comprobado',1)+'</tr></thead><tbody>'+
+    '<tr><td style="padding:6px 0;font-size:12.5px;color:var(--ink);">'+medioNombre+'</td>'+
+    '<td style="text-align:right;font-size:12.5px;color:var(--ink);">'+fmt(d.aronium)+'</td>'+
+    '<td style="text-align:right;font-size:12.5px;color:var(--ink);">'+fmt(h.esperado)+'</td>'+
+    '<td style="text-align:right;font-size:12.5px;font-weight:600;color:var(--warn);">'+fmt(h.real)+'</td></tr>'+
+    '</tbody></table>';
+}
+
+// Traduce el número a lo que significa — nunca implica que "Confirmar" corrige algo,
+// salvo en digitación (que sí corrige, y no necesita esta frase porque ya es autoexplicativa).
+function explicacionHallazgo_(h){
+  const d = h.detalle || {};
+  if(h.categoria === 'Conciliación: Swap medio de pago Aronium'){
+    return '<p style="font-size:11.5px;color:var(--ink-soft);margin:0 0 8px;">Se cancela casi exacto — no falta plata, quedó mal categorizada en Aronium. No corrige ningún dato, solo deja constancia.</p>';
+  }
+  if(h.categoria === 'Conciliación: Descuadre de caja'){
+    const falta = (d.deltaCaja||0) > 0; // Aronium > Comprobado: el POS registró más ventas en caja que las que se contaron
+    const texto = falta
+      ? 'Aronium registra más venta en efectivo/transferencia que lo contado en caja — posible plata que no llegó a completar el arqueo.'
+      : 'Se contó más plata en caja que lo que las ventas explican — origen no comprobado, no se registra como ingreso automáticamente.';
+    return '<p style="font-size:11.5px;color:var(--danger);margin:0 0 8px;">'+texto+' No corrige ningún dato, solo deja constancia.</p>';
+  }
+  return '';
+}
+
 function tarjetaHallazgo(h){
   const resuelta = h.estado !== 'Pendiente';
   const critica = h.severidad==='Critica';
@@ -760,25 +834,11 @@ function tarjetaHallazgo(h){
   const idDom = h.id.replace(/[^a-zA-Z0-9]/g,'_');
   const idJs = h.id.replace(/'/g,"\\'");
 
-  let montosHtml;
-  if(h.categoria === 'Conciliación: Sin cierre de caja'){
-    montosHtml = '<p style="font-size:12.5px;color:var(--ink-soft);margin:0 0 8px;">No hay cierre de caja digitado — se detectó '+fmt(h.real)+' en Débito/Crédito/Pedidos Ya ese día.</p>';
-  } else {
-    const dif = Math.abs(valorHallazgo_(h.real) - valorHallazgo_(h.esperado));
-    const colorDif = critica ? 'var(--danger)' : 'var(--warn)';
-    montosHtml = '<div style="display:flex;gap:20px;margin-bottom:8px;" class="mono">'+
-      '<div><div style="font-size:11px;color:var(--ink-soft);font-family:\'Work Sans\',sans-serif;">Digitado</div>'+fmt(h.esperado)+'</div>'+
-      '<div><div style="font-size:11px;color:var(--ink-soft);font-family:\'Work Sans\',sans-serif;">Comprobado</div>'+fmt(h.real)+'</div>'+
-      '<div><div style="font-size:11px;color:'+colorDif+';font-family:\'Work Sans\',sans-serif;">Diferencia</div><span style="color:'+colorDif+';">'+fmt(dif)+'</span></div>'+
-      '</div>';
-  }
-
   if(resuelta){
     const notaHtml = h.nota ? ' — "'+h.nota+'"' : '';
     const notifHtml = h.responsable ? (' · '+h.responsable+(h.notificado?' · notificado':' · sin notificar todavía')) : '';
     return '<div class="hallazgo'+claseCritica+'">'+
       '<div class="h-top"><strong style="font-size:14.5px;">'+CATEGORIA_CORTA_HALLAZGO[h.categoria]+'</strong><span class="pill '+pillClase+'">'+(critica?'Crítica':'Alerta')+'</span></div>'+
-      montosHtml+
       '<p style="font-size:12px;color:var(--ink-soft);margin:0;">✓ Resuelto'+notaHtml+notifHtml+'</p>'+
       '</div>';
   }
@@ -789,15 +849,23 @@ function tarjetaHallazgo(h){
 
   const sinCierre = h.categoria === 'Conciliación: Sin cierre de caja';
 
+  // Colapsada por defecto — el resumen de una línea ya dice qué pasó, sin abrir la tarjeta.
   return '<div class="hallazgo'+claseCritica+'">'+
-    '<div class="h-top"><strong style="font-size:14.5px;">'+CATEGORIA_CORTA_HALLAZGO[h.categoria]+'</strong><span class="pill '+pillClase+'">'+(critica?'Crítica':'Alerta')+'</span></div>'+
-    montosHtml+
-    notifLineaHtml+
-    '<textarea id="nota-'+idDom+'" placeholder="Nota ('+(critica?'obligatoria':'opcional')+')" style="min-height:34px;margin-bottom:'+(critica?'5':'9')+'px;'+(critica?'border-color:var(--danger);':'')+'"></textarea>'+
-    (critica ? '<p style="font-size:11px;color:var(--danger);margin:0 0 9px;">La nota es obligatoria para confirmar un hallazgo crítico.</p>' : '')+
-    (sinCierre ? '' : '<button class="btn-secondary" style="margin-bottom:6px;" onclick="responderHallazgo(\''+idJs+'\',\'rechazar\')">Rechazar</button>')+
-    '<button class="btn-primary" style="'+(critica?'background:var(--danger);':'')+'" onclick="responderHallazgo(\''+idJs+'\',\'confirmar\')">'+ACCION_TEXTO_HALLAZGO[h.categoria]+'</button>'+
-    '</div>';
+    '<div class="h-top h-top-click" onclick="toggleHallazgo(\''+idDom+'\')">'+
+      '<div><strong style="font-size:14.5px;">'+CATEGORIA_CORTA_HALLAZGO[h.categoria]+'</strong>'+
+      '<div style="font-size:11.5px;color:var(--ink-soft);margin-top:2px;">'+resumenHallazgo_(h)+'</div></div>'+
+      '<span class="pill '+pillClase+'">'+(critica?'Crítica':'Alerta')+'</span>'+
+    '</div>'+
+    '<div id="hbody-'+idDom+'" style="display:none;">'+
+      tablaHallazgo_(h)+
+      explicacionHallazgo_(h)+
+      notifLineaHtml+
+      '<textarea id="nota-'+idDom+'" placeholder="Nota ('+(critica?'obligatoria':'opcional')+')" style="min-height:34px;margin-bottom:'+(critica?'5':'9')+'px;'+(critica?'border-color:var(--danger);':'')+'"></textarea>'+
+      (critica ? '<p style="font-size:11px;color:var(--danger);margin:0 0 9px;">La nota es obligatoria para confirmar un hallazgo crítico.</p>' : '')+
+      (sinCierre ? '' : '<button class="btn-secondary" style="margin-bottom:6px;" onclick="responderHallazgo(\''+idJs+'\',\'rechazar\')">Rechazar</button>')+
+      '<button class="btn-primary" style="'+(critica?'background:var(--danger);':'')+'" onclick="responderHallazgo(\''+idJs+'\',\'confirmar\')">'+ACCION_TEXTO_HALLAZGO[h.categoria]+'</button>'+
+    '</div>'+
+  '</div>';
 }
 
 async function responderHallazgo(id, accion){
