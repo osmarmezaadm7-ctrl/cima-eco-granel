@@ -248,12 +248,17 @@ async function abrirConciliacion(forzar){
   if(document.getElementById('screen-conciliacion').classList.contains('active')) pintarConciliacion(r);
 }
 function pintarConciliacion(r){
+  const avisos = document.getElementById('conc-avisos'); avisos.innerHTML='';
+  if(r.avisoSinCerrar){
+    avisos.insertAdjacentHTML('beforeend', '<div class="check-row check-warn" style="margin-bottom:8px;">⚠ Conciliación del '+r.avisoSinCerrar.desde+' al '+r.avisoSinCerrar.hasta+' lleva '+r.avisoSinCerrar.diasAtraso+' día(s) sin cerrarse.</div>');
+  }
+  if(r.avisoFaltaIniciar){
+    avisos.insertAdjacentHTML('beforeend', '<div class="check-row" style="margin-bottom:8px;background:var(--forest-soft);color:var(--forest-dark);">Falta iniciar la conciliación de la semana del '+r.avisoFaltaIniciar.desde+' al '+r.avisoFaltaIniciar.hasta+'.</div>');
+  }
+  if(cacheModulo.conciliaciones) poblarFiltroAnios(cacheModulo.conciliaciones.conciliaciones||[]);
   const cont = document.getElementById('lista-conciliacion'); cont.innerHTML='';
   const lista = r.conciliaciones||[];
-  if(r.atraso){
-    cont.insertAdjacentHTML('beforeend', '<div class="check-row check-warn" style="margin-bottom:12px;">⚠ Van '+r.atraso.diasAtraso+' día(s) de atraso desde el último período conciliado.</div>');
-  }
-  if(!lista.length){ cont.innerHTML+='<p style="font-size:12px;color:var(--ink-soft);">No hay conciliaciones para mostrar.</p>'; return; }
+  if(!lista.length){ cont.innerHTML='<p style="font-size:12px;color:var(--ink-soft);">No hay conciliaciones para mostrar.</p>'; return; }
   lista.forEach(p=>{
     // Cerrada: gris, es historia. Completa: verde, ya se reparó al menos 1 hallazgo.
     // En proceso: ámbar, todavía se puede tocar de punta a punta.
@@ -266,6 +271,16 @@ function pintarConciliacion(r){
       (p.fechaCreacion?'<div class="fecha">Iniciado '+p.fechaCreacion+'</div>':'')+'</div>';
     cont.appendChild(div);
   });
+}
+
+// Llena el selector de Año con los años realmente presentes en los períodos, sin duplicar
+// si el usuario ya tenía uno elegido.
+function poblarFiltroAnios(lista){
+  const sel = document.getElementById('conc-filtro-anio');
+  const actual = sel.value;
+  const anios = [...new Set(lista.map(p=>{ const d=parseFechaCLtexto(p.desde); return d?d.getFullYear():null; }).filter(Boolean))].sort((a,b)=>b-a);
+  sel.innerHTML = '<option value="">Todos</option>' + anios.map(a=>'<option value="'+a+'">'+a+'</option>').join('');
+  if(anios.includes(Number(actual))) sel.value = actual;
 }
 
 // Enrutamiento real de la tarjeta — reemplaza el "siempre abre en Fuentes" de antes.
@@ -285,25 +300,26 @@ function abrirProcesoEnEtapaPendiente(p){
 
 // Filtro por período — 100% en el cliente, sobre la lista que ya está en caché (0
 // llamadas nuevas a GAS). "Traslapa con el rango elegido", no "coincide exacto".
+// Filtro por Mes/Año — 100% en el cliente, sobre la lista que ya está en caché (0
+// llamadas nuevas a GAS). Un período "pertenece" al mes/año de su fecha "desde".
 function filtrarConciliaciones(){
   const base = cacheModulo.conciliaciones;
   if(!base) return;
-  const desdeVal = document.getElementById('conc-filtro-desde').value;
-  const hastaVal = document.getElementById('conc-filtro-hasta').value;
-  if(!desdeVal && !hastaVal){ pintarConciliacion(base); return; }
-  const desdeF = desdeVal ? new Date(desdeVal+'T00:00:00') : null;
-  const hastaF = hastaVal ? new Date(hastaVal+'T00:00:00') : null;
+  const mesVal = document.getElementById('conc-filtro-mes').value;
+  const anioVal = document.getElementById('conc-filtro-anio').value;
+  if(mesVal===''&&anioVal===''){ pintarConciliacion(base); return; }
   const filtradas = (base.conciliaciones||[]).filter(p=>{
-    const pd = parseFechaCLtexto(p.desde), ph = parseFechaCLtexto(p.hasta);
-    if(desdeF && ph && ph < desdeF) return false;
-    if(hastaF && pd && pd > hastaF) return false;
+    const pd = parseFechaCLtexto(p.desde);
+    if(!pd) return false;
+    if(mesVal!=='' && pd.getMonth()!==Number(mesVal)) return false;
+    if(anioVal!=='' && pd.getFullYear()!==Number(anioVal)) return false;
     return true;
   });
-  pintarConciliacion(Object.assign({}, base, {conciliaciones: filtradas, atraso:null}));
+  pintarConciliacion(Object.assign({}, base, {conciliaciones: filtradas, avisoFaltaIniciar:null, avisoSinCerrar:null}));
 }
 function limpiarFiltroConciliaciones(){
-  document.getElementById('conc-filtro-desde').value='';
-  document.getElementById('conc-filtro-hasta').value='';
+  document.getElementById('conc-filtro-mes').value='';
+  document.getElementById('conc-filtro-anio').value='';
   if(cacheModulo.conciliaciones) pintarConciliacion(cacheModulo.conciliaciones);
 }
 
@@ -526,19 +542,30 @@ document.addEventListener('DOMContentLoaded', ()=>{
    =================================================================== */
 const NOMBRES_MEDIO = {Debito:'Débito', Credito:'Crédito', Efectivo:'Efectivo', PedidosYa:'Pedidos Ya', Transferencia:'Transferencia'};
 
+// Período de la Revisión actualmente abierta — ya no se lee de inputs de fecha en el DOM,
+// viene siempre del proceso que se abrió (tarjeta del listado, o volviendo desde Hallazgos).
+let revPeriodoDesde = '';
+let revPeriodoHasta = '';
+
 function abrirRevisionDesde(procesoId, desde, hasta){
   procesoActualGlobal = procesoId;
+  revPeriodoDesde = desde;
+  revPeriodoHasta = hasta;
   irA('screen-conciliacion-revision');
-  document.getElementById('rev-desde').value = valueFromCL(desde);
-  document.getElementById('rev-hasta').value = valueFromCL(hasta);
   cargarRevision();
 }
 
+// Volver desde Hallazgos — misma etapa 2, mismo período con el que se abrió el proceso
+// (nunca vacío, nunca pide elegir fecha de nuevo).
+function volverARevisionDesdeHallazgos(){
+  abrirRevisionDesde(procesoActualGlobal, revPeriodoDesde, revPeriodoHasta);
+}
+
 async function cargarRevision(){
-  const desde = fechaCLDesdeValue('rev-desde');
-  const hasta = fechaCLDesdeValue('rev-hasta');
+  const desde = revPeriodoDesde;
+  const hasta = revPeriodoHasta;
   const cont = document.getElementById('rev-contenido');
-  if(!desde || !hasta){ cont.innerHTML = '<p style="font-size:12px;color:var(--danger);">Elige ambas fechas.</p>'; return; }
+  if(!desde || !hasta){ cont.innerHTML = '<p style="font-size:12px;color:var(--danger);">No se pudo determinar el período de este proceso.</p>'; return; }
   document.getElementById('rev-titulo').textContent = 'Revisión · '+desde+' al '+hasta;
   cont.innerHTML = skeletonCards(3);
   const r = await llamarAPISilencioso('obtenerRevisionPeriodo', {desde, hasta});
@@ -623,8 +650,7 @@ function tarjetasRevisionMobile(dias){
 }
 
 function irAHallazgosDesdeRevision(){
-  const desde = fechaCLDesdeValue('rev-desde'), hasta = fechaCLDesdeValue('rev-hasta');
-  abrirHallazgosDesde(procesoActualGlobal, desde, hasta);
+  abrirHallazgosDesde(procesoActualGlobal, revPeriodoDesde, revPeriodoHasta);
 }
 
 /* ===================================================================
