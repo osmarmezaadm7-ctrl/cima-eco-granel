@@ -16,7 +16,14 @@
 .fuente-card .f-right{text-align:right;flex-shrink:0;}
 .fuente-card .f-right .fecha{font-size:10.5px;color:var(--ink-soft);margin-top:4px;}
 .hallazgo{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:14px 15px;margin-bottom:10px;}
+.hallazgo.critica{border-left:4px solid var(--danger);border-radius:0 14px 14px 0;}
 .hallazgo .h-top{display:flex;justify-content:space-between;gap:10px;margin-bottom:8px;}
+.hall-footer{position:sticky;bottom:0;background:var(--paper);padding:10px 0 4px;}
+.hall-footer-notif{background:var(--surface);border:1.5px solid var(--forest);border-radius:14px;padding:12px 14px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;}
+.notif-card{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:14px 15px;margin-bottom:12px;}
+.notif-card .n-top{display:flex;align-items:flex-start;gap:9px;margin-bottom:11px;}
+.notif-linea{border-left:4px solid var(--border);padding:6px 0 6px 10px;margin-bottom:6px;font-size:13px;}
+.notif-linea.critica{border-left-color:var(--danger);background:var(--terracotta-soft);border-radius:0 8px 8px 0;color:#7A3D20;font-weight:600;}
 .pill-ok{background:var(--forest-soft);color:var(--forest);}
 
 /* ===== Revisión / Fuentes (Conciliación) ===== */
@@ -430,6 +437,11 @@
     </div>
     <p style="font-size:12px;color:var(--ink-soft);">Transbank, PedidosYa y Aronium vs. lo registrado en el sistema.</p>
     <button class="btn-primary" style="margin-bottom:14px;" onclick="irANuevaConciliacion()">+ Nueva conciliación</button>
+    <div style="display:flex;gap:8px;align-items:flex-end;margin-bottom:14px;">
+      <div style="flex:1;"><label style="margin-top:0;">Desde</label><input type="date" id="conc-filtro-desde" onchange="filtrarConciliaciones()"></div>
+      <div style="flex:1;"><label style="margin-top:0;">Hasta</label><input type="date" id="conc-filtro-hasta" onchange="filtrarConciliaciones()"></div>
+      <button class="btn-secondary" style="width:auto;padding:11px 14px;" onclick="limpiarFiltroConciliaciones()">Limpiar</button>
+    </div>
     <div id="lista-conciliacion"></div>
   </div>
 
@@ -473,8 +485,6 @@
     <div class="submit-bar"><button class="btn-primary" id="btn-ir-revision" disabled onclick="irARevisionDesdeFuentes()">Ir a Revisión — faltan 4 fuentes</button></div>
   </div>
 
-
-  <!-- CONCILIACIÓN — Hallazgos de un período -->
   <!-- CONCILIACIÓN — Revisión (reemplaza a la vieja pantalla de hallazgos con emparejamiento) -->
   <div class="screen desktop-wide" id="screen-conciliacion-revision">
     <button class="back-link" onclick="irA('screen-conciliacion')"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"></path></svg> Volver</button>
@@ -495,6 +505,22 @@
     </div>
 
     <div id="rev-contenido"></div>
+  </div>
+
+  <!-- CONCILIACIÓN — Hallazgos (etapa 3) -->
+  <div class="screen desktop-wide" id="screen-conciliacion-hallazgos">
+    <button class="back-link" onclick="irA('screen-conciliacion-revision')"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"></path></svg> Volver</button>
+
+    <div class="stepper">
+      <div class="st done"><div class="n">✓</div>Fuentes</div><div class="line"></div>
+      <div class="st done"><div class="n">✓</div>Revisión</div><div class="line"></div>
+      <div class="st now"><div class="n">3</div>Hallazgos</div><div class="line"></div>
+      <div class="st"><div class="n">4</div>Cerrar</div>
+    </div>
+
+    <h2 style="font-size:17px;" id="hall-titulo">Hallazgos</h2>
+    <div id="hall-contenido"></div>
+    <div id="hall-footer"></div>
   </div>
 
   <!-- MOVIMIENTOS (todos) -->
@@ -703,6 +729,11 @@ function simularAPI(accion, extra){
   if (accion === 'sugerirProximoPeriodo') return { ok:true, desde:'', hasta:'', primeraVez:true };
   if (accion === 'obtenerNotificacionesActivas') return { ok:true, notificaciones:[] };
   if (accion === 'obtenerRevisionPeriodo') return { ok:true, dias:[], resumen:{cuadre:0,inconsistencias:0,descuadre:0} };
+  if (accion === 'obtenerHallazgosProceso') return { ok:true, procesoId:extra.procesoId, desde:'', hasta:'', estadoProceso:'En proceso', hallazgos:[] };
+  if (accion === 'confirmarHallazgoConciliacion') return { ok:true, aplicado:false, estadoProceso:'Completa' };
+  if (accion === 'enviarNotificacionesConciliacion') return { ok:true, personasNotificadas:0, personas:[] };
+  if (accion === 'avanzarEtapa') return { ok:true, etapa: extra.etapa };
+  if (accion === 'marcarNotificacionVista') return { ok:true };
   if (accion === 'listarCuentasPorPagar') return { ok:true, cuentas:[], total:0, cantidad:0 };
   if (accion === 'listarPrograma') return { ok:true, programa:[] };
   if (accion === 'listarInventarioMP') return { ok:true, inventario:[] };
