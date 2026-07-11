@@ -561,6 +561,12 @@ function volverARevisionDesdeHallazgos(){
   abrirRevisionDesde(procesoActualGlobal, revPeriodoDesde, revPeriodoHasta);
 }
 
+// Volver desde Revisión — retrocede un paso del flujo guiado, a Fuentes del mismo período
+// (nunca al listado general).
+function volverAFuentesDesdeRevision(){
+  irAFuentesDesde(revPeriodoDesde, revPeriodoHasta);
+}
+
 async function cargarRevision(){
   const desde = revPeriodoDesde;
   const hasta = revPeriodoHasta;
@@ -682,6 +688,8 @@ const ACCION_TEXTO_HALLAZGO = {
 
 function abrirHallazgosDesde(procesoId, desde, hasta){
   procesoActualGlobal = procesoId;
+  revPeriodoDesde = desde;
+  revPeriodoHasta = hasta;
   irA('screen-conciliacion-hallazgos');
   document.getElementById('hall-titulo').textContent = 'Hallazgos · '+(desde||'')+' al '+(hasta||'');
   cargarHallazgos(procesoId);
