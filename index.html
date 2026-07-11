@@ -436,12 +436,25 @@
       <button class="icon-btn" title="Actualizar" onclick="abrirConciliacion(true)"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 4v6h-6"></path><path d="M1 20v-6h6"></path><path d="M3.5 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.65 4.36A9 9 0 0 0 20.5 15"></path></svg></button>
     </div>
     <p style="font-size:12px;color:var(--ink-soft);">Transbank, PedidosYa y Aronium vs. lo registrado en el sistema.</p>
-    <button class="btn-primary" style="margin-bottom:14px;" onclick="irANuevaConciliacion()">+ Nueva conciliación</button>
+    <div id="conc-avisos"></div>
     <div style="display:flex;gap:8px;align-items:flex-end;margin-bottom:14px;">
-      <div style="flex:1;"><label style="margin-top:0;">Desde</label><input type="date" id="conc-filtro-desde" onchange="filtrarConciliaciones()"></div>
-      <div style="flex:1;"><label style="margin-top:0;">Hasta</label><input type="date" id="conc-filtro-hasta" onchange="filtrarConciliaciones()"></div>
+      <div style="flex:1;"><label style="margin-top:0;">Mes</label>
+        <select id="conc-filtro-mes" onchange="filtrarConciliaciones()">
+          <option value="">Todos</option>
+          <option value="0">Enero</option><option value="1">Febrero</option><option value="2">Marzo</option>
+          <option value="3">Abril</option><option value="4">Mayo</option><option value="5">Junio</option>
+          <option value="6">Julio</option><option value="7">Agosto</option><option value="8">Septiembre</option>
+          <option value="9">Octubre</option><option value="10">Noviembre</option><option value="11">Diciembre</option>
+        </select>
+      </div>
+      <div style="flex:1;"><label style="margin-top:0;">Año</label>
+        <select id="conc-filtro-anio" onchange="filtrarConciliaciones()">
+          <option value="">Todos</option>
+        </select>
+      </div>
       <button class="btn-secondary" style="width:auto;padding:11px 14px;" onclick="limpiarFiltroConciliaciones()">Limpiar</button>
     </div>
+    <button class="btn-primary" style="margin-bottom:14px;" onclick="irANuevaConciliacion()">+ Nueva conciliación</button>
     <div id="lista-conciliacion"></div>
   </div>
 
@@ -497,19 +510,12 @@
     </div>
 
     <h2 style="font-size:17px;" id="rev-titulo">Revisión</h2>
-    <p style="font-size:11.5px;color:var(--ink-soft);margin:-4px 0 12px;">Entrada temporal: mientras se construye el flujo guiado completo, el período se elige directo acá.</p>
-    <div style="display:flex;gap:10px;align-items:flex-end;margin-bottom:14px;">
-      <div style="flex:1;"><label>Desde</label><input type="date" id="rev-desde"></div>
-      <div style="flex:1;"><label>Hasta</label><input type="date" id="rev-hasta"></div>
-      <button class="btn-primary" style="width:auto;padding:11px 18px;" onclick="cargarRevision()">Ver</button>
-    </div>
-
     <div id="rev-contenido"></div>
   </div>
 
   <!-- CONCILIACIÓN — Hallazgos (etapa 3) -->
   <div class="screen desktop-wide" id="screen-conciliacion-hallazgos">
-    <button class="back-link" onclick="irA('screen-conciliacion-revision')"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"></path></svg> Volver</button>
+    <button class="back-link" onclick="volverARevisionDesdeHallazgos()"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"></path></svg> Volver</button>
 
     <div class="stepper">
       <div class="st done"><div class="n">✓</div>Fuentes</div><div class="line"></div>
