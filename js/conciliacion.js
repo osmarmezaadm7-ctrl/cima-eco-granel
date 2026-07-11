@@ -839,7 +839,8 @@ function tarjetaHallazgo(h){
     const notifHtml = h.responsable ? (' · '+h.responsable+(h.notificado?' · notificado':' · sin notificar todavía')) : '';
     return '<div class="hallazgo'+claseCritica+'">'+
       '<div class="h-top"><strong style="font-size:14.5px;">'+CATEGORIA_CORTA_HALLAZGO[h.categoria]+'</strong><span class="pill '+pillClase+'">'+(critica?'Crítica':'Alerta')+'</span></div>'+
-      '<p style="font-size:12px;color:var(--ink-soft);margin:0;">✓ Resuelto'+notaHtml+notifHtml+'</p>'+
+      '<p style="font-size:12px;color:var(--ink-soft);margin:0 0 6px;">✓ Resuelto'+notaHtml+notifHtml+'</p>'+
+      '<a href="#" style="font-size:11.5px;color:var(--ink-soft);text-decoration:underline;" onclick="event.preventDefault();confirmarRevertirHallazgo(\''+idJs+'\')">Revertir</a>'+
       '</div>';
   }
 
@@ -866,6 +867,27 @@ function tarjetaHallazgo(h){
       '<button class="btn-primary" style="'+(critica?'background:var(--danger);':'')+'" onclick="responderHallazgo(\''+idJs+'\',\'confirmar\')">'+ACCION_TEXTO_HALLAZGO[h.categoria]+'</button>'+
     '</div>'+
   '</div>';
+}
+
+function confirmarRevertirHallazgo(id){
+  const h = cacheHallazgosActual[id];
+  if(!h) return;
+  const idJs = id.replace(/'/g,"\\'");
+  const texto = h.aplicado
+    ? 'Esto va a restaurar el valor digitado original ('+fmt(h.esperado)+') en el cierre de caja de ese día, y el hallazgo vuelve a Pendiente.'
+    : 'El hallazgo vuelve a Pendiente. No había ningún dato corregido que restaurar.';
+  abrirModal(
+    '<h3 style="font-size:16px;margin:0 0 8px;">¿Revertir este hallazgo?</h3>'+
+    '<p style="font-size:12.5px;color:var(--ink-soft);margin:0 0 14px;">'+texto+'</p>'+
+    '<div style="display:flex;gap:8px;"><button class="btn-secondary" onclick="cerrarModal()">Cancelar</button><button class="btn-primary" style="background:var(--danger);" onclick="revertirHallazgo(\''+idJs+'\')">Revertir</button></div>'
+  );
+}
+
+async function revertirHallazgo(id){
+  cerrarModal();
+  const r = await llamarAPI('revertirHallazgoConciliacion', {procesoId: procesoActualGlobal, hallazgoId: id});
+  if(!r.ok){ alert(r.error||'No se pudo revertir'); return; }
+  cargarHallazgos(procesoActualGlobal);
 }
 
 async function responderHallazgo(id, accion){
