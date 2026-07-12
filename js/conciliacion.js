@@ -1024,7 +1024,15 @@ async function marcarNotificacionComoVista(btn, id){
    =================================================================== */
 let ultimoCierreResp = null;
 
+// Cerrada es punto final de solo lectura — no puede encadenar "Volver" hacia Hallazgos ->
+// Revisión -> Fuentes (dejaría navegar/editar etapas de un proceso ya cerrado). Cierre es
+// la ÚNICA pantalla a la que entra un proceso Cerrada (ver abrirProcesoEnEtapaPendiente),
+// así que cortando acá alcanza — no hace falta tocar nada de Hallazgos/Revisión/Fuentes.
 function volverAHallazgosDesdeCierre(){
+  if(ultimoCierreResp && ultimoCierreResp.estadoProceso === 'Cerrada'){
+    abrirConciliacion(true); // forzar=true: refresca el listado para que se vea 'Cerrada'
+    return;
+  }
   abrirHallazgosDesde(procesoActualGlobal, revPeriodoDesde, revPeriodoHasta);
 }
 
@@ -1057,6 +1065,9 @@ function pintarCierre(r){
   const cerrada = r.estadoProceso === 'Cerrada';
   const badgeHtml = '<div style="margin-bottom:12px;"><span class="pill pill-ok">'+(cerrada?'Cerrada':'Completa')+'</span></div>';
 
+  const volverTexto = document.getElementById('cierre-volver-texto');
+  if(volverTexto) volverTexto.textContent = cerrada ? 'Salir' : 'Volver';
+
   const kpiHtml =
     '<div class="rev-kpi-row">'+
       '<div class="rev-kpi verde"><div class="lbl">Cuadre</div><div class="val">'+r.resumen.cuadre+' días</div></div>'+
@@ -1064,7 +1075,8 @@ function pintarCierre(r){
       '<div class="rev-kpi rojo"><div class="lbl">Descuadre</div><div class="val">'+r.resumen.descuadre+' días</div></div>'+
     '</div>';
 
-  const tablaHtml = tablaCierreDesktop(r.dias, r.hallazgos);
+  const esAncho = window.matchMedia('(min-width: 900px)').matches;
+  const tablaOCards = esAncho ? tablaCierreDesktop(r.dias, r.hallazgos) : tarjetasCierreMobile(r.dias, r.hallazgos);
 
   const comisionesHtml =
     '<div style="font-size:12.5px;font-weight:700;margin:18px 0 8px;">Comisiones del período</div>'+
@@ -1077,7 +1089,7 @@ function pintarCierre(r){
     ? '<p style="font-size:12px;color:var(--ink-soft);margin-top:18px;">Este proceso está cerrado — de solo lectura.</p>'
     : '<button class="btn-primary" style="margin-top:18px;" onclick="abrirModalCerrarConciliacion()">Cerrar conciliación</button>';
 
-  document.getElementById('cierre-contenido').innerHTML = badgeHtml + kpiHtml + tablaHtml + comisionesHtml + footerHtml;
+  document.getElementById('cierre-contenido').innerHTML = badgeHtml + kpiHtml + tablaOCards + comisionesHtml + footerHtml;
 }
 
 function resumenDiaCierre_(d, propios){
@@ -1127,6 +1139,49 @@ function tablaCierreDesktop(dias, hallazgos){
   return '<table class="tabla-rev"><colgroup><col class="c-dia"><col class="c-num"><col class="c-num"><col class="c-num"><col></colgroup>'+
     '<thead><tr><th>Día</th><th>Aronium</th><th>Registro</th><th>Comprobado</th><th>Quedó así</th></tr></thead>'+
     '<tbody>'+filas+filaTotal+'</tbody></table>';
+}
+
+// Vista mobile — mismo patrón que tarjetasRevisionMobile (tarjeta por día, click para
+// expandir), pero el detalle es la resolución de cada hallazgo, no el desglose por medio
+// de pago. La fila de Total período va aparte, al final, como una tarjeta propia.
+function tarjetasCierreMobile(dias, hallazgos){
+  const porDia = {};
+  hallazgos.forEach(h=>{ (porDia[h.fechaInicioReal] = porDia[h.fechaInicioReal] || []).push(h); });
+
+  let html = '', tA=0, tR=0, tC=0;
+  dias.forEach((d,i)=>{
+    tA += d.totalAronium||0; tR += d.totalRegistro||0; tC += d.totalComprobado||0;
+    const propios = porDia[d.fechaInicioReal] || [];
+    const claseCard = d.sinCierre ? 'rojo' : (d.rojo ? 'rojo' : (d.amarillo ? '' : 'verde'));
+    const luces = d.sinCierre ? '<span class="punto rojo"></span>'
+      : ((d.amarillo?'<span class="punto amarillo"></span> ':'') + (d.rojo?'<span class="punto rojo"></span>':'') + ((!d.amarillo && !d.rojo)?'<span class="punto verde"></span>':''));
+    const idDet = 'cierre-mob-det-'+i;
+    const numsHtml = d.sinCierre
+      ? '<p style="font-size:12px;color:var(--danger);font-style:italic;margin:4px 0 0;">Sin cierre de caja ('+fmt(d.totalComprobado)+')</p>'
+      : '<div class="rowline"><span>Aronium</span><b>'+fmt(d.totalAronium)+'</b></div>'+
+        '<div class="rowline"><span>Registro</span><b>'+fmt(d.totalRegistro)+'</b></div>'+
+        '<div class="rowline"><span>Comprobado</span><b>'+fmt(d.totalComprobado)+'</b></div>';
+    let detalleHtml = '';
+    if(!propios.length){
+      detalleHtml = '<p style="font-size:11.5px;color:var(--ink-soft);margin:8px 0 0;">Sin hallazgos este día.</p>';
+    } else {
+      detalleHtml = '<div style="margin-top:8px;border-top:1px solid var(--border);padding-top:8px;">'+
+        propios.map(h=>detalleHallazgoCierre_(h)).join('')+'</div>';
+    }
+    html += '<div class="card-dia '+claseCard+'" onclick="var e=document.getElementById(\''+idDet+'\');e.style.display=(e.style.display===\'block\'?\'none\':\'block\');">'+
+      '<div class="c-top"><strong>'+d.fecha+'</strong>'+luces+'</div>'+
+      numsHtml+
+      '<p style="font-size:11.5px;color:var(--ink-soft);margin:6px 0 0;">'+resumenDiaCierre_(d, propios)+'</p>'+
+      '<div id="'+idDet+'" style="display:none;">'+detalleHtml+'</div>'+
+      '</div>';
+  });
+
+  html += '<div class="card-dia" style="background:var(--forest-soft);">'+
+    '<div class="rowline"><span>Total período · Aronium</span><b>'+fmt(tA)+'</b></div>'+
+    '<div class="rowline"><span>Registro</span><b>'+fmt(tR)+'</b></div>'+
+    '<div class="rowline"><span>Comprobado</span><b>'+fmt(tC)+'</b></div></div>';
+
+  return html;
 }
 
 function tarjetaComisionCierre_(nombre, fuente, c){
