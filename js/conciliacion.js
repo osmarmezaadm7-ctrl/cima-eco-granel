@@ -976,8 +976,23 @@ function construirCuerpoNotificacion_(mensaje){
       const montoHtml = (it.corregido && it.valorAnterior!=null && it.valorCorregido!=null)
         ? ' <span class="mono" style="font-weight:600;font-size:11.5px;color:var(--forest);">'+fmt(it.valorAnterior)+' → '+fmt(it.valorCorregido)+'</span>'
         : '';
+      // CAMBIO 12/07/2026 (con Osmar) — Descuadre/Swap no tienen valorAnterior/valorCorregido
+      // (nunca se "corrigen"), así que antes solo mostraban la nota manual. Si el backend ya
+      // mandó el monto calculado, se pinta como línea destacada antes de la nota. Notificaciones
+      // viejas (sin estos campos) caen directo al comportamiento anterior, sin romper nada.
+      let montoDestacadoHtml = '';
+      if(it.montoDescuadre!=null && it.direccionDescuadre){
+        const color = it.direccionDescuadre==='falta' ? 'var(--danger)' : 'var(--success)';
+        const texto = it.direccionDescuadre==='falta' ? 'Faltan ' : 'Sobran ';
+        montoDestacadoHtml = '<div style="font-size:13px;font-weight:700;color:'+color+';margin-top:2px;">'+texto+fmt(it.montoDescuadre)+'</div>'+
+          '<div class="item-sub">Contado '+fmt(it.contado)+' → Sistema '+fmt(it.sistema)+'</div>';
+      } else if(it.montoSwap!=null){
+        montoDestacadoHtml = '<div style="font-size:13px;font-weight:700;color:var(--warn);margin-top:2px;">'+fmt(it.montoSwap)+' mal clasificado</div>'+
+          '<div class="item-sub">Caja '+fmt(it.cajaContado)+' → '+fmt(it.cajaSistema)+'</div>'+
+          '<div class="item-sub">Tarjetas '+fmt(it.tarjetasContado)+' → '+fmt(it.tarjetasSistema)+'</div>';
+      }
       const subHtml = it.corregido ? ('Corregido'+(it.nota?' — '+it.nota:'')) : (it.nota || 'Revisado');
-      cuerpo += '<div class="item-row"><div class="item-cat">'+it.categoria+montoHtml+'</div><div class="item-sub">'+subHtml+'</div></div>';
+      cuerpo += '<div class="item-row"><div class="item-cat">'+it.categoria+montoHtml+'</div>'+montoDestacadoHtml+'<div class="item-sub" style="font-style:italic;">'+(montoDestacadoHtml?'Nota: ':'')+subHtml+'</div></div>';
     });
     cuerpo += '</div>';
   });
