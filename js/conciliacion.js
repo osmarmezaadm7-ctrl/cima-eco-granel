@@ -936,12 +936,39 @@ async function enviarNotificacionesProceso(){
 // Intenta leer el mensaje como JSON estructurado ({periodo, dias:[{fecha,critica,items}]}).
 // Si falla (notificaciones viejas, guardadas como oración plana antes del 12/07/2026),
 // cae a mostrar el texto tal cual — no hace falta migrar lo ya archivado.
+// El título prioriza lo más grave (12/07/2026, con Osmar — "se hizo una conciliación" no
+// dice nada; el título tiene que decir qué se encontró): 1) algo crítico sin explicar,
+// 2) algo corregido, 3) todo revisado sin cambios. El período baja a subtítulo.
 function construirCuerpoNotificacion_(mensaje){
   let payload = null;
   try { payload = JSON.parse(mensaje); } catch(e) {}
   if(!payload || !payload.dias){
-    return { titulo: 'Notificación', cuerpo: '<p style="font-size:12.5px;color:var(--ink-soft);margin:0;">'+mensaje+'</p>' };
+    return { titulo: 'Notificación', subtitulo: '', esAlerta: false, cuerpo: '<p style="font-size:12.5px;color:var(--ink-soft);margin:0;">'+mensaje+'</p>' };
   }
+
+  const todos = [];
+  payload.dias.forEach(d => d.items.forEach(it => todos.push(it)));
+  const corregidos = todos.filter(it=>it.corregido);
+  const diasCriticos = payload.dias.filter(d=>d.critica);
+  const esAlerta = diasCriticos.length > 0;
+
+  let titulo;
+  if(esAlerta){
+    if(diasCriticos.length === 1){
+      const criticosDeEseDia = diasCriticos[0].items.filter(it=>it.critica);
+      titulo = criticosDeEseDia.length === 1
+        ? (criticosDeEseDia[0].categoria + ' sin explicar — ' + diasCriticos[0].fecha)
+        : (criticosDeEseDia.length + ' hallazgos críticos — ' + diasCriticos[0].fecha);
+    } else {
+      titulo = diasCriticos.length + ' días con hallazgos críticos';
+    }
+  } else if(corregidos.length){
+    titulo = 'Se corrigieron ' + corregidos.length + ' hallazgo' + (corregidos.length===1?'':'s') + ' de digitación';
+  } else {
+    titulo = todos.length + ' hallazgo' + (todos.length===1?'':'s') + ' revisado' + (todos.length===1?'':'s') + ', sin cambios';
+  }
+  const subtitulo = 'Conciliación ' + payload.periodo + ' · ' + todos.length + ' hallazgo' + (todos.length===1?'':'s') + ' revisado' + (todos.length===1?'':'s');
+
   let cuerpo = '';
   payload.dias.forEach(d=>{
     cuerpo += '<div class="notif-linea'+(d.critica?' critica':'')+'"><span class="fecha-linea">'+d.fecha+'</span>';
@@ -954,7 +981,7 @@ function construirCuerpoNotificacion_(mensaje){
     });
     cuerpo += '</div>';
   });
-  return { titulo: 'Conciliación '+payload.periodo, cuerpo: cuerpo };
+  return { titulo: titulo, subtitulo: subtitulo, esAlerta: esAlerta, cuerpo: cuerpo };
 }
 
 async function cargarNotificaciones(){
@@ -964,11 +991,16 @@ async function cargarNotificaciones(){
   cont.innerHTML='';
   (r.notificaciones||[]).forEach(n=>{
     const c = construirCuerpoNotificacion_(n.mensaje);
+    const iconoHtml = c.esAlerta
+      ? '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--danger)" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;margin-top:1px;"><path d="M12 9v4"></path><path d="M12 17h.01"></path><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path></svg>'
+      : '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;margin-top:1px;color:var(--ink-soft);"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>';
     const div = document.createElement('div');
     div.className = 'notif-card';
     div.innerHTML =
-      '<div class="n-top"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;margin-top:1px;color:var(--ink-soft);"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>'+
-      '<p style="font-size:13.5px;margin:0;font-weight:600;">'+c.titulo+'</p></div>'+
+      '<div class="n-top">'+iconoHtml+
+      '<div><p style="font-size:14px;margin:0;font-weight:700;color:'+(c.esAlerta?'var(--danger)':'var(--ink)')+';">'+c.titulo+'</p>'+
+      (c.subtitulo ? '<p style="font-size:11px;color:var(--ink-soft);margin:2px 0 0;">'+c.subtitulo+'</p>' : '')+
+      '</div></div>'+
       c.cuerpo+
       '<button class="btn-primary" style="width:100%;margin-top:12px;" onclick="marcarNotificacionComoVista(this,\''+n.id+'\')">Marcar como vista</button>';
     cont.appendChild(div);
