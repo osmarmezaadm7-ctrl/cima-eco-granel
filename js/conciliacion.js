@@ -933,18 +933,44 @@ async function enviarNotificacionesProceso(){
    Cada notificación ya viene consolidada desde el backend (1 por persona, agrupando todos
    sus hallazgos reparados de un proceso) — acá solo se pinta y se marca como vista.
    =================================================================== */
+// Intenta leer el mensaje como JSON estructurado ({periodo, dias:[{fecha,critica,items}]}).
+// Si falla (notificaciones viejas, guardadas como oración plana antes del 12/07/2026),
+// cae a mostrar el texto tal cual — no hace falta migrar lo ya archivado.
+function construirCuerpoNotificacion_(mensaje){
+  let payload = null;
+  try { payload = JSON.parse(mensaje); } catch(e) {}
+  if(!payload || !payload.dias){
+    return { titulo: 'Notificación', cuerpo: '<p style="font-size:12.5px;color:var(--ink-soft);margin:0;">'+mensaje+'</p>' };
+  }
+  let cuerpo = '';
+  payload.dias.forEach(d=>{
+    cuerpo += '<div class="notif-linea'+(d.critica?' critica':'')+'"><span class="fecha-linea">'+d.fecha+'</span>';
+    d.items.forEach(it=>{
+      const montoHtml = (it.corregido && it.valorAnterior!=null && it.valorCorregido!=null)
+        ? ' <span class="mono" style="font-weight:600;font-size:11.5px;color:var(--forest);">'+fmt(it.valorAnterior)+' → '+fmt(it.valorCorregido)+'</span>'
+        : '';
+      const subHtml = it.corregido ? ('Corregido'+(it.nota?' — '+it.nota:'')) : (it.nota || 'Revisado');
+      cuerpo += '<div class="item-row"><div class="item-cat">'+it.categoria+montoHtml+'</div><div class="item-sub">'+subHtml+'</div></div>';
+    });
+    cuerpo += '</div>';
+  });
+  return { titulo: 'Conciliación '+payload.periodo, cuerpo: cuerpo };
+}
+
 async function cargarNotificaciones(){
   const cont = document.getElementById('notif-home');
   if(!cont) return;
   const r = await llamarAPISilencioso('obtenerNotificacionesActivas', {});
   cont.innerHTML='';
   (r.notificaciones||[]).forEach(n=>{
+    const c = construirCuerpoNotificacion_(n.mensaje);
     const div = document.createElement('div');
     div.className = 'notif-card';
     div.innerHTML =
       '<div class="n-top"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;margin-top:1px;color:var(--ink-soft);"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>'+
-      '<p style="font-size:13.5px;margin:0;">'+n.mensaje+'</p></div>'+
-      '<button class="btn-primary" onclick="marcarNotificacionComoVista(this,\''+n.id+'\')">Marcar como vista</button>';
+      '<p style="font-size:13.5px;margin:0;font-weight:600;">'+c.titulo+'</p></div>'+
+      c.cuerpo+
+      '<button class="btn-primary" style="width:100%;margin-top:12px;" onclick="marcarNotificacionComoVista(this,\''+n.id+'\')">Marcar como vista</button>';
     cont.appendChild(div);
   });
 }
