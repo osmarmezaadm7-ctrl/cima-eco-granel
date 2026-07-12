@@ -286,10 +286,9 @@ function poblarFiltroAnios(lista){
 // Enrutamiento real de la tarjeta — reemplaza el "siempre abre en Fuentes" de antes.
 // etapa es de uso interno (no se pinta como texto en ningún lado), solo decide la pantalla.
 function abrirProcesoEnEtapaPendiente(p){
-  if(p.etapa==='Hallazgos' || p.etapa==='Resumen' || p.estado==='Cerrada'){
-    // Resumen todavía no existe como pantalla propia — mientras se construye, un proceso
-    // Cerrada o en etapa Resumen entra a Hallazgos (de solo consulta: el backend ya
-    // bloquea confirmarHallazgoConciliacion si el proceso está Cerrada).
+  if(p.etapa==='Resumen' || p.estado==='Cerrada'){
+    abrirCierreDesde(p.procesoId, p.desde, p.hasta);
+  } else if(p.etapa==='Hallazgos'){
     abrirHallazgosDesde(p.procesoId, p.desde, p.hasta);
   } else if(p.etapa==='Revision'){
     abrirRevisionDesde(p.procesoId, p.desde, p.hasta);
@@ -748,7 +747,11 @@ function pintarHallazgos(r){
     });
   }
 
-  document.getElementById('hall-contenido').innerHTML = kpiHtml + listaHtml;
+  const botonCierreHtml = r.estadoProceso==='Completa'
+    ? '<button class="btn-primary" style="margin-top:16px;" onclick="irACierreDesdeHallazgos()">Ir a Cierre</button>'
+    : '';
+
+  document.getElementById('hall-contenido').innerHTML = kpiHtml + listaHtml + botonCierreHtml;
   pintarFooterNotificarHallazgos(r);
 }
 
@@ -951,4 +954,175 @@ async function marcarNotificacionComoVista(btn, id){
   const r = await llamarAPISilencioso('marcarNotificacionVista', {id});
   if(r.ok){ btn.closest('.notif-card').remove(); }
   else { btn.disabled=false; btn.textContent='Marcar como vista'; alert(r.error||'No se pudo marcar'); }
+}
+
+/* ===================================================================
+   CIERRE — etapa 4 del flujo de Conciliación (12/07/2026)
+   Reusa la misma llamada que Hallazgos (obtenerHallazgosProceso, ya extendida con
+   dias/resumen/comisiones) — cero lecturas nuevas a Sheets. El día por día usa el mismo
+   patrón visual de Revisión (tabla + semáforo + expandible), pero la columna final
+   muestra el desenlace de cada día en vez del detalle por medio de pago, y se agrega
+   una fila de Total período.
+   =================================================================== */
+let ultimoCierreResp = null;
+
+function volverAHallazgosDesdeCierre(){
+  abrirHallazgosDesde(procesoActualGlobal, revPeriodoDesde, revPeriodoHasta);
+}
+
+function irACierreDesdeHallazgos(){
+  abrirCierreDesde(procesoActualGlobal, revPeriodoDesde, revPeriodoHasta);
+}
+
+function abrirCierreDesde(procesoId, desde, hasta){
+  procesoActualGlobal = procesoId;
+  revPeriodoDesde = desde;
+  revPeriodoHasta = hasta;
+  irA('screen-conciliacion-cierre');
+  document.getElementById('cierre-titulo').textContent = 'Cierre · '+(desde||'')+' al '+(hasta||'');
+  cargarCierre(procesoId);
+}
+
+async function cargarCierre(procesoId){
+  const cont = document.getElementById('cierre-contenido');
+  if(!procesoId){ cont.innerHTML = '<p style="font-size:12px;color:var(--danger);">Este período todavía no tiene un proceso de conciliación creado.</p>'; return; }
+  cont.innerHTML = skeletonCards(3);
+  const r = await llamarAPISilencioso('obtenerHallazgosProceso', {procesoId});
+  if(!r.ok){ cont.innerHTML = '<p style="font-size:12px;color:var(--danger);">'+(r.error||'Error al cargar')+'</p>'; return; }
+  document.getElementById('cierre-titulo').textContent = 'Cierre · '+r.desde+' al '+r.hasta;
+  llamarAPISilencioso('avanzarEtapa', {procesoId, etapa:'Resumen'}).catch(()=>{});
+  ultimoCierreResp = r;
+  pintarCierre(r);
+}
+
+function pintarCierre(r){
+  const cerrada = r.estadoProceso === 'Cerrada';
+  const badgeHtml = '<div style="margin-bottom:12px;"><span class="pill pill-ok">'+(cerrada?'Cerrada':'Completa')+'</span></div>';
+
+  const kpiHtml =
+    '<div class="rev-kpi-row">'+
+      '<div class="rev-kpi verde"><div class="lbl">Cuadre</div><div class="val">'+r.resumen.cuadre+' días</div></div>'+
+      '<div class="rev-kpi amarillo"><div class="lbl">Inconsistencias</div><div class="val">'+r.resumen.inconsistencias+' días</div></div>'+
+      '<div class="rev-kpi rojo"><div class="lbl">Descuadre</div><div class="val">'+r.resumen.descuadre+' días</div></div>'+
+    '</div>';
+
+  const tablaHtml = tablaCierreDesktop(r.dias, r.hallazgos);
+
+  const comisionesHtml =
+    '<div style="font-size:12.5px;font-weight:700;margin:18px 0 8px;">Comisiones del período</div>'+
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">'+
+      tarjetaComisionCierre_('Transbank', 'Transbank Comisión', r.comisiones.transbank)+
+      tarjetaComisionCierre_('Pedidos Ya', 'PedidosYa', r.comisiones.pedidosYa)+
+    '</div>';
+
+  const footerHtml = cerrada
+    ? '<p style="font-size:12px;color:var(--ink-soft);margin-top:18px;">Este proceso está cerrado — de solo lectura.</p>'
+    : '<button class="btn-primary" style="margin-top:18px;" onclick="abrirModalCerrarConciliacion()">Cerrar conciliación</button>';
+
+  document.getElementById('cierre-contenido').innerHTML = badgeHtml + kpiHtml + tablaHtml + comisionesHtml + footerHtml;
+}
+
+function resumenDiaCierre_(d, propios){
+  if(d.sinCierre) return 'Sin cierre, sumado a otro día del cierre';
+  if(!propios.length) return 'Cuadra';
+  const aplicados = propios.filter(h=>h.aplicado);
+  if(aplicados.length){
+    const total = aplicados.reduce((s,h)=> s + (valorHallazgo_(h.real)-valorHallazgo_(h.esperado)), 0);
+    return 'Corregido '+fmtSigno(total)+(propios.length>aplicados.length ? ', otros revisados' : '');
+  }
+  return propios.length+' hallazgo'+(propios.length===1?'':'s')+' revisado'+(propios.length===1?'':'s')+', sin cambios';
+}
+
+function detalleHallazgoCierre_(h){
+  const nombre = CATEGORIA_CORTA_HALLAZGO[h.categoria] || h.categoria;
+  const cambioHtml = h.aplicado ? '<div class="mono" style="font-size:12.5px;margin:2px 0;">'+fmt(h.esperado)+' → '+fmt(h.real)+'</div>' : '';
+  const notaHtml = h.nota ? '<div style="font-size:11.5px;color:var(--ink-soft);">'+h.nota+'</div>' : '';
+  const quienHtml = h.responsable ? ' · '+h.responsable : '';
+  return '<div style="padding:4px 2px;"><div style="display:flex;justify-content:space-between;font-size:12.5px;font-weight:600;">'+
+    '<span>'+nombre+'</span><span style="color:var(--ink-soft);font-weight:400;">'+(h.aplicado?'Corregido':'Revisado')+quienHtml+'</span></div>'+
+    cambioHtml+notaHtml+'</div>';
+}
+
+function tablaCierreDesktop(dias, hallazgos){
+  const porDia = {};
+  hallazgos.forEach(h=>{ (porDia[h.fechaInicioReal] = porDia[h.fechaInicioReal] || []).push(h); });
+
+  let filas = '', tA=0, tR=0, tC=0;
+  dias.forEach(d=>{
+    tA += d.totalAronium||0; tR += d.totalRegistro||0; tC += d.totalComprobado||0;
+    const propios = porDia[d.fechaInicioReal] || [];
+    const numsHtml = d.sinCierre
+      ? '<td colspan="3" style="text-align:left;font-style:italic;color:var(--danger);">Sin cierre de caja ('+fmt(d.totalComprobado)+')</td>'
+      : '<td>'+fmt(d.totalAronium)+'</td><td>'+fmt(d.totalRegistro)+'</td><td>'+fmt(d.totalComprobado)+'</td>';
+    filas += '<tr class="fila-dia" onclick="toggleFilaRevision(this)"><td>'+d.fecha+' ▾</td>'+numsHtml+
+      '<td style="text-align:left;font-size:11.5px;color:var(--ink-soft);">'+resumenDiaCierre_(d, propios)+'</td></tr>';
+    if(!propios.length){
+      filas += '<tr class="fila-medio" style="display:none;"><td colspan="5" style="font-size:12px;color:var(--ink-soft);">Sin hallazgos este día.</td></tr>';
+    } else {
+      propios.forEach(h=>{
+        filas += '<tr class="fila-medio" style="display:none;"><td colspan="5">'+detalleHallazgoCierre_(h)+'</td></tr>';
+      });
+    }
+  });
+  const filaTotal = '<tr style="background:var(--forest-soft);font-weight:700;"><td>Total período</td><td>'+fmt(tA)+'</td><td>'+fmt(tR)+'</td><td>'+fmt(tC)+'</td><td></td></tr>';
+
+  return '<table class="tabla-rev"><colgroup><col class="c-dia"><col class="c-num"><col class="c-num"><col class="c-num"><col></colgroup>'+
+    '<thead><tr><th>Día</th><th>Aronium</th><th>Registro</th><th>Comprobado</th><th>Quedó así</th></tr></thead>'+
+    '<tbody>'+filas+filaTotal+'</tbody></table>';
+}
+
+function tarjetaComisionCierre_(nombre, fuente, c){
+  if(!c.monto){
+    return '<div style="background:var(--surface);border:1.5px solid var(--border);border-radius:14px;padding:13px;">'+
+      '<div style="font-size:11px;color:var(--ink-soft);">'+nombre+'</div>'+
+      '<div style="font-size:12px;color:var(--ink-soft);margin-top:8px;">Sin comisión calculada.</div></div>';
+  }
+  const accionHtml = c.confirmado
+    ? '<div style="display:flex;align-items:center;gap:6px;background:var(--forest-soft);color:var(--forest);font-size:11.5px;font-weight:700;padding:7px;border-radius:9px;justify-content:center;">✓ Registrado</div>'
+    : '<button class="btn-line" style="margin-top:0;padding:9px;font-size:12px;" onclick="abrirModalRegistrarGasto(\''+fuente+'\')">Registrar gasto</button>';
+  return '<div style="background:var(--surface);border:1.5px solid var(--border);border-radius:14px;padding:13px;">'+
+    '<div style="font-size:11px;color:var(--ink-soft);">'+nombre+' <span style="opacity:.75;">(IVA incluido)</span></div>'+
+    '<div class="mono" style="font-weight:700;font-size:18px;margin:3px 0 9px;">'+fmt(c.monto)+'</div>'+
+    accionHtml+
+  '</div>';
+}
+
+function abrirModalRegistrarGasto(fuente){
+  const c = fuente === 'Transbank Comisión' ? ultimoCierreResp.comisiones.transbank : ultimoCierreResp.comisiones.pedidosYa;
+  const nombre = fuente === 'Transbank Comisión' ? 'Transbank' : 'Pedidos Ya';
+  const naturaleza = fuente === 'Transbank Comisión' ? 'Gasto Transbank' : 'Comisión PedidosYa';
+  abrirModal(
+    '<h3 style="font-size:15px;">Confirmar registro de gasto</h3>'+
+    '<p style="font-size:11.5px;color:var(--ink-soft);margin:2px 0 10px;">Comisión '+nombre+' · período hasta '+revPeriodoHasta+'</p>'+
+    '<div class="rowline"><span>Negocio</span><b>Cima Eco-Granel</b></div>'+
+    '<div class="rowline"><span>Naturaleza</span><b>'+naturaleza+'</b></div>'+
+    '<div class="rowline"><span>Medio de pago</span><b>Descuento en liquidación</b></div>'+
+    '<div class="rowline" style="font-size:14px;font-weight:700;"><span>Monto (IVA incluido)</span><b>'+fmt(c.monto)+'</b></div>'+
+    '<p style="font-size:11px;color:var(--ink-soft);margin:10px 0 0;">Esto crea un Egreso en Finanzas. No hay forma de deshacerlo desde aquí — si es un error, se corrige manualmente en Finanzas.</p>'+
+    '<div class="error-msg" id="cierre-modal-error"></div>'+
+    '<div style="display:flex;gap:8px;margin-top:14px;"><button class="btn-secondary" onclick="cerrarModal()">Cancelar</button><button class="btn-primary" onclick="ejecutarRegistrarGasto(\''+fuente+'\')">Confirmar y registrar</button></div>'
+  );
+}
+
+async function ejecutarRegistrarGasto(fuente){
+  const r = await llamarAPI('confirmarGastoComision', {procesoId: procesoActualGlobal, fuente});
+  if(!r.ok){ const e=document.getElementById('cierre-modal-error'); if(e) e.textContent = r.error||'No se pudo registrar'; return; }
+  cerrarModal();
+  cargarCierre(procesoActualGlobal);
+}
+
+function abrirModalCerrarConciliacion(){
+  abrirModal(
+    '<h3 style="font-size:16px;margin:0 0 8px;">¿Cerrar esta conciliación?</h3>'+
+    '<p style="font-size:12.5px;color:var(--ink-soft);margin:0 0 14px;">El proceso queda de solo lectura. No se van a poder volver a subir fuentes ni cambiar hallazgos de este período.</p>'+
+    '<div class="error-msg" id="cierre-modal-error"></div>'+
+    '<div style="display:flex;gap:8px;"><button class="btn-secondary" onclick="cerrarModal()">Cancelar</button><button class="btn-primary" onclick="ejecutarCerrarConciliacion()">Cerrar conciliación</button></div>'
+  );
+}
+
+async function ejecutarCerrarConciliacion(){
+  const r = await llamarAPI('cerrarConciliacion', {procesoId: procesoActualGlobal});
+  if(!r.ok){ const e=document.getElementById('cierre-modal-error'); if(e) e.textContent = r.error||'No se pudo cerrar'; return; }
+  cerrarModal();
+  cargarCierre(procesoActualGlobal);
 }
