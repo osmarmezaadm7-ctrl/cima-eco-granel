@@ -35,6 +35,18 @@
 .item-sub{font-size:11.5px;color:var(--ink-soft);margin-top:1px;}
 .pill-ok{background:var(--forest-soft);color:var(--forest);}
 
+/* ===== Producción / Conteo (13/07/2026) ===== */
+.conteo-chips{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;}
+.chip-cat{border:1.5px solid var(--border);color:var(--ink-soft);font-size:12.5px;font-weight:600;padding:7px 14px;border-radius:20px;cursor:pointer;user-select:none;}
+.chip-cat.activo{background:var(--forest);border-color:var(--forest);color:#fff;}
+.conteo-seccion-titulo{font-size:10.5px;color:var(--ink-soft);font-weight:800;text-transform:uppercase;letter-spacing:.4px;margin:14px 0 6px;}
+.conteo-row{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--border);gap:10px;}
+.conteo-row span{font-size:14px;}
+.conteo-stepper{display:flex;align-items:center;gap:8px;flex-shrink:0;}
+.conteo-stepper button{width:36px;height:36px;border-radius:9px;border:1.5px solid var(--border);background:#fff;font-size:17px;line-height:1;cursor:pointer;padding:0;color:var(--ink);}
+.conteo-stepper button:hover{background:var(--forest-soft);}
+.conteo-stepper input{width:48px;height:36px;text-align:center;border:1.5px solid var(--border);border-radius:9px;font-family:'JetBrains Mono',monospace;font-size:13px;padding:0;}
+
 /* ===== Revisión / Fuentes (Conciliación) ===== */
 .stepper{display:flex;align-items:center;gap:6px;margin-bottom:24px;}
 .stepper .st{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:700;color:var(--ink-soft);white-space:nowrap;}
@@ -589,7 +601,17 @@
   </div>
 
   <!-- INVENTARIO MP -->
-  <div class="screen desktop-wide" id="screen-inventario">
+  <div class="screen" id="screen-conteo">
+  <button class="back-link" onclick="irA('screen-home')"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"></path></svg> Volver</button>
+  <div class="header-row"><h2 style="font-size:17px;">Contar stock</h2><button class="icon-btn" title="Actualizar" onclick="abrirConteo(true)"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 4v6h-6"></path><path d="M1 20v-6h6"></path><path d="M3.5 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.65 4.36A9 9 0 0 0 20.5 15"></path></svg></button></div>
+  <p style="font-size:12px;color:var(--ink-soft);margin:0 0 10px;">Categorías</p>
+  <div id="conteo-chips" class="conteo-chips"></div>
+  <div id="conteo-lista"></div>
+  <div class="error-msg" id="conteo-error"></div>
+  <div class="submit-bar"><button class="btn-primary" onclick="guardarConteo()">Guardar conteo</button></div>
+</div>
+
+<div class="screen desktop-wide" id="screen-inventario">
     <button class="back-link" onclick="irA('screen-home')"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"></path></svg> Volver</button>
     <div class="header-row"><h2 style="font-size:17px;">Inventario de materia prima</h2><button class="icon-btn" title="Actualizar" onclick="abrirInventario(true)"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 4v6h-6"></path><path d="M1 20v-6h6"></path><path d="M3.5 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.65 4.36A9 9 0 0 0 20.5 15"></path></svg></button></div>
     <div class="card">
@@ -1051,6 +1073,14 @@ async function entrarAHome(){
     if (puedeCima && tienePermisoLocal('RegistrarMovimiento')) cont.appendChild(crearMenuCard(ICONS.caja,'Cierre de caja','Registrar ventas del día',()=>{document.getElementById('cc-fecha').value = fechaLocalISO();setModoCierre('dia',document.querySelector('#cc-modo-group button'));irA('screen-cierre');},true));
   }
 
+  // ===== PRODUCCIÓN (NUEVO 13/07/2026) — independiente del árbol de arriba: cualquier
+  // persona con RegistrarConteo ve "Contar stock" sin importar qué otro permiso tenga.
+  // Solo Conteo por ahora — Revisión y Pauta se agregan cuando esas pantallas existan.
+  if (tienePermisoLocal('RegistrarConteo')) {
+    cont.insertAdjacentHTML('beforeend','<div class="menu-grupo-titulo">Producción</div>');
+    cont.appendChild(crearMenuCard(ICONS.produccion,'Contar stock','Conteo diario para Cima',()=>abrirConteo(),true));
+  }
+
   if (esEscritorio && tienePermisoLocal('VerDashboardCompleto')) { abrirPanel(); return; }
   if (esEscritorio && tienePermisoLocal('VisualizarReportes')) { abrirEstadoResultados(); return; }
   if (esEscritorio && tienePermisoLocal('VerPrograma')) { abrirPrograma(); return; }
@@ -1082,6 +1112,7 @@ function pintarSidebar(){
   if (finanzasHtml) nav.insertAdjacentHTML('beforeend', '<div class="grupo">Finanzas</div>'+finanzasHtml);
 
   let prodHtml='';
+  if (tienePermisoLocal('RegistrarConteo')) prodHtml += item('screen-conteo',ICONS.produccion,'Contar stock');
   if (tienePermisoLocal('VerPrograma')) prodHtml += item('screen-programa',ICONS.programa,'Programa de producción');
   if (tienePermisoLocal('GestionarInventario')) prodHtml += item('screen-inventario',ICONS.inventario,'Inventario MP') + item('screen-lista-compra',ICONS.carrito,'Lista de compra MP');
   if (prodHtml) nav.insertAdjacentHTML('beforeend', '<div class="grupo">Producción</div>'+prodHtml);
@@ -1106,6 +1137,7 @@ function onEntrarScreen(id){
   if(id==='screen-alertas') abrirAlertas();
   if(id==='screen-conciliacion') abrirConciliacion();
   if(id==='screen-config-sistema') abrirConfigSistema();
+  if(id==='screen-conteo') abrirConteo();
   if(id==='screen-programa') abrirPrograma();
   if(id==='screen-inventario') abrirInventario();
   if(id==='screen-lista-compra') abrirListaCompra();
@@ -2039,6 +2071,12 @@ const PERMISOS_MODULOS = [
     { clave:'RegistrarCompra', label:'Registrar compras y gastos' },
     { clave:'VisualizarReportes', label:'Visualizar reportes', nuevo:true }
   ]},
+  { titulo: 'Producción', items: [
+    { clave:'RegistrarConteo', label:'Contar stock (Conteo)', nuevo:true },
+    { clave:'VerPrograma', label:'Revisar y enviar pedido a producción' },
+    { clave:'GestionarPauta', label:'Pauta de producción (Vegan Corner)', nuevo:true },
+    { clave:'GestionarInventario', label:'Inventario de materia prima' }
+  ]},
   { titulo: 'Conciliación', items: [
     { clave:'ProcesarConciliacion', label:'Procesar conciliación', nuevo:true }
   ]},
@@ -2313,6 +2351,7 @@ irA = function(id){
 pintarUsuarios();
 </script>
 <script src="js/conciliacion.js"></script>
+<script src="js/produccion.js"></script>
 
 </body>
 </html>
