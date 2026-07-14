@@ -939,11 +939,43 @@ async function enviarNotificacionesProceso(){
 // El título prioriza lo más grave (12/07/2026, con Osmar — "se hizo una conciliación" no
 // dice nada; el título tiene que decir qué se encontró): 1) algo crítico sin explicar,
 // 2) algo corregido, 3) todo revisado sin cambios. El período baja a subtítulo.
-function construirCuerpoNotificacion_(mensaje){
+function formatFechaNotif_(fecha) {
+  if (!fecha) return '';
+  const d = new Date(fecha);
+  if (isNaN(d.getTime())) return '';
+  const hh = String(d.getHours()).padStart(2, '0'), mm = String(d.getMinutes()).padStart(2, '0');
+  const hoy = new Date();
+  if (d.toDateString() === hoy.toDateString()) return 'Hoy, ' + hh + ':' + mm;
+  return d.getDate() + ' de ' + NOMBRES_MES[d.getMonth()] + ', ' + hh + ':' + mm;
+}
+
+// CAMBIO 13/07/2026 (con Osmar — Producción): ahora recibe fechaCreacion además del
+// mensaje, para poder destacarla en grande — antes ninguna notificación mostraba fecha.
+// Los mensajes de Producción (nuevoConteo, pedidoProduccion, produccionConfirmada) son
+// JSON con un campo `tipo`, mismo patrón que ya usaba Conciliación con `payload.dias` —
+// título real ("Nuevo pedido de producción") en vez del genérico "Notificación".
+function construirCuerpoNotificacion_(mensaje, fechaCreacion) {
   let payload = null;
-  try { payload = JSON.parse(mensaje); } catch(e) {}
-  if(!payload || !payload.dias){
-    return { titulo: 'Notificación', subtitulo: '', esAlerta: false, cuerpo: '<p style="font-size:12.5px;color:var(--ink-soft);margin:0;">'+mensaje+'</p>' };
+  try { payload = JSON.parse(mensaje); } catch (e) {}
+
+  if (payload && payload.tipo) {
+    const fechaDestacada = formatFechaNotif_(fechaCreacion);
+    if (payload.tipo === 'nuevoConteo') {
+      return { titulo: 'Nuevo conteo', fechaDestacada: fechaDestacada, esAlerta: false,
+        cuerpo: '<p style="font-size:12.5px;color:var(--ink-soft);margin:0;">Contado por ' + payload.nombre + '</p>' };
+    }
+    if (payload.tipo === 'pedidoProduccion') {
+      return { titulo: 'Nuevo pedido de producción', fechaDestacada: fechaDestacada, esAlerta: false,
+        cuerpo: '<p style="font-size:12.5px;color:var(--ink-soft);margin:0;">Enviado por ' + payload.nombre + (payload.observacion ? ' — ' + payload.observacion : '') + '</p>' };
+    }
+    if (payload.tipo === 'produccionConfirmada') {
+      return { titulo: 'Producción confirmada', fechaDestacada: fechaDestacada, esAlerta: false,
+        cuerpo: '<p style="font-size:12.5px;color:var(--ink-soft);margin:0;">' + (payload.resumen || '') + ' — ' + payload.nombre + '</p>' };
+    }
+  }
+
+  if (!payload || !payload.dias) {
+    return { titulo: 'Notificación', subtitulo: '', esAlerta: false, cuerpo: '<p style="font-size:12.5px;color:var(--ink-soft);margin:0;">' + mensaje + '</p>' };
   }
 
   const todos = [];
@@ -1005,7 +1037,7 @@ async function cargarNotificaciones(){
   const r = await llamarAPISilencioso('obtenerNotificacionesActivas', {});
   cont.innerHTML='';
   (r.notificaciones||[]).forEach(n=>{
-    const c = construirCuerpoNotificacion_(n.mensaje);
+    const c = construirCuerpoNotificacion_(n.mensaje, n.fechaCreacion);
     const iconoHtml = c.esAlerta
       ? '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--danger)" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;margin-top:1px;"><path d="M12 9v4"></path><path d="M12 17h.01"></path><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path></svg>'
       : '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;margin-top:1px;color:var(--ink-soft);"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>';
@@ -1015,6 +1047,8 @@ async function cargarNotificaciones(){
     // (como las de Conciliación) se ven exactamente igual que antes.
     const accionBtn = n.accionNotif==='abrirRevision'
       ? '<button class="btn-primary" onclick="accionNotificacion(this,\''+n.id+'\',\'abrirRevision\')">Ver revisión</button>'
+      : n.accionNotif==='abrirPauta'
+      ? '<button class="btn-primary" onclick="accionNotificacion(this,\''+n.id+'\',\'abrirPauta\')">Ver pauta</button>'
       : '';
     const marcarBtn = '<button class="'+(n.accionNotif?'btn-secondary':'btn-primary')+'" style="'+(n.accionNotif?'':'width:100%;')+'" onclick="marcarNotificacionComoVista(this,\''+n.id+'\')">Marcar como vista</button>';
     const div = document.createElement('div');
@@ -1022,7 +1056,7 @@ async function cargarNotificaciones(){
     div.innerHTML =
       '<div class="n-top">'+iconoHtml+
       '<div><p style="font-size:14px;margin:0;font-weight:700;color:'+(c.esAlerta?'var(--danger)':'var(--ink)')+';">'+c.titulo+'</p>'+
-      (c.subtitulo ? '<p style="font-size:11px;color:var(--ink-soft);margin:2px 0 0;">'+c.subtitulo+'</p>' : '')+
+      (c.fechaDestacada ? '<p style="font-size:17px;font-weight:800;color:var(--forest);margin:2px 0 0;">'+c.fechaDestacada+'</p>' : (c.subtitulo ? '<p style="font-size:11px;color:var(--ink-soft);margin:2px 0 0;">'+c.subtitulo+'</p>' : ''))+
       '</div></div>'+
       c.cuerpo+
       '<div class="n-acciones" style="margin-top:12px;">'+accionBtn+marcarBtn+'</div>';
@@ -1044,6 +1078,7 @@ async function accionNotificacion(btn, id, accion){
   await llamarAPISilencioso('marcarNotificacionVista', {id});
   const card = btn.closest('.notif-card'); if(card) card.remove();
   if(accion==='abrirRevision' && typeof abrirRevision==='function') abrirRevision();
+  if(accion==='abrirPauta' && typeof abrirPauta==='function') abrirPauta();
 }
 
 /* ===================================================================
