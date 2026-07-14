@@ -12,6 +12,11 @@ let cacheConteoCatalogo = null;           // { ok, catalogo:[{nombre, productoPr
 let conteoCategoriasActivas = new Set();  // categorías con el chip activo
 let conteoCantidades = {};                // clave "productoProduccion|categoria" -> cantidad contada
 
+// Rosa/Katherine (Vegan Corner) solo reportan SU propio stock congelado — no cuentan lo
+// de Cima (Horneada/Pasteles/Congelados no son suyos). Esta pantalla se adapta sola:
+// una sola categoría, sin chips, y el guardado va a StockCongeladoVC, no a ConteoStockCima.
+function esVeganCorner_() { return !!(sesion && sesion.negocio === 'Vegan Corner'); }
+
 async function abrirConteo(forzar) {
   irA('screen-conteo');
   if (!cacheConteoCatalogo || forzar) {
@@ -25,13 +30,43 @@ async function abrirConteo(forzar) {
     cacheConteoCatalogo = r;
     // Por defecto NINGUNA categoría activa — que Rocío/el staff elija qué va a contar
     // en vez de arrancar con todo desplegado (confuso, mucho para escanear de una).
-    conteoCategoriasActivas = new Set();
+    // Para Vegan Corner no aplica: solo existe una categoría posible para ellos.
+    conteoCategoriasActivas = esVeganCorner_() ? new Set(['Empanadas Congeladas']) : new Set();
     conteoCantidades = {};
   }
   if (document.getElementById('screen-conteo').classList.contains('active')) pintarConteo();
 }
 
 function pintarConteo() {
+  const titulo = document.querySelector('#screen-conteo h2');
+  const boton = document.querySelector('#screen-conteo .submit-bar button');
+
+  if (esVeganCorner_()) {
+    document.getElementById('conteo-chips').style.display = 'none';
+    if (titulo) titulo.textContent = 'Stock congelado';
+    if (boton) boton.textContent = 'Guardar stock';
+    const productos = cacheConteoCatalogo.catalogo.filter(p => p.categoria === 'Empanadas Congeladas');
+    let html = '';
+    productos.forEach(p => {
+      const key = p.productoProduccion + '|' + p.categoria;
+      const val = conteoCantidades[key] !== undefined ? conteoCantidades[key] : 0;
+      const keyEsc = key.replace(/'/g, "\\'");
+      html += '<div class="conteo-row">' +
+        '<span>' + p.nombre + '</span>' +
+        '<div class="conteo-stepper">' +
+          '<button type="button" onclick="cambiarCantidadConteo(\'' + keyEsc + '\',-1)">\u2212</button>' +
+          '<input type="number" min="0" value="' + val + '" oninput="escribirCantidadConteo(\'' + keyEsc + '\',this.value)">' +
+          '<button type="button" onclick="cambiarCantidadConteo(\'' + keyEsc + '\',1)">+</button>' +
+        '</div>' +
+      '</div>';
+    });
+    document.getElementById('conteo-lista').innerHTML = html || '<p style="font-size:13.5px;color:var(--ink-soft);padding:24px 0;text-align:center;">No hay empanadas configuradas para contar.</p>';
+    return;
+  }
+
+  document.getElementById('conteo-chips').style.display = '';
+  if (titulo) titulo.textContent = 'Contar stock';
+  if (boton) boton.textContent = 'Guardar conteo';
   const categorias = [...new Set(cacheConteoCatalogo.catalogo.map(p => p.categoria))];
 
   document.getElementById('conteo-chips').innerHTML = categorias.map(c => {
@@ -77,6 +112,25 @@ function escribirCantidadConteo(key, val) {
 
 async function guardarConteo() {
   document.getElementById('conteo-error').textContent = '';
+
+  if (esVeganCorner_()) {
+    const productos = cacheConteoCatalogo.catalogo.filter(p => p.categoria === 'Empanadas Congeladas');
+    if (!productos.length) { document.getElementById('conteo-error').textContent = 'No hay productos para guardar.'; return; }
+    for (const p of productos) {
+      const key = p.productoProduccion + '|' + p.categoria;
+      const cantidad = conteoCantidades[key] !== undefined ? conteoCantidades[key] : 0;
+      const r = await llamarAPI('actualizarStockCongeladoVC', { data: { producto: p.productoProduccion, stockActual: cantidad, responsable: sesion.nombre } });
+      if (!r.ok) { document.getElementById('conteo-error').textContent = r.error || 'Error al guardar el stock'; return; }
+    }
+    conteoCantidades = {};
+    document.getElementById('confirm-title').textContent = 'Stock actualizado';
+    document.getElementById('confirm-msg').textContent = 'Se guardó tu stock congelado — Rocío lo va a ver en Revisión.';
+    document.getElementById('confirm-detalle').innerHTML = '';
+    ocultarBotonOtro();
+    irA('screen-confirm');
+    return;
+  }
+
   if (!conteoCategoriasActivas.size) {
     document.getElementById('conteo-error').textContent = 'Selecciona al menos una categoría.';
     return;
@@ -108,7 +162,7 @@ async function guardarConteo() {
   ocultarBotonOtro();
   // Aviso corto a Rocío y Osmar, con botón directo a Revisión — el detalle completo se ve
   // al entrar, la notificación es solo un aviso de "hay algo nuevo que revisar".
-  await llamarAPI('crearNotificacion', { para: ['Rocío Romo', 'Osmar Meza'], mensaje: 'Nuevo conteo — ' + sesion.nombre, accionNotif: 'abrirRevision' });
+  await llamarAPI('crearNotificacion', { para: ['Rocío Romo', 'Osmar Meza'], mensaje: JSON.stringify({ tipo: 'nuevoConteo', nombre: sesion.nombre }), accionNotif: 'abrirRevision' });
   irA('screen-confirm');
 }
 
@@ -272,8 +326,8 @@ async function enviarRevision() {
   // Notificación liviana a Rosa y Katherine — mensaje corto (el resumen completo lo ve el
   // que envió en la pantalla de confirmación); no es pantalla propia, es parte de enviar.
   const resumen = items.map(it => it.productoProduccion + ' x' + it.cantidadProgramada).join(', ');
-  const mensajeNotif = 'Nuevo pedido de producción — ' + sesion.nombre + (revisionObservacion ? ' — ' + revisionObservacion : '');
-  await llamarAPI('crearNotificacion', { para: ['Rosa Merino', 'Katherine Bustamante'], mensaje: mensajeNotif });
+  const mensajeNotif = JSON.stringify({ tipo: 'pedidoProduccion', nombre: sesion.nombre, observacion: revisionObservacion || '' });
+  await llamarAPI('crearNotificacion', { para: ['Rosa Merino', 'Katherine Bustamante'], mensaje: mensajeNotif, accionNotif: 'abrirPauta' });
 
   cacheRevision = null; revisionPedidos = {}; revisionAgregados = []; revisionEliminados = new Set(); revisionObservacion = '';
   document.getElementById('confirm-title').textContent = 'Pedido enviado';
