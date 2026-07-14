@@ -106,6 +106,9 @@ async function guardarConteo() {
   document.getElementById('confirm-msg').textContent = 'Se registraron ' + productos.length + ' productos. Rocío u Osmar lo revisan antes de pedir a producción.';
   document.getElementById('confirm-detalle').innerHTML = '';
   ocultarBotonOtro();
+  // Aviso corto a Rocío y Osmar, con botón directo a Revisión — el detalle completo se ve
+  // al entrar, la notificación es solo un aviso de "hay algo nuevo que revisar".
+  await llamarAPI('crearNotificacion', { para: ['Rocío Romo', 'Osmar Meza'], mensaje: 'Nuevo conteo — ' + sesion.nombre, accionNotif: 'abrirRevision' });
   irA('screen-confirm');
 }
 
@@ -113,7 +116,9 @@ async function guardarConteo() {
 let cacheRevision = null;          // { ok, items:[...], conteoIds:[...] } — obtenerConteosPendientes()
 let cacheCatalogoCompleto = null;  // catálogo completo (soloConteo:false), para "+ Agregar producto"
 let revisionPedidos = {};          // productoProduccion -> cantidad a pedir
-let revisionAgregados = [];        // [{productoProduccion, nombre}] agregados a mano, sin conteo previo
+let revisionAgregados = [];        // [{productoProduccion, nombre, comentario}] agregados a mano, sin conteo previo
+let revisionEliminados = new Set(); // productoProduccion quitados de la lista que vino del conteo (no se envían)
+let revisionObservacion = '';      // observación general opcional para toda la orden
 
 async function abrirRevision(forzar) {
   irA('screen-revision');
@@ -127,49 +132,82 @@ async function abrirRevision(forzar) {
     cacheRevision = r;
     revisionPedidos = {};
     revisionAgregados = [];
+    revisionEliminados = new Set();
+    revisionObservacion = '';
+    const taObs = document.getElementById('revision-observacion');
+    if (taObs) taObs.value = '';
   }
   pintarRevision();
 }
 
-// "Empanadas" / "Empanadas Congeladas" son nombres de categoría, técnicos para la fila
-// de detalle — se muestran como "Horneada"/"Congelada", más claro para decidir el pedido.
-function detalleLegibleRevision_(detalle) {
-  return (detalle || '').replace('Empanadas Congeladas', 'Congelada').replace('Empanadas', 'Horneada');
+// "Empanadas" / "Empanadas Congeladas" son nombres de categoría técnicos — se muestran
+// como "Horneada"/"Congelada". Cualquier otra categoría (Pasteles, Congelados) se muestra
+// como "Stock", genérico — repetir el nombre de la categoría ahí era redundante. Todos los
+// badges llevan el mismo peso visual (mismo gris), incluido VC — ninguno se destaca más
+// que otro, todos son solo datos de referencia para decidir el Pedir.
+function badgesDetalleRevision_(detalle, stockVC) {
+  const etiqueta = (cat) => cat === 'Empanadas Congeladas' ? 'Congelada' : cat === 'Empanadas' ? 'Horneada' : 'Stock';
+  let html = Object.keys(detalle || {}).map(cat =>
+    '<span class="revision-badge">' + etiqueta(cat) + ' ' + detalle[cat] + '</span>'
+  ).join('');
+  if (stockVC) html += '<span class="revision-badge">VC ' + stockVC + '</span>';
+  return html;
 }
 
 function pintarRevision() {
   const cont = document.getElementById('revision-lista');
-  if (!cacheRevision.items.length && !revisionAgregados.length) {
+  const itemsVisibles = cacheRevision.items.filter(it => !revisionEliminados.has(it.productoProduccion));
+  if (!itemsVisibles.length && !revisionAgregados.length) {
     cont.innerHTML = '<p style="font-size:13.5px;color:var(--ink-soft);padding:24px 0;text-align:center;">No hay conteos pendientes de revisión.</p>';
+    document.getElementById('revision-observacion-wrap').style.display = 'none';
     return;
   }
+  document.getElementById('revision-observacion-wrap').style.display = '';
   let html = '';
-  cacheRevision.items.forEach(it => {
+  itemsVisibles.forEach(it => {
     const val = revisionPedidos[it.productoProduccion] !== undefined ? revisionPedidos[it.productoProduccion] : '';
     const clave = it.productoProduccion.replace(/'/g, "\\'");
     html += '<div class="revision-row' + (it.bajoMinimo ? ' alerta' : '') + '">' +
+      '<button class="revision-quitar" title="Quitar" onclick="quitarProductoRevision(\'' + clave + '\')"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"></path><path d="M6 6l12 12"></path></svg></button>' +
       '<div class="revision-row-top">' +
         '<span>' + it.productoProduccion + '</span>' +
         '<input type="number" min="0" placeholder="0" value="' + val + '" oninput="cambiarPedidoRevision(\'' + clave + '\',this.value)">' +
       '</div>' +
-      '<p class="revision-detalle">' + detalleLegibleRevision_(it.detalleContado) +
-        (it.stockCongeladoVC ? ' · VC ' + it.stockCongeladoVC : '') +
-        (it.stockMinimo ? ' · mínimo ' + it.stockMinimo : '') +
-      '</p>' +
+      '<p class="revision-detalle">' + badgesDetalleRevision_(it.detalle, it.stockCongeladoVC) + '</p>' +
     '</div>';
   });
-  revisionAgregados.forEach(a => {
+  revisionAgregados.forEach((a, idx) => {
     const val = revisionPedidos[a.productoProduccion] !== undefined ? revisionPedidos[a.productoProduccion] : '';
     const clave = a.productoProduccion.replace(/'/g, "\\'");
     html += '<div class="revision-row">' +
+      '<button class="revision-quitar" title="Quitar" onclick="quitarAgregadoRevision(' + idx + ')"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"></path><path d="M6 6l12 12"></path></svg></button>' +
       '<div class="revision-row-top">' +
         '<span>' + a.nombre + '</span>' +
         '<input type="number" min="0" placeholder="0" value="' + val + '" oninput="cambiarPedidoRevision(\'' + clave + '\',this.value)">' +
       '</div>' +
-      '<p class="revision-detalle">Agregado manualmente — sin conteo previo</p>' +
+      '<p class="revision-detalle">Agregado manualmente</p>' +
+      '<input type="text" placeholder="Comentario (ej: para cumpleaños del sábado)" value="' + (a.comentario || '').replace(/"/g, '&quot;') + '" oninput="cambiarComentarioAgregado(' + idx + ',this.value)" style="width:100%;font-size:12.5px;height:32px;margin-top:6px;">' +
     '</div>';
   });
   cont.innerHTML = html;
+}
+
+function quitarProductoRevision(clave) {
+  revisionEliminados.add(clave);
+  delete revisionPedidos[clave];
+  pintarRevision();
+}
+function quitarAgregadoRevision(idx) {
+  const clave = revisionAgregados[idx].productoProduccion;
+  delete revisionPedidos[clave];
+  revisionAgregados.splice(idx, 1);
+  pintarRevision();
+}
+function cambiarComentarioAgregado(idx, val) {
+  revisionAgregados[idx].comentario = val;
+}
+function cambiarObservacionRevision(val) {
+  revisionObservacion = val;
 }
 
 function cambiarPedidoRevision(clave, val) {
@@ -213,12 +251,13 @@ async function enviarRevision() {
   document.getElementById('revision-error').textContent = '';
   const items = [];
   cacheRevision.items.forEach(it => {
+    if (revisionEliminados.has(it.productoProduccion)) return;
     const cant = revisionPedidos[it.productoProduccion];
     if (cant > 0) items.push({ productoProduccion: it.productoProduccion, cantidadProgramada: cant, cantidadContada: it.contadoTotal });
   });
   revisionAgregados.forEach(a => {
     const cant = revisionPedidos[a.productoProduccion];
-    if (cant > 0) items.push({ productoProduccion: a.productoProduccion, cantidadProgramada: cant });
+    if (cant > 0) items.push({ productoProduccion: a.productoProduccion, cantidadProgramada: cant, comentario: a.comentario || '' });
   });
   if (!items.length) {
     document.getElementById('revision-error').textContent = 'Escribe una cantidad a pedir en al menos un producto.';
@@ -230,11 +269,13 @@ async function enviarRevision() {
   });
   if (!r.ok) { document.getElementById('revision-error').textContent = r.error || 'Error al enviar el pedido'; return; }
 
-  // Notificación liviana a Rosa y Katherine — no es pantalla propia, es parte de enviar.
+  // Notificación liviana a Rosa y Katherine — mensaje corto (el resumen completo lo ve el
+  // que envió en la pantalla de confirmación); no es pantalla propia, es parte de enviar.
   const resumen = items.map(it => it.productoProduccion + ' x' + it.cantidadProgramada).join(', ');
-  await llamarAPI('crearNotificacion', { para: ['Rosa Merino', 'Katherine Bustamante'], mensaje: 'Pedido de producción (' + sesion.nombre + '): ' + resumen });
+  const mensajeNotif = 'Nuevo pedido de producción — ' + sesion.nombre + (revisionObservacion ? ' — ' + revisionObservacion : '');
+  await llamarAPI('crearNotificacion', { para: ['Rosa Merino', 'Katherine Bustamante'], mensaje: mensajeNotif });
 
-  cacheRevision = null; revisionPedidos = {}; revisionAgregados = [];
+  cacheRevision = null; revisionPedidos = {}; revisionAgregados = []; revisionEliminados = new Set(); revisionObservacion = '';
   document.getElementById('confirm-title').textContent = 'Pedido enviado';
   document.getElementById('confirm-msg').textContent = 'Se avisó a Rosa y Katherine: ' + resumen;
   document.getElementById('confirm-detalle').innerHTML = '';
