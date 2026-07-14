@@ -277,8 +277,10 @@ async function enviarRevision() {
 
   cacheRevision = null; revisionPedidos = {}; revisionAgregados = []; revisionEliminados = new Set(); revisionObservacion = '';
   document.getElementById('confirm-title').textContent = 'Pedido enviado';
-  document.getElementById('confirm-msg').textContent = 'Se avisó a Rosa y Katherine: ' + resumen;
-  document.getElementById('confirm-detalle').innerHTML = '';
+  document.getElementById('confirm-msg').textContent = 'Se avisó a Rosa y Katherine.';
+  document.getElementById('confirm-detalle').innerHTML = items.map(it =>
+    '<div class="check-row" style="background:var(--surface);border:1px solid var(--border);"><span>' + it.productoProduccion + '</span><strong>x' + it.cantidadProgramada + '</strong></div>'
+  ).join('');
   ocultarBotonOtro();
   irA('screen-confirm');
 }
