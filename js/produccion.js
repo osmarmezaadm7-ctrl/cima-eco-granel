@@ -23,9 +23,9 @@ async function abrirConteo(forzar) {
       return;
     }
     cacheConteoCatalogo = r;
-    // Por defecto todas las categorías activas — Rocío desactiva las que no
-    // correspondan contar hoy en vez de tener que activar todo a mano.
-    conteoCategoriasActivas = new Set(r.catalogo.map(p => p.categoria));
+    // Por defecto NINGUNA categoría activa — que Rocío/el staff elija qué va a contar
+    // en vez de arrancar con todo desplegado (confuso, mucho para escanear de una).
+    conteoCategoriasActivas = new Set();
     conteoCantidades = {};
   }
   if (document.getElementById('screen-conteo').classList.contains('active')) pintarConteo();
@@ -58,7 +58,7 @@ function pintarConteo() {
       '</div>';
     });
   });
-  if (!html) html = '<p style="font-size:12px;color:var(--ink-soft);padding:12px 0;">Selecciona al menos una categoría para empezar a contar.</p>';
+  if (!html) html = '<p style="font-size:13.5px;color:var(--ink-soft);padding:24px 0;text-align:center;">Elige qué categoría(s) vas a contar.</p>';
   document.getElementById('conteo-lista').innerHTML = html;
 }
 
