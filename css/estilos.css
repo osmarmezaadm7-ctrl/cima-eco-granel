@@ -85,6 +85,7 @@ h1,h2,h3{font-family:'Fraunces',serif;margin:0;color:var(--ink);}
 .menu-card .icon{width:40px;height:40px;border-radius:11px;background:rgba(255,255,255,0.16);display:flex;align-items:center;justify-content:center;flex-shrink:0;}
 .menu-card.flat .icon{background:var(--forest-soft);color:var(--forest);}
 .menu-card .txt strong{display:block;font-size:14.5px;font-family:'Fraunces',serif;}
+@media(max-width:899px){ .menu-card .txt strong{font-size:20px;} }
 .menu-card .txt span{font-size:11.5px;opacity:.85;}
 .menu-card.flat{background:var(--surface);color:var(--ink);border:1px solid var(--border);box-shadow:none;}
 .menu-card.flat .txt span{color:var(--ink-soft);opacity:1;}
