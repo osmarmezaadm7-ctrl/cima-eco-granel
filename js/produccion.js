@@ -284,3 +284,153 @@ async function enviarRevision() {
   ocultarBotonOtro();
   irA('screen-confirm');
 }
+
+// ============ PAUTA DE PRODUCCIÓN — MODELO DE SESIÓN DE TRABAJO ============
+// Marcar "Hecho" y editar cantidad se guardan de inmediato como borrador (actualizarBorradorPauta)
+// — no se pierde nada si se cae el navegador, y dos personas ven el mismo progreso en vivo.
+// "Quitar" de la vista es puramente local (pautaOcultos) — no tiene consecuencia real, así que
+// no hace falta guardarlo: si se refresca, el ítem simplemente reaparece.
+// "+ Agregar producto" se escribe de inmediato (agregarItemPautaDirecto) — agregar sí es un
+// hecho consumado. Solo "Confirmar producción" resuelve todo de una vez.
+let cachePauta = null;              // { ok, pauta:[...] } — obtenerPautaActiva()
+let pautaOcultos = new Set();       // ids ocultados de la vista en esta sesión (sin guardar)
+let pautaAgregadosSesion = [];      // ids agregados durante esta sesión (para el registro al confirmar)
+let cacheCatalogoPauta = null;      // catálogo completo, para "+ Agregar producto"
+
+async function abrirPauta(forzar) {
+  irA('screen-pauta');
+  if (!cachePauta || forzar) {
+    document.getElementById('pauta-lista').innerHTML = skeletonCards(3);
+    const r = await llamarAPI('obtenerPautaActiva', {});
+    if (!r.ok) {
+      document.getElementById('pauta-lista').innerHTML = '<p class="error-msg">' + (r.error || 'Error al cargar la pauta') + '</p>';
+      return;
+    }
+    cachePauta = r;
+    pautaOcultos = new Set();
+    pautaAgregadosSesion = [];
+  }
+  pintarPauta();
+}
+
+function claveGrupoPauta_(it) {
+  return it.conteoId || (it.fecha + '|' + it.responsable + '|' + it.id);
+}
+
+function pintarPauta() {
+  const cont = document.getElementById('pauta-lista');
+  const visibles = cachePauta.pauta.filter(it => !pautaOcultos.has(it.id));
+  const planificados = visibles.filter(it => pautaAgregadosSesion.indexOf(it.id) === -1);
+  const agregados = visibles.filter(it => pautaAgregadosSesion.indexOf(it.id) !== -1);
+
+  if (!visibles.length) {
+    cont.innerHTML = '<p style="font-size:13.5px;color:var(--ink-soft);padding:24px 0;text-align:center;">No hay pedidos pendientes en la pauta.</p>';
+    return;
+  }
+
+  const filaHtml = (it) => {
+    const hecho = it.estadoBorrador === 'Hecho';
+    const cant = it.cantidadBorrador !== null && it.cantidadBorrador !== undefined ? it.cantidadBorrador : it.cantidadProgramada;
+    return '<div class="pauta-row' + (hecho ? ' hecho' : '') + '" id="pauta-row-' + it.id + '">' +
+      '<button class="pauta-quitar" title="Quitar" onclick="ocultarItemPauta(\'' + it.id + '\')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"></path><path d="M6 6l12 12"></path></svg></button>' +
+      '<div class="pauta-row-top">' +
+        '<button class="pauta-check' + (hecho ? ' marcado' : '') + '" onclick="toggleHechoPauta(\'' + it.id + '\')" aria-label="Marcar hecho">' +
+          (hecho ? '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"></path></svg>' : '') +
+        '</button>' +
+        '<span class="pauta-nombre">' + it.producto + '</span>' +
+        '<input type="text" inputmode="numeric" value="' + cant + '" id="pauta-cant-' + it.id + '" onchange="cambiarCantidadBorradorPauta(\'' + it.id + '\',this.value)">' +
+      '</div>' +
+      (it.comentario ? '<p class="pauta-obs">' + it.comentario + '</p>' : '') +
+    '</div>';
+  };
+
+  // Planificados agrupados por pedido (mismo ConteoId+Responsable) — "Pedido por" una
+  // sola vez por grupo, no repetido en cada producto.
+  const grupos = {}; const ordenGrupos = [];
+  planificados.forEach(it => {
+    const clave = claveGrupoPauta_(it);
+    if (!grupos[clave]) { grupos[clave] = { responsable: it.responsable, items: [] }; ordenGrupos.push(clave); }
+    grupos[clave].items.push(it);
+  });
+
+  let html = '';
+  ordenGrupos.forEach(clave => {
+    const g = grupos[clave];
+    html += '<p class="pauta-grupo-titulo">Pedido por: ' + g.responsable + '</p>' + g.items.map(filaHtml).join('');
+  });
+  if (agregados.length) {
+    html += '<p class="pauta-grupo-titulo">Agregado en esta sesión</p>' + agregados.map(filaHtml).join('');
+  }
+  cont.innerHTML = html;
+}
+
+async function toggleHechoPauta(id) {
+  const it = cachePauta.pauta.find(x => x.id === id);
+  if (!it) return;
+  it.estadoBorrador = it.estadoBorrador === 'Hecho' ? '' : 'Hecho';
+  pintarPauta();
+  await llamarAPI('actualizarBorradorPauta', { data: { id: id, estadoBorrador: it.estadoBorrador, cantidadBorrador: it.cantidadBorrador } });
+}
+
+async function cambiarCantidadBorradorPauta(id, val) {
+  const it = cachePauta.pauta.find(x => x.id === id);
+  if (!it) return;
+  it.cantidadBorrador = Math.max(0, Number(val) || 0);
+  await llamarAPI('actualizarBorradorPauta', { data: { id: id, estadoBorrador: it.estadoBorrador, cantidadBorrador: it.cantidadBorrador } });
+}
+
+function ocultarItemPauta(id) {
+  pautaOcultos.add(id);
+  pintarPauta();
+}
+
+async function mostrarBuscadorPauta() {
+  document.getElementById('pauta-error').textContent = '';
+  if (!cacheCatalogoPauta) {
+    const r = await llamarAPI('obtenerCatalogoProduccion', { soloConteo: false });
+    if (!r.ok) { document.getElementById('pauta-error').textContent = r.error || 'Error al cargar el catálogo'; return; }
+    cacheCatalogoPauta = r;
+  }
+  const vistos = new Set();
+  const opciones = [];
+  cacheCatalogoPauta.catalogo.forEach(p => {
+    if (vistos.has(p.productoProduccion)) return;
+    vistos.add(p.productoProduccion);
+    opciones.push({ label: p.nombre, value: p.productoProduccion });
+  });
+  initSearchSelect('ss-pauta-producto', opciones, { onSelect: (valor) => agregarProductoPauta(valor, opciones) });
+  const wrap = document.getElementById('ss-pauta-producto-wrap');
+  wrap.style.display = 'block';
+  document.querySelector('#ss-pauta-producto input[type=text]').focus();
+}
+
+async function agregarProductoPauta(valor, opciones) {
+  const opt = opciones.find(o => o.value === valor);
+  const r = await llamarAPI('agregarItemPautaDirecto', { data: { producto: valor, cantidad: 1, responsable: sesion.nombre } });
+  if (!r.ok) { document.getElementById('pauta-error').textContent = r.error || 'No se pudo agregar el producto'; return; }
+  cachePauta.pauta.push({
+    id: r.id, fecha: fechaLocalISO(), producto: opt ? opt.label : valor, cantidadProgramada: 1,
+    estado: 'Programado', responsable: sesion.nombre, conteoId: '', cantidadContada: null,
+    comentario: '', estadoBorrador: '', cantidadBorrador: null
+  });
+  pautaAgregadosSesion.push(r.id);
+  document.getElementById('ss-pauta-producto-wrap').style.display = 'none';
+  document.querySelector('#ss-pauta-producto input[type=text]').value = '';
+  pintarPauta();
+}
+
+async function confirmarProduccion() {
+  document.getElementById('pauta-error').textContent = '';
+  const r = await llamarAPI('confirmarPauta', { data: { responsable: sesion.nombre, agregadosIds: pautaAgregadosSesion } });
+  if (!r.ok) { document.getElementById('pauta-error').textContent = r.error || 'Error al confirmar producción'; return; }
+
+  cachePauta = null; pautaOcultos = new Set(); pautaAgregadosSesion = [];
+  document.getElementById('confirm-title').textContent = 'Producción confirmada';
+  document.getElementById('confirm-msg').textContent = r.completados.length + ' producto' + (r.completados.length === 1 ? '' : 's') + ' completado' + (r.completados.length === 1 ? '' : 's') +
+    (r.faltantes.length ? ', ' + r.faltantes.length + ' quedaron pendientes para la próxima.' : '.');
+  document.getElementById('confirm-detalle').innerHTML = r.completados.map(it =>
+    '<div class="check-row" style="background:var(--surface);border:1px solid var(--border);"><span>' + it.producto + '</span><strong>x' + it.cantidad + '</strong></div>'
+  ).join('');
+  ocultarBotonOtro();
+  irA('screen-confirm');
+}
