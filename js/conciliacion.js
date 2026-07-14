@@ -1009,6 +1009,14 @@ async function cargarNotificaciones(){
     const iconoHtml = c.esAlerta
       ? '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--danger)" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;margin-top:1px;"><path d="M12 9v4"></path><path d="M12 17h.01"></path><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path></svg>'
       : '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;margin-top:1px;color:var(--ink-soft);"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>';
+    // NUEVO 13/07/2026 (con Osmar — Producción): si la notificación trae accionNotif (ej.
+    // "abrirRevision"), se agrega un botón de acción además de "Marcar como vista" — el
+    // botón de acción marca vista Y navega en un solo clic. Notificaciones sin accionNotif
+    // (como las de Conciliación) se ven exactamente igual que antes.
+    const accionBtn = n.accionNotif==='abrirRevision'
+      ? '<button class="btn-primary" onclick="accionNotificacion(this,\''+n.id+'\',\'abrirRevision\')">Ver revisión</button>'
+      : '';
+    const marcarBtn = '<button class="'+(n.accionNotif?'btn-secondary':'btn-primary')+'" style="'+(n.accionNotif?'':'width:100%;')+'" onclick="marcarNotificacionComoVista(this,\''+n.id+'\')">Marcar como vista</button>';
     const div = document.createElement('div');
     div.className = 'notif-card';
     div.innerHTML =
@@ -1017,7 +1025,7 @@ async function cargarNotificaciones(){
       (c.subtitulo ? '<p style="font-size:11px;color:var(--ink-soft);margin:2px 0 0;">'+c.subtitulo+'</p>' : '')+
       '</div></div>'+
       c.cuerpo+
-      '<button class="btn-primary" style="width:100%;margin-top:12px;" onclick="marcarNotificacionComoVista(this,\''+n.id+'\')">Marcar como vista</button>';
+      '<div class="n-acciones" style="margin-top:12px;">'+accionBtn+marcarBtn+'</div>';
     cont.appendChild(div);
   });
 }
@@ -1027,6 +1035,15 @@ async function marcarNotificacionComoVista(btn, id){
   const r = await llamarAPISilencioso('marcarNotificacionVista', {id});
   if(r.ok){ btn.closest('.notif-card').remove(); }
   else { btn.disabled=false; btn.textContent='Marcar como vista'; alert(r.error||'No se pudo marcar'); }
+}
+
+// NUEVO 13/07/2026 (con Osmar — Producción): botón de acción de una notificación — marca
+// vista y navega a la vez (confirmado con Osmar: un solo clic, no dos pasos separados).
+async function accionNotificacion(btn, id, accion){
+  btn.disabled = true;
+  await llamarAPISilencioso('marcarNotificacionVista', {id});
+  const card = btn.closest('.notif-card'); if(card) card.remove();
+  if(accion==='abrirRevision' && typeof abrirRevision==='function') abrirRevision();
 }
 
 /* ===================================================================
