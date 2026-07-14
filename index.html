@@ -47,6 +47,14 @@
 .conteo-stepper button:hover{background:var(--forest-soft);}
 .conteo-stepper input{width:48px;height:36px;text-align:center;border:1.5px solid var(--border);border-radius:9px;font-family:'JetBrains Mono',monospace;font-size:14px;padding:0;}
 
+.revision-row{border:1px solid var(--border);border-radius:11px;padding:11px 13px;margin-bottom:9px;}
+.revision-row.alerta{background:var(--terracotta-soft);border-color:var(--terracotta);}
+.revision-row-top{display:flex;justify-content:space-between;align-items:center;gap:10px;}
+.revision-row-top span{font-size:14.5px;font-weight:600;}
+.revision-row-top input{width:56px;height:32px;text-align:center;border:1.5px solid var(--border);border-radius:8px;font-family:'JetBrains Mono',monospace;font-size:14px;padding:0;flex-shrink:0;}
+.revision-detalle{font-size:11.5px;color:var(--ink-soft);margin:4px 0 0;}
+.revision-row.alerta .revision-detalle{color:var(--warn);}
+
 /* ===== Revisión / Fuentes (Conciliación) ===== */
 .stepper{display:flex;align-items:center;gap:6px;margin-bottom:24px;}
 .stepper .st{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:700;color:var(--ink-soft);white-space:nowrap;}
@@ -601,7 +609,23 @@
   </div>
 
   <!-- INVENTARIO MP -->
-  <div class="screen" id="screen-conteo">
+  <div class="screen" id="screen-revision">
+  <button class="back-link" onclick="irA('screen-home')"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"></path></svg> Volver</button>
+  <div class="header-row"><h2 style="font-size:17px;">Revisión y envío</h2><button class="icon-btn" title="Actualizar" onclick="abrirRevision(true)"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 4v6h-6"></path><path d="M1 20v-6h6"></path><path d="M3.5 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.65 4.36A9 9 0 0 0 20.5 15"></path></svg></button></div>
+  <div id="revision-lista"></div>
+  <button class="btn-secondary" style="width:100%;margin:12px 0;" onclick="mostrarBuscadorRevision()">+ Agregar producto</button>
+  <div id="ss-rev-producto-wrap" style="display:none;">
+    <div class="search-select" id="ss-rev-producto">
+      <input type="text" placeholder="Buscar producto…" autocomplete="off" onfocus="abrirSearchSelect('ss-rev-producto')" oninput="filtrarSearchSelect('ss-rev-producto')">
+      <input type="hidden" id="ss-rev-producto-valor">
+      <div class="search-select-list" id="ss-rev-producto-list"></div>
+    </div>
+  </div>
+  <div class="error-msg" id="revision-error"></div>
+  <div class="submit-bar"><button class="btn-primary" onclick="enviarRevision()">Enviar a producción</button></div>
+</div>
+
+<div class="screen" id="screen-conteo">
   <button class="back-link" onclick="irA('screen-home')"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"></path></svg> Volver</button>
   <div class="header-row"><h2 style="font-size:17px;">Contar stock</h2><button class="icon-btn" title="Actualizar" onclick="abrirConteo(true)"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 4v6h-6"></path><path d="M1 20v-6h6"></path><path d="M3.5 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.65 4.36A9 9 0 0 0 20.5 15"></path></svg></button></div>
   <p style="font-size:12px;color:var(--ink-soft);margin:0 0 10px;">Categorías</p>
@@ -1077,9 +1101,10 @@ async function entrarAHome(){
   // ===== PRODUCCIÓN (NUEVO 13/07/2026) — independiente del árbol de arriba: cualquier
   // persona con RegistrarConteo ve "Contar stock" sin importar qué otro permiso tenga.
   // Solo Conteo por ahora — Revisión y Pauta se agregan cuando esas pantallas existan.
-  if (tienePermisoLocal('RegistrarConteo')) {
+  if (tienePermisoLocal('RegistrarConteo') || tienePermisoLocal('VerPrograma')) {
     cont.insertAdjacentHTML('beforeend','<div class="menu-grupo-titulo">Producción</div>');
-    cont.appendChild(crearMenuCard(ICONS.conteo,'Contar stock','Conteo diario para Cima',()=>abrirConteo(),true));
+    if (tienePermisoLocal('RegistrarConteo')) cont.appendChild(crearMenuCard(ICONS.conteo,'Contar stock','Conteo diario para Cima',()=>abrirConteo(),true));
+    if (tienePermisoLocal('VerPrograma')) cont.appendChild(crearMenuCard(ICONS.programa,'Revisión y envío','Revisar conteos y pedir a producción',()=>abrirRevision(),true));
   }
 
   if (esEscritorio && tienePermisoLocal('VerDashboardCompleto')) { abrirPanel(); return; }
@@ -1114,6 +1139,7 @@ function pintarSidebar(){
 
   let prodHtml='';
   if (tienePermisoLocal('RegistrarConteo')) prodHtml += item('screen-conteo',ICONS.conteo,'Contar stock');
+  if (tienePermisoLocal('VerPrograma')) prodHtml += item('screen-revision',ICONS.programa,'Revisión y envío');
   if (tienePermisoLocal('VerPrograma')) prodHtml += item('screen-programa',ICONS.programa,'Programa de producción');
   if (tienePermisoLocal('GestionarInventario')) prodHtml += item('screen-inventario',ICONS.inventario,'Inventario MP') + item('screen-lista-compra',ICONS.carrito,'Lista de compra MP');
   if (prodHtml) nav.insertAdjacentHTML('beforeend', '<div class="grupo">Producción</div>'+prodHtml);
@@ -1138,6 +1164,7 @@ function onEntrarScreen(id){
   if(id==='screen-alertas') abrirAlertas();
   if(id==='screen-conciliacion') abrirConciliacion();
   if(id==='screen-config-sistema') abrirConfigSistema();
+  if(id==='screen-revision') abrirRevision();
   if(id==='screen-conteo') abrirConteo();
   if(id==='screen-programa') abrirPrograma();
   if(id==='screen-inventario') abrirInventario();
