@@ -84,12 +84,18 @@ h1,h2,h3{font-family:'Fraunces',serif;margin:0;color:var(--ink);}
 .menu-card{display:flex;align-items:center;gap:12px;background:var(--forest);color:#fff;border:none;border-radius:var(--radius-lg);padding:15px;margin-bottom:9px;text-align:left;box-shadow:var(--shadow);width:100%;cursor:pointer;}
 .menu-card .icon{width:40px;height:40px;border-radius:11px;background:rgba(255,255,255,0.16);display:flex;align-items:center;justify-content:center;flex-shrink:0;}
 .menu-card.flat .icon{background:var(--forest-soft);color:var(--forest);}
+.menu-card.flat.icon-caramel .icon{background:#F3E9DB;color:var(--caramel);}
+.menu-card.flat.icon-neutral .icon{background:#EFEDE7;color:var(--ink-soft);}
 .menu-card .txt strong{display:block;font-size:14.5px;font-family:'Fraunces',serif;}
 @media(max-width:899px){ .menu-card .txt strong{font-size:20px;} }
 .menu-card .txt span{font-size:11.5px;opacity:.85;}
 .menu-card.flat{background:var(--surface);color:var(--ink);border:1px solid var(--border);box-shadow:none;}
 .menu-card.flat .txt span{color:var(--ink-soft);opacity:1;}
-.menu-grupo-titulo{font-size:11.5px;text-transform:uppercase;letter-spacing:.5px;color:var(--ink-soft);font-weight:700;margin:16px 2px 8px;}
+.menu-card-chica{display:flex;align-items:center;gap:10px;background:transparent;border:1px solid var(--border);border-radius:14px;padding:11px 14px;margin-bottom:8px;text-align:left;width:100%;cursor:pointer;color:var(--ink-soft);font-size:13.5px;font-weight:600;font-family:'Work Sans',sans-serif;}
+.menu-card-chica .ico{display:flex;flex-shrink:0;}
+.menu-card-chica .ico svg{width:17px;height:17px;}
+.menu-grupo-titulo{font-size:11.5px;text-transform:uppercase;letter-spacing:.5px;color:var(--ink-soft);font-weight:700;margin:26px 2px 10px;}
+.menu-grupo-titulo:first-child{margin-top:16px;}
 .logout{margin-top:auto;padding-top:14px;display:flex;flex-direction:column;gap:2px;}
 .logout button{background:var(--surface);border:1.5px solid var(--border);border-radius:12px;color:var(--ink);font-size:14.5px;font-weight:700;text-align:center;padding:12px;cursor:pointer;}
 
