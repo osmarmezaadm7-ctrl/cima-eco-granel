@@ -351,8 +351,17 @@ let pautaOcultos = new Set();       // ids ocultados de la vista en esta sesión
 let pautaAgregadosSesion = [];      // ids agregados durante esta sesión (para el registro al confirmar)
 let cacheCatalogoPauta = null;      // catálogo completo, para "+ Agregar producto"
 
+// Historial de Pauta (NUEVO 15/07/2026 — con Osmar): tab de solo lectura sobre
+// RegistroProduccion, paginado de 5 en 5 con "Ver más" (sin scroll infinito ni filtro por
+// fecha — el volumen esperado es ~1 confirmación por día, no hace falta más que esto).
+let cacheHistorialPauta = [];       // acumulado de tarjetas ya traídas
+let historialPautaOffset = 0;       // cuántas filas ya se pidieron al servidor
+let historialPautaHayMas = false;
+
 async function abrirPauta(forzar) {
   irA('screen-pauta');
+  cambiarTabPauta('activa');
+  if (forzar) { cacheHistorialPauta = []; historialPautaOffset = 0; }
   if (!cachePauta || forzar) {
     document.getElementById('pauta-lista').innerHTML = skeletonCards(3);
     const r = await llamarAPI('obtenerPautaActiva', {});
@@ -487,4 +496,55 @@ async function confirmarProduccion() {
   ).join('');
   ocultarBotonOtro();
   irA('screen-confirm');
+}
+
+function cambiarTabPauta(tab) {
+  document.getElementById('pauta-tab-btn-activa').classList.toggle('activo', tab === 'activa');
+  document.getElementById('pauta-tab-btn-historial').classList.toggle('activo', tab === 'historial');
+  document.getElementById('pauta-tab-activa').style.display = tab === 'activa' ? '' : 'none';
+  document.getElementById('pauta-tab-historial').style.display = tab === 'historial' ? '' : 'none';
+  if (tab === 'historial' && !cacheHistorialPauta.length) cargarHistorialPauta(true);
+}
+
+async function cargarHistorialPauta(reset) {
+  if (reset) {
+    cacheHistorialPauta = []; historialPautaOffset = 0;
+    document.getElementById('historial-lista').innerHTML = skeletonCards(3);
+    document.getElementById('historial-vermas').style.display = 'none';
+  }
+  const r = await llamarAPI('obtenerHistorialProduccion', { offset: historialPautaOffset });
+  if (!r.ok) { document.getElementById('historial-lista').innerHTML = '<p class="error-msg">' + (r.error || 'Error al cargar el historial') + '</p>'; return; }
+  cacheHistorialPauta = cacheHistorialPauta.concat(r.historial || []);
+  historialPautaOffset += (r.historial || []).length;
+  historialPautaHayMas = !!r.hayMas;
+  pintarHistorialPauta();
+}
+
+function pintarHistorialPauta() {
+  const cont = document.getElementById('historial-lista');
+  const btnMas = document.getElementById('historial-vermas');
+  if (!cacheHistorialPauta.length) {
+    cont.innerHTML = '<p style="font-size:13.5px;color:var(--ink-soft);padding:24px 0;text-align:center;">Todavía no hay producción confirmada.</p>';
+    btnMas.style.display = 'none';
+    return;
+  }
+  const filaItem = (it) => '<div class="rowline"><span>' + it.producto + (it.agregado ? '<span class="tag-agregado">+ agregado</span>' : '') + '</span><b>x' + it.cantidad + '</b></div>';
+  cont.innerHTML = cacheHistorialPauta.map((h, i) => {
+    const idDet = 'hist-det-' + i;
+    const total = h.completados.length + h.faltantes.length;
+    const agregados = h.completados.filter(it => it.agregado).length + h.faltantes.filter(it => it.agregado).length;
+    const detalle = (h.completados.length ? '<div class="hist-grupo-titulo ok">Completados</div>' + h.completados.map(filaItem).join('') : '') +
+      (h.faltantes.length ? '<div class="hist-grupo-titulo pend">Pendiente</div>' + h.faltantes.map(filaItem).join('') : '');
+    return '<div class="card-dia verde" onclick="var e=document.getElementById(\'' + idDet + '\');e.style.display=(e.style.display===\'block\'?\'none\':\'block\');">' +
+      '<div class="c-top"><strong>' + h.fecha + (h.hora ? ', ' + h.hora : '') + '</strong><span class="badge-completado">' + h.completados.length + ' de ' + total + '</span></div>' +
+      '<p style="font-size:12px;color:var(--ink-soft);margin:2px 0 0;">Confirmado por ' + h.responsable + '</p>' +
+      '<div class="hist-metricas">' +
+        '<span class="m-ok">' + h.completados.length + ' completado' + (h.completados.length === 1 ? '' : 's') + '</span>' +
+        (h.faltantes.length ? '<span class="m-pend">' + h.faltantes.length + ' pendiente' + (h.faltantes.length === 1 ? '' : 's') + '</span>' : '') +
+        (agregados ? '<span class="m-agr">' + agregados + ' agregado' + (agregados === 1 ? '' : 's') + '</span>' : '') +
+      '</div>' +
+      '<div id="' + idDet + '" style="display:none;">' + detalle + '</div>' +
+    '</div>';
+  }).join('');
+  btnMas.style.display = historialPautaHayMas ? '' : 'none';
 }
