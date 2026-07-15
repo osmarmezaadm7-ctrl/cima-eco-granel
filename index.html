@@ -1173,7 +1173,7 @@ async function entrarAHome(){
     cont.insertAdjacentHTML('beforeend','<div class="menu-grupo-titulo">Producción</div>');
     if (tienePermisoLocal('RegistrarConteo')) cont.appendChild(crearMenuCard(ICONS.conteo,'Contar stock','Conteo diario para Cima',()=>abrirConteo(),true));
     if (tienePermisoLocal('VerPrograma')) cont.appendChild(crearMenuCard(ICONS.programa,'Revisión y envío','Revisar conteos y pedir a producción',()=>abrirRevision(),true));
-    if (tienePermisoLocal('GestionarPauta')) cont.appendChild(crearMenuCard(ICONS.programa,'Pauta de producción','Marcar pedidos como listos',()=>abrirPauta(),true));
+    if (tienePermisoLocal('GestionarPauta') || tienePermisoLocal('VerPrograma')) cont.appendChild(crearMenuCard(ICONS.programa,'Pauta de producción', tienePermisoLocal('GestionarPauta')?'Marcar pedidos como listos':'Ver historial de confirmaciones', ()=>abrirPauta(),true));
   }
 
   if (esEscritorio && tienePermisoLocal('VerDashboardCompleto')) { abrirPanel(); return; }
