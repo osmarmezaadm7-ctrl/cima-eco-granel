@@ -2,7 +2,7 @@
   --paper:#FAF9F5; --surface:#FFFFFF; --ink:#1D211C; --ink-soft:#5B5648;
   --forest:#2B4638; --forest-dark:#1E3128; --forest-soft:#E8EEE7;
   --terracotta:#BE5A2B; --terracotta-soft:#FBEBE0;
-  --caramel:#A9825B;
+  --caramel:#A9825B; --amber-soft:#FBF0D9;
   --border:#D8D3C4; --success:#2F6B3E; --warn:#B4531F; --danger:#B23A2E;
   --radius:12px; --radius-lg:16px; --shadow:0 2px 10px rgba(35,37,32,0.06);
 }
