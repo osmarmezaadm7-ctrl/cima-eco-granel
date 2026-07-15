@@ -462,19 +462,24 @@ function pintarPauta() {
   cont.innerHTML = html;
 }
 
+// CAMBIO 15/07/2026 (con Osmar): estos dos usaban llamarAPI, que muestra el overlay de
+// carga de pantalla completa en cada llamada — como el checklist ya se actualiza al
+// instante (optimista, ver arriba), ese overlay solo interrumpía el chequeo rápido de
+// varios ítems seguidos. El guardado del borrador pasa a llamarAPISilencioso, igual que
+// ya se usa para notificaciones — es un guardado de fondo, no necesita bloquear pantalla.
 async function toggleHechoPauta(id) {
   const it = cachePauta.pauta.find(x => x.id === id);
   if (!it) return;
   it.estadoBorrador = it.estadoBorrador === 'Hecho' ? '' : 'Hecho';
   pintarPauta();
-  await llamarAPI('actualizarBorradorPauta', { data: { id: id, estadoBorrador: it.estadoBorrador, cantidadBorrador: it.cantidadBorrador } });
+  await llamarAPISilencioso('actualizarBorradorPauta', { data: { id: id, estadoBorrador: it.estadoBorrador, cantidadBorrador: it.cantidadBorrador } });
 }
 
 async function cambiarCantidadBorradorPauta(id, val) {
   const it = cachePauta.pauta.find(x => x.id === id);
   if (!it) return;
   it.cantidadBorrador = Math.max(0, Number(val) || 0);
-  await llamarAPI('actualizarBorradorPauta', { data: { id: id, estadoBorrador: it.estadoBorrador, cantidadBorrador: it.cantidadBorrador } });
+  await llamarAPISilencioso('actualizarBorradorPauta', { data: { id: id, estadoBorrador: it.estadoBorrador, cantidadBorrador: it.cantidadBorrador } });
 }
 
 function ocultarItemPauta(id) {
