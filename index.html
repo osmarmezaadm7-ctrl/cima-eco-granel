@@ -1157,9 +1157,23 @@ async function entrarAHome(){
   document.getElementById('sidebar-user').textContent = sesion.nombre + ' · ' + sesion.rol;
   pintarSidebar();
 
+// CAMBIO 15/07/2026 (con Osmar): el bloque de Producción vivía suelto DESPUÉS de todo el
+// árbol de tarjetas del Home, así que siempre quedaba al final — incluso después de
+// Configuraciones. Se extrae a función para poder llamarlo antes de Configuraciones para
+// quien tiene VerDashboardCompleto/VisualizarReportes (Osmar, Rocío), y se mantiene su
+// posición de siempre para Rosa/Katherine (que no pasan por esa rama).
+function agregarBloqueProduccion(cont) {
+  if (!(tienePermisoLocal('RegistrarConteo') || tienePermisoLocal('VerPrograma') || tienePermisoLocal('GestionarPauta'))) return;
+  cont.insertAdjacentHTML('beforeend','<div class="menu-grupo-titulo">Producción</div>');
+  if (tienePermisoLocal('RegistrarConteo')) cont.appendChild(crearMenuCard(ICONS.conteo,'Contar stock','Conteo diario para Cima',()=>abrirConteo(),true));
+  if (tienePermisoLocal('VerPrograma')) cont.appendChild(crearMenuCard(ICONS.programa,'Revisión y envío','Revisar conteos y pedir a producción',()=>abrirRevision(),true));
+  if (tienePermisoLocal('GestionarPauta') || tienePermisoLocal('VerPrograma')) cont.appendChild(crearMenuCard(ICONS.programa,'Pauta de producción', tienePermisoLocal('GestionarPauta')?'Marcar pedidos como listos':'Ver historial de confirmaciones', ()=>abrirPauta(),true));
+}
+
   const cont = document.getElementById('home-content'); cont.innerHTML='';
   const puedeCima = sesion.rol==='Admin' || sesion.negocio==='Cima Eco-Granel' || sesion.negocio==='Ambos';
 
+  let bloqueProduccionAgregado = false;
   if (tienePermisoLocal('VerDashboardCompleto') || tienePermisoLocal('VisualizarReportes')){
     if (tienePermisoLocal('VerDashboardCompleto')){
       cont.insertAdjacentHTML('beforeend','<div class="menu-grupo-titulo">Panel</div>');
@@ -1181,6 +1195,7 @@ async function entrarAHome(){
     if (tienePermisoLocal('ProcesarConciliacion')){
       cont.appendChild(crearMenuCard(ICONS.conciliacion,'Conciliación','Transbank, PedidosYa, Aronium vs. lo registrado',()=>abrirConciliacion(),true));
     }
+    agregarBloqueProduccion(cont); bloqueProduccionAgregado = true;
     if (tienePermisoLocal('ConfigurarSistema')){
       cont.insertAdjacentHTML('beforeend','<div class="menu-grupo-titulo">Configuraciones</div>');
       cont.appendChild(crearMenuCard(ICONS.banco,'Créditos','Financiamientos activos',()=>abrirCreditos(),true));
@@ -1196,15 +1211,11 @@ async function entrarAHome(){
     if (puedeCima && tienePermisoLocal('RegistrarMovimiento')) cont.appendChild(crearMenuCard(ICONS.caja,'Cierre de caja','Registrar ventas del día',()=>{document.getElementById('cc-fecha').value = fechaLocalISO();setModoCierre('dia',document.querySelector('#cc-modo-group button'));irA('screen-cierre');},true));
   }
 
-  // ===== PRODUCCIÓN (NUEVO 13/07/2026) — independiente del árbol de arriba: cualquier
-  // persona con RegistrarConteo ve "Contar stock" sin importar qué otro permiso tenga.
-  // Solo Conteo por ahora — Revisión y Pauta se agregan cuando esas pantallas existan.
-  if (tienePermisoLocal('RegistrarConteo') || tienePermisoLocal('VerPrograma') || tienePermisoLocal('GestionarPauta')) {
-    cont.insertAdjacentHTML('beforeend','<div class="menu-grupo-titulo">Producción</div>');
-    if (tienePermisoLocal('RegistrarConteo')) cont.appendChild(crearMenuCard(ICONS.conteo,'Contar stock','Conteo diario para Cima',()=>abrirConteo(),true));
-    if (tienePermisoLocal('VerPrograma')) cont.appendChild(crearMenuCard(ICONS.programa,'Revisión y envío','Revisar conteos y pedir a producción',()=>abrirRevision(),true));
-    if (tienePermisoLocal('GestionarPauta') || tienePermisoLocal('VerPrograma')) cont.appendChild(crearMenuCard(ICONS.programa,'Pauta de producción', tienePermisoLocal('GestionarPauta')?'Marcar pedidos como listos':'Ver historial de confirmaciones', ()=>abrirPauta(),true));
-  }
+  // CAMBIO 15/07/2026 (con Osmar): para quien entra a la rama de arriba, el bloque de
+  // Producción ya se agregó antes de Configuraciones (ver agregarBloqueProduccion). Para
+  // el resto (Rosa/Katherine, que no pasan por esa rama), se agrega acá — misma posición
+  // relativa de siempre, ya que esas ramas no tienen sección de Configuraciones.
+  if (!bloqueProduccionAgregado) agregarBloqueProduccion(cont);
 
   if (esEscritorio && tienePermisoLocal('VerDashboardCompleto')) { abrirPanel(); return; }
   if (esEscritorio && tienePermisoLocal('VisualizarReportes')) { abrirEstadoResultados(); return; }
