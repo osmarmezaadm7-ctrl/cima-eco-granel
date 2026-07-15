@@ -1165,9 +1165,9 @@ async function entrarAHome(){
 function agregarBloqueProduccion(cont) {
   if (!(tienePermisoLocal('RegistrarConteo') || tienePermisoLocal('VerPrograma') || tienePermisoLocal('GestionarPauta'))) return;
   cont.insertAdjacentHTML('beforeend','<div class="menu-grupo-titulo">Producción</div>');
-  if (tienePermisoLocal('RegistrarConteo')) cont.appendChild(crearMenuCard(ICONS.conteo,'Contar stock','Conteo diario para Cima',()=>abrirConteo(),true));
-  if (tienePermisoLocal('VerPrograma')) cont.appendChild(crearMenuCard(ICONS.programa,'Revisión y envío','Revisar conteos y pedir a producción',()=>abrirRevision(),true));
-  if (tienePermisoLocal('GestionarPauta') || tienePermisoLocal('VerPrograma')) cont.appendChild(crearMenuCard(ICONS.programa,'Pauta de producción', tienePermisoLocal('GestionarPauta')?'Marcar pedidos como listos':'Ver historial de confirmaciones', ()=>abrirPauta(),true));
+  if (tienePermisoLocal('RegistrarConteo')) cont.appendChild(crearMenuCard(ICONS.conteo,'Contar stock','Conteo diario para Cima',()=>abrirConteo(),true,'caramel'));
+  if (tienePermisoLocal('VerPrograma')) cont.appendChild(crearMenuCard(ICONS.programa,'Revisión y envío','Revisar conteos y pedir a producción',()=>abrirRevision(),true,'caramel'));
+  if (tienePermisoLocal('GestionarPauta') || tienePermisoLocal('VerPrograma')) cont.appendChild(crearMenuCard(ICONS.programa,'Pauta de producción', tienePermisoLocal('GestionarPauta')?'Marcar pedidos como listos':'Ver historial de confirmaciones', ()=>abrirPauta(),true,'caramel'));
 }
 
   const cont = document.getElementById('home-content'); cont.innerHTML='';
@@ -1185,21 +1185,21 @@ function agregarBloqueProduccion(cont) {
     if (tienePermisoLocal('RegistrarCompra')) cont.appendChild(crearMenuCard(ICONS.recibo,'Compra / gasto','Registrar egreso o factura',()=>{prepararCompra();irA('screen-compra');},true));
     if (tienePermisoLocal('VisualizarReportes')){
       cont.insertAdjacentHTML('beforeend','<div class="menu-grupo-titulo">Reportes</div>');
-      cont.appendChild(crearMenuCard(ICONS.importar,'Importar reportes','Aronium, PedidosYa, Transbank',()=>irA('screen-importar'),true));
-      cont.appendChild(crearMenuCard(ICONS.cxp,'Cuentas por pagar','Facturas pendientes de pago',()=>abrirCuentasPorPagar(),true));
-      cont.appendChild(crearMenuCard(ICONS.cxc,'Cuentas por cobrar','Ventas y canjes pendientes',()=>abrirCuentasPorCobrar(),false));
-      cont.appendChild(crearMenuCard(ICONS.resultados,'Estado de resultados','Por negocio, mes actual',()=>abrirEstadoResultados(),true));
-      cont.appendChild(crearMenuCard(ICONS.f29,'F29','Cálculo de apoyo IVA + PPM',()=>abrirF29(),true));
-      cont.appendChild(crearMenuCard(ICONS.alerta,'Alertas','Auditoría e informativas',()=>abrirAlertas(),true));
+      cont.appendChild(crearMenuCard(ICONS.importar,'Importar reportes','Aronium, PedidosYa, Transbank',()=>irA('screen-importar'),true,'neutral'));
+      cont.appendChild(crearMenuCard(ICONS.cxp,'Cuentas por pagar','Facturas pendientes de pago',()=>abrirCuentasPorPagar(),true,'neutral'));
+      cont.appendChild(crearMenuCard(ICONS.cxc,'Cuentas por cobrar','Ventas y canjes pendientes',()=>abrirCuentasPorCobrar(),false,'neutral'));
+      cont.appendChild(crearMenuCard(ICONS.resultados,'Estado de resultados','Por negocio, mes actual',()=>abrirEstadoResultados(),true,'neutral'));
+      cont.appendChild(crearMenuCard(ICONS.f29,'F29','Cálculo de apoyo IVA + PPM',()=>abrirF29(),true,'neutral'));
+      cont.appendChild(crearMenuCard(ICONS.alerta,'Alertas','Auditoría e informativas',()=>abrirAlertas(),true,'neutral'));
     }
     if (tienePermisoLocal('ProcesarConciliacion')){
-      cont.appendChild(crearMenuCard(ICONS.conciliacion,'Conciliación','Transbank, PedidosYa, Aronium vs. lo registrado',()=>abrirConciliacion(),true));
+      cont.appendChild(crearMenuCard(ICONS.conciliacion,'Conciliación','Transbank, PedidosYa, Aronium vs. lo registrado',()=>abrirConciliacion(),true,'neutral'));
     }
     agregarBloqueProduccion(cont); bloqueProduccionAgregado = true;
     if (tienePermisoLocal('ConfigurarSistema')){
       cont.insertAdjacentHTML('beforeend','<div class="menu-grupo-titulo">Configuraciones</div>');
-      cont.appendChild(crearMenuCard(ICONS.banco,'Créditos','Financiamientos activos',()=>abrirCreditos(),true));
-      cont.appendChild(crearMenuCard(ICONS.usuarios,'Usuarios y permisos','Accesos y restablecer PIN',()=>abrirPermisos(),true));
+      cont.appendChild(crearMenuCardChica(ICONS.banco,'Créditos',()=>abrirCreditos()));
+      cont.appendChild(crearMenuCardChica(ICONS.usuarios,'Usuarios y permisos',()=>abrirPermisos()));
     }
   } else if (tienePermisoLocal('VerPrograma')){
     cont.insertAdjacentHTML('beforeend','<div class="menu-grupo-titulo">Producción</div>');
@@ -1207,8 +1207,14 @@ function agregarBloqueProduccion(cont) {
     cont.appendChild(crearMenuCard(ICONS.inventario,'Inventario de MP','Ver y actualizar stock',()=>abrirInventario(),true));
     cont.appendChild(crearMenuCard(ICONS.carrito,'Lista de compra MP','Insumos bajo su mínimo',()=>abrirListaCompra(),true));
   } else {
-    cont.insertAdjacentHTML('beforeend','<div class="menu-grupo-titulo">Accesos rápidos</div>');
-    if (puedeCima && tienePermisoLocal('RegistrarMovimiento')) cont.appendChild(crearMenuCard(ICONS.caja,'Cierre de caja','Registrar ventas del día',()=>{document.getElementById('cc-fecha').value = fechaLocalISO();setModoCierre('dia',document.querySelector('#cc-modo-group button'));irA('screen-cierre');},true));
+    // CAMBIO 15/07/2026 (con Osmar): antes el título "Accesos rápidos" se mostraba
+    // siempre, aunque no hubiera ninguna tarjeta abajo (caso de Rosa/Katherine, que no
+    // tienen RegistrarMovimiento) — quedaba un encabezado vacío. Ahora solo se agrega si
+    // efectivamente va a haber al menos una tarjeta.
+    if (puedeCima && tienePermisoLocal('RegistrarMovimiento')) {
+      cont.insertAdjacentHTML('beforeend','<div class="menu-grupo-titulo">Accesos rápidos</div>');
+      cont.appendChild(crearMenuCard(ICONS.caja,'Cierre de caja','Registrar ventas del día',()=>{document.getElementById('cc-fecha').value = fechaLocalISO();setModoCierre('dia',document.querySelector('#cc-modo-group button'));irA('screen-cierre');},true));
+    }
   }
 
   // CAMBIO 15/07/2026 (con Osmar): para quien entra a la rama de arriba, el bloque de
@@ -1223,9 +1229,18 @@ function agregarBloqueProduccion(cont) {
   if (esEscritorio && puedeCima && tienePermisoLocal('RegistrarMovimiento')) { document.getElementById('cc-fecha').value = fechaLocalISO(); setModoCierre('dia',document.querySelector('#cc-modo-group button')); irA('screen-cierre'); return; }
   irA('screen-home');
 }
-function crearMenuCard(icon,titulo,sub,onClick,flat){
-  const b=document.createElement('button'); b.className='menu-card'+(flat?' flat':'');
+function crearMenuCard(icon,titulo,sub,onClick,flat,dominio){
+  const b=document.createElement('button'); b.className='menu-card'+(flat?' flat':'')+(dominio?' icon-'+dominio:'');
   b.innerHTML='<div class="icon">'+icon+'</div><div class="txt"><strong>'+titulo+'</strong><span>'+sub+'</span></div>';
+  b.onclick=onClick; return b;
+}
+
+// NUEVO 15/07/2026 (con Osmar — rediseño Home): fila compacta ícono+texto, sin subtítulo
+// ni tarjeta grande — para secciones de baja frecuencia de uso (hoy solo Configuraciones),
+// que no necesitan el mismo peso visual que el resto del Home.
+function crearMenuCardChica(icon,titulo,onClick){
+  const b=document.createElement('button'); b.className='menu-card-chica';
+  b.innerHTML='<span class="ico">'+icon+'</span><span>'+titulo+'</span>';
   b.onclick=onClick; return b;
 }
 
