@@ -339,6 +339,26 @@ async function enviarRevision() {
   irA('screen-confirm');
 }
 
+// NUEVO 15/07/2026 (con Osmar): "Registrar stock" — cierra el/los conteo(s) pendientes
+// sin generar pedido a producción (conteo pedido solo para tener el stock al día). No usa
+// revisionPedidos/revisionAgregados para nada — solo importa qué conteos había pendientes.
+async function registrarStockSinPedido() {
+  document.getElementById('revision-error').textContent = '';
+  if (!cacheRevision || !cacheRevision.conteoIds || !cacheRevision.conteoIds.length) {
+    document.getElementById('revision-error').textContent = 'No hay conteos para registrar.';
+    return;
+  }
+  const r = await llamarAPI('registrarConteoSinPedido', { data: { conteoIds: cacheRevision.conteoIds } });
+  if (!r.ok) { document.getElementById('revision-error').textContent = r.error || 'Error al registrar el stock'; return; }
+
+  cacheRevision = null; revisionPedidos = {}; revisionAgregados = []; revisionEliminados = new Set(); revisionObservacion = '';
+  document.getElementById('confirm-title').textContent = 'Stock registrado';
+  document.getElementById('confirm-msg').textContent = 'El conteo quedó guardado, sin generar pedido a producción.';
+  document.getElementById('confirm-detalle').innerHTML = '';
+  ocultarBotonOtro();
+  irA('screen-confirm');
+}
+
 // ============ PAUTA DE PRODUCCIÓN — MODELO DE SESIÓN DE TRABAJO ============
 // Marcar "Hecho" y editar cantidad se guardan de inmediato como borrador (actualizarBorradorPauta)
 // — no se pierde nada si se cae el navegador, y dos personas ven el mismo progreso en vivo.
@@ -360,8 +380,23 @@ let historialPautaHayMas = false;
 
 async function abrirPauta(forzar) {
   irA('screen-pauta');
-  cambiarTabPauta('activa');
   if (forzar) { cacheHistorialPauta = []; historialPautaOffset = 0; }
+
+  // CAMBIO 15/07/2026 (con Osmar): quien tiene VerPrograma pero no GestionarPauta (Osmar,
+  // Rocío) no gestiona la pauta activa — antes veía la pantalla vieja "Programa de
+  // producción" en el sidebar, ahora entra acá directo, pero solo a Historial (sin tabs,
+  // sin checklist, sin +Agregar ni Confirmar producción — esas acciones son de quien sí
+  // tiene GestionarPauta).
+  const soloHistorial = !tienePermisoLocal('GestionarPauta') && tienePermisoLocal('VerPrograma');
+  document.getElementById('pauta-tabs').style.display = soloHistorial ? 'none' : '';
+  if (soloHistorial) {
+    document.getElementById('pauta-tab-activa').style.display = 'none';
+    document.getElementById('pauta-tab-historial').style.display = '';
+    if (forzar || !cacheHistorialPauta.length) cargarHistorialPauta(true);
+    return;
+  }
+
+  cambiarTabPauta('activa');
   if (!cachePauta || forzar) {
     document.getElementById('pauta-lista').innerHTML = skeletonCards(3);
     const r = await llamarAPI('obtenerPautaActiva', {});
