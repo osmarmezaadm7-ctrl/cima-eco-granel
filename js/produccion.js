@@ -37,15 +37,40 @@ async function abrirConteo(forzar) {
   if (document.getElementById('screen-conteo').classList.contains('active')) pintarConteo();
 }
 
+function filaConteoDesktop_(p, key, val, keyEsc) {
+  return '<tr><td style="padding:9px 6px;font-weight:600;color:var(--ink);">' + p.nombre + '</td>' +
+    '<td style="padding:9px 6px;">' + p.categoria + '</td>' +
+    '<td style="padding:6px;text-align:right;"><div class="conteo-stepper" style="display:inline-flex;">' +
+      '<button type="button" onclick="cambiarCantidadConteo(\'' + keyEsc + '\',-1)">\u2212</button>' +
+      '<input type="number" min="0" value="' + val + '" oninput="escribirCantidadConteo(\'' + keyEsc + '\',this.value)">' +
+      '<button type="button" onclick="cambiarCantidadConteo(\'' + keyEsc + '\',1)">+</button>' +
+    '</div></td></tr>';
+}
+function pintarConteoDesktop_(productos) {
+  const titulo = document.querySelector('#screen-conteo h2');
+  const boton = document.querySelector('#screen-conteo .submit-bar button');
+  let html = '<table><thead><tr><th>Producto</th><th>Categoría</th><th style="text-align:right;">Cantidad</th></tr></thead><tbody>';
+  productos.forEach(p => {
+    const key = p.productoProduccion + '|' + p.categoria;
+    const val = conteoCantidades[key] !== undefined ? conteoCantidades[key] : 0;
+    html += filaConteoDesktop_(p, key, val, key.replace(/'/g, "\\'"));
+  });
+  html += '</tbody></table>';
+  if (!productos.length) html = '<p style="font-size:13.5px;color:var(--ink-soft);padding:24px 0;text-align:center;">' +
+    (esVeganCorner_() ? 'No hay empanadas configuradas para contar.' : 'Elige qué categoría(s) vas a contar.') + '</p>';
+  document.getElementById('conteo-lista').innerHTML = html;
+}
 function pintarConteo() {
   const titulo = document.querySelector('#screen-conteo h2');
   const boton = document.querySelector('#screen-conteo .submit-bar button');
+  const esAncho = window.matchMedia('(min-width: 900px)').matches;
 
   if (esVeganCorner_()) {
     document.getElementById('conteo-chips').style.display = 'none';
     if (titulo) titulo.textContent = 'Stock congelado';
     if (boton) boton.textContent = 'Guardar stock';
     const productos = cacheConteoCatalogo.catalogo.filter(p => p.categoria === 'Empanadas Congeladas');
+    if (esAncho) { pintarConteoDesktop_(productos); return; }
     let html = '';
     productos.forEach(p => {
       const key = p.productoProduccion + '|' + p.categoria;
@@ -73,6 +98,9 @@ function pintarConteo() {
     const activo = conteoCategoriasActivas.has(c);
     return '<span class="chip-cat' + (activo ? ' activo' : '') + '" onclick="toggleCategoriaConteo(\'' + c.replace(/'/g, "\\'") + '\')">' + c + '</span>';
   }).join('');
+
+  const productosActivos = cacheConteoCatalogo.catalogo.filter(p => conteoCategoriasActivas.has(p.categoria));
+  if (esAncho) { pintarConteoDesktop_(productosActivos); return; }
 
   let html = '';
   categorias.filter(c => conteoCategoriasActivas.has(c)).forEach(cat => {
@@ -155,15 +183,19 @@ function revisarConteo() {
 
 function pintarResumenConteo(productos) {
   const categorias = [...new Set(productos.map(p => p.categoria))];
+  const esAncho = window.matchMedia('(min-width: 900px)').matches;
   let html = '';
   let totalUnidades = 0;
   categorias.forEach(cat => {
     const items = productos.filter(p => p.categoria === cat);
-    html += '<p class="resumen-seccion-titulo">' + cat + '</p>' +
-      items.map(p => {
-        totalUnidades += p.cantidadContada;
-        return '<div class="resumen-fila"><span>' + p.nombre + '</span><strong>' + p.cantidadContada + '</strong></div>';
-      }).join('');
+    if (esAncho) {
+      html += '<p class="resumen-seccion-titulo">' + cat + '</p><table><tbody>' +
+        items.map(p => { totalUnidades += p.cantidadContada; return '<tr><td style="padding:9px 6px;font-weight:700;">' + p.nombre + '</td><td style="padding:9px 6px;text-align:right;font-family:\'JetBrains Mono\',monospace;font-weight:700;">' + p.cantidadContada + '</td></tr>'; }).join('') +
+        '</tbody></table>';
+    } else {
+      html += '<p class="resumen-seccion-titulo">' + cat + '</p>' +
+        items.map(p => { totalUnidades += p.cantidadContada; return '<div class="resumen-fila"><span>' + p.nombre + '</span><strong>' + p.cantidadContada + '</strong></div>'; }).join('');
+    }
   });
   document.getElementById('resumen-conteo-lista').innerHTML = html;
   document.getElementById('resumen-conteo-total').textContent =
@@ -326,7 +358,51 @@ function badgesDetalleRevision_(detalle, stockVC) {
   return html;
 }
 
+function filaRevisionDesktop_(nombre, productoProduccion, val, clave, detalleHtml, factorHtml, comentarioHtml, quitarOnclick, alerta) {
+  return '<tr' + (alerta ? ' style="background:var(--terracotta-soft);"' : '') + '>' +
+    '<td style="padding:9px 4px;text-align:center;width:26px;"><button class="revision-quitar" title="Quitar" onclick="' + quitarOnclick + '"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"></path><path d="M6 6l12 12"></path></svg></button></td>' +
+    '<td style="padding:9px 6px;"><div style="font-weight:700;">' + nombre + '</div>' + factorHtml + '</td>' +
+    '<td style="padding:9px 6px;">' + detalleHtml + '</td>' +
+    '<td style="padding:6px;text-align:center;"><div class="conteo-stepper" style="display:inline-flex;">' +
+      '<button type="button" onclick="cambiarPedidoRevisionPaso(\'' + clave + '\',-1)">\u2212</button>' +
+      '<input type="number" min="0" placeholder="0" value="' + val + '" oninput="cambiarPedidoRevision(\'' + clave + '\',this.value)">' +
+      '<button type="button" onclick="cambiarPedidoRevisionPaso(\'' + clave + '\',1)">+</button>' +
+    '</div></td>' +
+    '<td style="padding:9px 6px;">' + comentarioHtml + '</td>' +
+  '</tr>';
+}
+function comentarioInputDesktop_(clave, claveEsc) {
+  const val = revisionComentarios[clave] || '';
+  return '<input type="text" placeholder="Comentario (opcional)" value="' + val.replace(/"/g, '&quot;') + '" oninput="cambiarComentarioProducto(\'' + claveEsc + '\',this.value)" style="width:100%;font-size:12.5px;height:32px;">';
+}
+function pintarRevisionDesktop_() {
+  const cont = document.getElementById('revision-lista');
+  const itemsVisibles = cacheRevision.items.filter(it => !revisionEliminados.has(it.productoProduccion));
+  if (!itemsVisibles.length && !revisionAgregados.length) {
+    cont.innerHTML = '<p style="font-size:13.5px;color:var(--ink-soft);padding:24px 0;text-align:center;">No hay conteos pendientes de revisión.</p>';
+    document.getElementById('revision-observacion-wrap').style.display = 'none';
+    return;
+  }
+  document.getElementById('revision-observacion-wrap').style.display = '';
+  let filas = '';
+  itemsVisibles.forEach(it => {
+    const val = revisionPedidos[it.productoProduccion] !== undefined ? revisionPedidos[it.productoProduccion] : '';
+    const clave = it.productoProduccion.replace(/'/g, "\\'");
+    filas += filaRevisionDesktop_(it.productoProduccion, it.productoProduccion, val, clave,
+      badgesDetalleRevision_(it.detalle, it.stockCongeladoVC), etiquetaFactorHtml_(it.productoProduccion),
+      comentarioInputDesktop_(it.productoProduccion, clave), 'quitarProductoRevision(\'' + clave + '\')', it.bajoMinimo);
+  });
+  revisionAgregados.forEach((a, idx) => {
+    const val = revisionPedidos[a.productoProduccion] !== undefined ? revisionPedidos[a.productoProduccion] : '';
+    const clave = a.productoProduccion.replace(/'/g, "\\'");
+    filas += filaRevisionDesktop_(a.nombre, a.productoProduccion, val, clave,
+      '<span class="revision-badge">Agregado manualmente</span>', etiquetaFactorHtml_(a.productoProduccion),
+      comentarioInputDesktop_(a.productoProduccion, clave), 'quitarAgregadoRevision(' + idx + ')', false);
+  });
+  cont.innerHTML = '<table><thead><tr><th></th><th>Producto</th><th>Stock</th><th style="text-align:center;">Pedir</th><th>Comentario</th></tr></thead><tbody>' + filas + '</tbody></table>';
+}
 function pintarRevision() {
+  if (window.matchMedia('(min-width: 900px)').matches) { pintarRevisionDesktop_(); return; }
   const cont = document.getElementById('revision-lista');
   const itemsVisibles = cacheRevision.items.filter(it => !revisionEliminados.has(it.productoProduccion));
   if (!itemsVisibles.length && !revisionAgregados.length) {
@@ -528,7 +604,51 @@ function filaProductoCero_(p, esExtra) {
   '</div>';
 }
 
+function comentarioInputCeroDesktop_(clave, claveEsc) {
+  const val = ceroComentarios[clave] || '';
+  return '<input type="text" placeholder="Comentario (opcional)" value="' + val.replace(/"/g, '&quot;') + '" oninput="cambiarComentarioCero(\'' + claveEsc + '\',this.value)" style="width:100%;font-size:12.5px;height:32px;">';
+}
+function filaProductoCeroDesktop_(p) {
+  const key = p.productoProduccion + '|' + p.categoria;
+  const val = ceroCantidades[key] !== undefined ? ceroCantidades[key] : 0;
+  const keyEsc = key.replace(/'/g, "\\'");
+  const claveComentario = p.productoProduccion.replace(/'/g, "\\'");
+  return '<tr><td style="padding:9px 6px;"><div style="font-weight:700;">' + p.nombre + '</div>' + etiquetaFactorHtml_(p.productoProduccion) + '</td>' +
+    '<td style="padding:6px;text-align:center;"><div class="conteo-stepper" style="display:inline-flex;">' +
+      '<button type="button" onclick="cambiarCantidadCero(\'' + keyEsc + '\',-1)">\u2212</button>' +
+      '<input type="number" min="0" value="' + val + '" oninput="escribirCantidadCero(\'' + keyEsc + '\',this.value)">' +
+      '<button type="button" onclick="cambiarCantidadCero(\'' + keyEsc + '\',1)">+</button>' +
+    '</div></td>' +
+    '<td style="padding:9px 6px;">' + comentarioInputCeroDesktop_(p.productoProduccion, claveComentario) + '</td></tr>';
+}
+function pintarCeroDesktop_() {
+  const categorias = [...new Set(cacheCatalogoCompleto.catalogo.map(p => p.categoria))];
+  document.getElementById('cero-chips').innerHTML = categorias.map(c => {
+    const activo = ceroCategoriasActivas.has(c);
+    return '<span class="chip-cat' + (activo ? ' activo' : '') + '" onclick="toggleCategoriaCero(\'' + c.replace(/'/g, "\\'") + '\')">' + c + '</span>';
+  }).join('');
+  let html = '';
+  categorias.filter(c => ceroCategoriasActivas.has(c)).forEach(cat => {
+    const productosCat = cacheCatalogoCompleto.catalogo.filter(p => p.categoria === cat);
+    if (!productosCat.length) return;
+    const marcados = productosCat.filter(p => p.marcado);
+    const noMarcados = productosCat.filter(p => !p.marcado);
+    html += '<p class="conteo-seccion-titulo">' + cat + '</p><table><tbody>';
+    html += marcados.map(filaProductoCeroDesktop_).join('');
+    html += '</tbody></table>';
+    if (noMarcados.length) {
+      if (ceroVerMas.has(cat)) {
+        html += '<table><tbody>' + noMarcados.map(filaProductoCeroDesktop_).join('') + '</tbody></table>';
+      } else {
+        html += '<button type="button" class="btn-vermas-cat" onclick="toggleVerMasCero(\'' + cat.replace(/'/g, "\\'") + '\')">Ver más de ' + cat + '</button>';
+      }
+    }
+  });
+  if (!html) html = '<p style="font-size:13.5px;color:var(--ink-soft);padding:24px 0;text-align:center;">Elige qué categoría(s) vas a pedir.</p>';
+  document.getElementById('cero-lista').innerHTML = html;
+}
 function pintarCero() {
+  if (window.matchMedia('(min-width: 900px)').matches) { pintarCeroDesktop_(); return; }
   const categorias = [...new Set(cacheCatalogoCompleto.catalogo.map(p => p.categoria))];
   document.getElementById('cero-chips').innerHTML = categorias.map(c => {
     const activo = ceroCategoriasActivas.has(c);
@@ -578,10 +698,16 @@ function revisarPedidoDesdeCero() {
 
 // Compartido entre los dos modos de Pedidos — arma la pantalla de resumen antes de enviar.
 function pintarResumenPedido(items, observacion) {
-  const html = items.map(it =>
-    '<div class="resumen-fila"><span>' + it.productoProduccion + '</span><strong>' + it.cantidadProgramada + '</strong></div>' +
-    (it.comentario ? '<p class="resumen-fila-nota">"' + it.comentario + '"</p>' : '')
-  ).join('');
+  const esAncho = window.matchMedia('(min-width: 900px)').matches;
+  const html = esAncho
+    ? '<table><tbody>' + items.map(it =>
+        '<tr><td style="padding:9px 6px;"><div style="font-weight:700;">' + it.productoProduccion + '</div>' + (it.comentario ? '<div style="font-size:10.5px;color:var(--ink-soft);font-style:italic;margin-top:2px;">"' + it.comentario + '"</div>' : '') + '</td>' +
+        '<td style="padding:9px 6px;text-align:right;font-family:\'JetBrains Mono\',monospace;font-weight:700;">' + it.cantidadProgramada + '</td></tr>'
+      ).join('') + '</tbody></table>'
+    : items.map(it =>
+        '<div class="resumen-fila"><span>' + it.productoProduccion + '</span><strong>' + it.cantidadProgramada + '</strong></div>' +
+        (it.comentario ? '<p class="resumen-fila-nota">"' + it.comentario + '"</p>' : '')
+      ).join('');
   document.getElementById('resumen-pedido-lista').innerHTML = html;
   const wrapObs = document.getElementById('resumen-pedido-observacion-wrap');
   if (observacion) {
@@ -684,7 +810,52 @@ function claveGrupoPauta_(it) {
   return it.conteoId || (it.fecha + '|' + it.responsable + '|' + it.id);
 }
 
+function filaPautaDesktop_(it) {
+  if (pautaSoloLectura) {
+    const cant = it.cantidadBorrador !== null && it.cantidadBorrador !== undefined ? it.cantidadBorrador : it.cantidadProgramada;
+    const nombreEsc = it.producto.replace(/'/g, "\\'");
+    return '<tr><td style="padding:9px 6px;font-weight:700;">' + it.producto + (it.comentario ? '<div style="font-size:10.5px;color:var(--ink-soft);font-weight:400;margin-top:2px;">' + it.comentario + '</div>' : '') + '</td>' +
+      '<td style="padding:9px 6px;color:var(--ink-soft);">' + it.fecha + ' · ' + it.responsable + ' · cantidad ' + cant + '</td>' +
+      '<td style="padding:9px 6px;text-align:right;"><button class="btn-eliminar-pauta" onclick="abrirEliminarPauta(\'' + it.id + '\',\'' + nombreEsc + '\')">Eliminar</button></td></tr>';
+  }
+  const hecho = it.estadoBorrador === 'Hecho';
+  const cant = it.cantidadBorrador !== null && it.cantidadBorrador !== undefined ? it.cantidadBorrador : it.cantidadProgramada;
+  return '<tr id="pauta-row-' + it.id + '">' +
+    '<td style="padding:9px 4px;width:30px;"><button class="pauta-check' + (hecho ? ' marcado' : '') + '" onclick="toggleHechoPauta(\'' + it.id + '\')" aria-label="Marcar hecho">' +
+      (hecho ? '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"></path></svg>' : '') +
+    '</button></td>' +
+    '<td style="padding:9px 6px;font-weight:700;">' + it.producto + (it.comentario ? '<div style="font-size:10.5px;color:var(--ink-soft);font-weight:400;margin-top:2px;">' + it.comentario + '</div>' : '') + '</td>' +
+    '<td style="padding:6px;width:90px;"><input type="text" inputmode="numeric" value="' + cant + '" id="pauta-cant-' + it.id + '" onchange="cambiarCantidadBorradorPauta(\'' + it.id + '\',this.value)" style="width:70px;text-align:center;font-family:\'JetBrains Mono\',monospace;font-weight:700;border:1px solid var(--border);border-radius:7px;padding:6px 8px;"></td>' +
+    '<td style="padding:9px 6px;width:30px;text-align:right;"><button class="pauta-quitar" title="Quitar" onclick="ocultarItemPauta(\'' + it.id + '\')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"></path><path d="M6 6l12 12"></path></svg></button></td></tr>';
+}
+function pintarPautaDesktop_() {
+  const cont = document.getElementById('pauta-lista');
+  const visibles = cachePauta.pauta.filter(it => !pautaOcultos.has(it.id));
+  const planificados = visibles.filter(it => pautaAgregadosSesion.indexOf(it.id) === -1);
+  const agregados = visibles.filter(it => pautaAgregadosSesion.indexOf(it.id) !== -1);
+  if (!visibles.length) {
+    cont.innerHTML = '<p style="font-size:13.5px;color:var(--ink-soft);padding:24px 0;text-align:center;">' +
+      (pautaSoloLectura ? 'No hay ítems pendientes.' : 'No hay pedidos pendientes en la pauta.') + '</p>';
+    return;
+  }
+  const grupos = {}; const ordenGrupos = [];
+  planificados.forEach(it => {
+    const clave = claveGrupoPauta_(it);
+    if (!grupos[clave]) { grupos[clave] = { responsable: it.responsable, items: [] }; ordenGrupos.push(clave); }
+    grupos[clave].items.push(it);
+  });
+  let html = '';
+  ordenGrupos.forEach(clave => {
+    const g = grupos[clave];
+    html += '<p class="pauta-grupo-titulo">Pedido por: ' + g.responsable + '</p><table><tbody>' + g.items.map(filaPautaDesktop_).join('') + '</tbody></table>';
+  });
+  if (agregados.length) {
+    html += '<p class="pauta-grupo-titulo">Agregado en esta sesión</p><table><tbody>' + agregados.map(filaPautaDesktop_).join('') + '</tbody></table>';
+  }
+  cont.innerHTML = html;
+}
 function pintarPauta() {
+  if (window.matchMedia('(min-width: 900px)').matches) { pintarPautaDesktop_(); return; }
   const cont = document.getElementById('pauta-lista');
   const visibles = cachePauta.pauta.filter(it => !pautaOcultos.has(it.id));
   const planificados = visibles.filter(it => pautaAgregadosSesion.indexOf(it.id) === -1);
@@ -849,24 +1020,31 @@ function revisarPauta() {
 
 function filaResumenPauta_(it, atenuado) {
   const cant = it.cantidadBorrador !== null && it.cantidadBorrador !== undefined ? it.cantidadBorrador : it.cantidadProgramada;
+  if (window.matchMedia('(min-width: 900px)').matches) {
+    return '<tr' + (atenuado ? ' style="opacity:.6;"' : '') + '><td style="padding:9px 6px;"><div style="font-weight:700;">' + it.producto + '</div>' + (it.comentario ? '<div style="font-size:10.5px;color:var(--ink-soft);margin-top:2px;">' + it.comentario + '</div>' : '') + '</td>' +
+      '<td style="padding:9px 6px;text-align:right;font-family:\'JetBrains Mono\',monospace;font-weight:700;">' + cant + '</td></tr>';
+  }
   return '<div class="resumen-fila' + (atenuado ? ' atenuado' : '') + '"><span>' + it.producto + '</span><strong>' + cant + '</strong></div>' +
     (it.comentario ? '<p class="resumen-fila-nota">' + it.comentario + '</p>' : '');
 }
 
 function pintarResumenPauta(completados, faltantes) {
+  const esAncho = window.matchMedia('(min-width: 900px)').matches;
+  const abrirTabla = () => esAncho ? '<table><tbody>' : '';
+  const cerrarTabla = () => esAncho ? '</tbody></table>' : '';
   const compPlanificados = completados.filter(it => pautaAgregadosSesion.indexOf(it.id) === -1);
   const compAgregados = completados.filter(it => pautaAgregadosSesion.indexOf(it.id) !== -1);
 
   let html = '';
   if (compPlanificados.length) {
-    html += '<p class="resumen-seccion-titulo verde">Completados</p>' + compPlanificados.map(it => filaResumenPauta_(it)).join('');
+    html += '<p class="resumen-seccion-titulo verde">Completados</p>' + abrirTabla() + compPlanificados.map(it => filaResumenPauta_(it)).join('') + cerrarTabla();
   }
   if (compAgregados.length) {
     html += '<p class="resumen-seccion-titulo caramelo">Agregado en esta sesión <span class="resumen-seccion-nota">· no venía en el pedido</span></p>' +
-      compAgregados.map(it => filaResumenPauta_(it)).join('');
+      abrirTabla() + compAgregados.map(it => filaResumenPauta_(it)).join('') + cerrarTabla();
   }
   if (faltantes.length) {
-    html += '<p class="resumen-seccion-titulo terracota">Quedan pendientes</p>' + faltantes.map(it => filaResumenPauta_(it, true)).join('');
+    html += '<p class="resumen-seccion-titulo terracota">Quedan pendientes</p>' + abrirTabla() + faltantes.map(it => filaResumenPauta_(it, true)).join('') + cerrarTabla();
   }
   document.getElementById('resumen-pauta-lista').innerHTML = html;
 
@@ -941,3 +1119,13 @@ function pintarHistorialPauta() {
   }).join('');
   btnMas.style.display = historialPautaHayMas ? '' : 'none';
 }
+
+window.addEventListener('resize', () => {
+  const activa = (id) => document.getElementById(id) && document.getElementById(id).classList.contains('active');
+  if (activa('screen-conteo') && cacheConteoCatalogo) pintarConteo();
+  if (activa('screen-revision')) {
+    if (pedidoModo === 'conteo' && cacheRevision && cacheRevision.items && cacheRevision.items.length) pintarRevision();
+    if (pedidoModo === 'cero' && cacheCatalogoCompleto) pintarCero();
+  }
+  if (activa('screen-pauta') && cachePauta) pintarPauta();
+});
