@@ -629,34 +629,6 @@
     <div id="lista-movimientos-full"></div>
   </div>
 
-  <!-- PRODUCCIÓN — PROGRAMA -->
-  <div class="screen desktop-wide" id="screen-programa">
-    <button class="back-link" onclick="irA('screen-home')"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"></path></svg> Volver</button>
-    <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;">
-      <h2 style="font-size:17px;">Programa de producción</h2>
-      <div style="display:flex;gap:8px;">
-        <button class="icon-btn" title="Actualizar" onclick="abrirPrograma(true)"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 4v6h-6"></path><path d="M1 20v-6h6"></path><path d="M3.5 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.65 4.36A9 9 0 0 0 20.5 15"></path></svg></button>
-        <button class="btn-secondary btn-small" id="btn-nuevo-programa" style="display:none;" onclick="irA('screen-programa-nuevo')">+ Nuevo</button>
-      </div>
-    </div>
-    <div id="lista-programa"></div>
-  </div>
-
-  <div class="screen" id="screen-programa-nuevo">
-    <button class="back-link" onclick="irA('screen-programa')"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"></path></svg> Volver</button>
-    <h2 style="font-size:17px;">Nuevo ítem de programa</h2>
-    <label>Fecha</label><input type="date" id="pp-fecha">
-    <label>Producto</label>
-    <div class="search-select" id="ss-pp-producto">
-      <input type="text" placeholder="Buscar producto…" autocomplete="off" onfocus="abrirSearchSelect('ss-pp-producto')" oninput="filtrarSearchSelect('ss-pp-producto')">
-      <input type="hidden" id="ss-pp-producto-valor">
-      <div class="search-select-list" id="ss-pp-producto-list"></div>
-    </div>
-    <label>Cantidad programada</label><input type="number" id="pp-cantidad">
-    <div class="error-msg" id="pp-error"></div>
-    <div class="submit-bar"><button class="btn-primary" onclick="guardarPrograma()">Guardar</button></div>
-  </div>
-
   <!-- INVENTARIO MP -->
   <div class="screen" id="screen-revision">
   <div class="header-row" style="margin-bottom:10px;">
@@ -910,7 +882,6 @@ function simularAPI(accion, extra){
   if (accion === 'avanzarEtapa') return { ok:true, etapa: extra.etapa };
   if (accion === 'marcarNotificacionVista') return { ok:true };
   if (accion === 'listarCuentasPorPagar') return { ok:true, cuentas:[], total:0, cantidad:0 };
-  if (accion === 'listarPrograma') return { ok:true, programa:[] };
   if (accion === 'listarInventarioMP') return { ok:true, inventario:[] };
   if (accion === 'listaCompraMP') return { ok:true, listaCompra:[] };
   if (accion === 'obtenerPanel') return { ok:true, ingresosTotal:7729801, egresosTotal:5830269, margenOperacional:1899532, retiros:1378559,
@@ -1147,9 +1118,6 @@ async function entrarAHome(){
     const hoy = new Date();
     cachePanel[hoy.getFullYear()+'-'+(hoy.getMonth()+1)] = ri.panel;
   }
-  if(esEscritorio && ri.programa){
-    cacheModulo.programa = ri.programa;
-  }
 
   const mostrarSidebar = tienePermisoLocal('VerDashboardCompleto') || tienePermisoLocal('VisualizarReportes') ||
     tienePermisoLocal('VerPrograma') || tienePermisoLocal('ConfigurarSistema') || tienePermisoLocal('RegistrarMovimiento');
@@ -1201,11 +1169,6 @@ function agregarBloqueProduccion(cont) {
       cont.appendChild(crearMenuCardChica(ICONS.banco,'Créditos',()=>abrirCreditos()));
       cont.appendChild(crearMenuCardChica(ICONS.usuarios,'Usuarios y permisos',()=>abrirPermisos()));
     }
-  } else if (tienePermisoLocal('VerPrograma')){
-    cont.insertAdjacentHTML('beforeend','<div class="menu-grupo-titulo">Producción</div>');
-    cont.appendChild(crearMenuCard(ICONS.programa,'Programa de producción', tienePermisoLocal('EditarPrograma')?'Ver y editar el programa':'Ver programa y declarar entregas', ()=>abrirPrograma(),false));
-    cont.appendChild(crearMenuCard(ICONS.inventario,'Inventario de MP','Ver y actualizar stock',()=>abrirInventario(),true));
-    cont.appendChild(crearMenuCard(ICONS.carrito,'Lista de compra MP','Insumos bajo su mínimo',()=>abrirListaCompra(),true));
   } else {
     // CAMBIO 15/07/2026 (con Osmar): antes el título "Accesos rápidos" se mostraba
     // siempre, aunque no hubiera ninguna tarjeta abajo (caso de Rosa/Katherine, que no
@@ -1225,7 +1188,6 @@ function agregarBloqueProduccion(cont) {
 
   if (esEscritorio && tienePermisoLocal('VerDashboardCompleto')) { abrirPanel(); return; }
   if (esEscritorio && tienePermisoLocal('VisualizarReportes')) { abrirEstadoResultados(); return; }
-  if (esEscritorio && tienePermisoLocal('VerPrograma')) { abrirPrograma(); return; }
   if (esEscritorio && puedeCima && tienePermisoLocal('RegistrarMovimiento')) { document.getElementById('cc-fecha').value = fechaLocalISO(); setModoCierre('dia',document.querySelector('#cc-modo-group button')); irA('screen-cierre'); return; }
   irA('screen-home');
 }
@@ -1269,7 +1231,9 @@ function pintarSidebar(){
   // pantalla vieja "Programa de producción" (screen-programa) — ya no corresponde a la
   // versión actual. Ahora entra a la misma "Pauta de producción", pero abrirPauta() la
   // abre solo en modo Historial para quien no tiene GestionarPauta (ver produccion.js).
-  // No se borra screen-programa/abrirPrograma() del código, solo se deja de enlazar.
+  // CAMBIO 16/07/2026 (con Osmar): screen-programa y sus funciones (abrirPrograma,
+  // listarPrograma, crearPrograma, marcarProgramaEntregado, etc.) ya se borraron del todo —
+  // no había ningún link vivo hacia ellas desde ninguna combinación de permisos real.
   if (tienePermisoLocal('GestionarPauta') || tienePermisoLocal('VerPrograma')) prodHtml += item('screen-pauta',ICONS.programa,'Pauta de producción');
   if (tienePermisoLocal('GestionarInventario')) prodHtml += item('screen-inventario',ICONS.inventario,'Inventario MP') + item('screen-lista-compra',ICONS.carrito,'Lista de compra MP');
   if (prodHtml) nav.insertAdjacentHTML('beforeend', '<div class="grupo">Producción</div>'+prodHtml);
@@ -1297,7 +1261,6 @@ function onEntrarScreen(id){
   if(id==='screen-pauta') abrirPauta();
   if(id==='screen-revision') abrirRevision();
   if(id==='screen-conteo') abrirConteo();
-  if(id==='screen-programa') abrirPrograma();
   if(id==='screen-inventario') abrirInventario();
   if(id==='screen-lista-compra') abrirListaCompra();
   if(id==='screen-venta-vegan') abrirVentaVegan();
@@ -2400,47 +2363,6 @@ async function resolverAlertaUI(id, requiereNota){
   }
 }
 
-function pintarPrograma(r){
-  const cont = document.getElementById('lista-programa'); cont.innerHTML='';
-  (r.programa||[]).forEach(p=>{
-    const div = document.createElement('div'); div.className='card'; div.dataset.id=p.id;
-    div.innerHTML = '<div style="display:flex;justify-content:space-between;"><strong style="font-size:13px;">'+p.producto+'</strong><span class="pill '+(p.estado==='Entregado'?'pill-menor':'pill-alerta')+'">'+p.estado+'</span></div>'+
-      '<p style="font-size:12px;color:var(--ink-soft);">'+p.fecha+' &middot; Programado: '+p.cantidadProgramada+' &middot; '+(p.responsable||'')+'</p>'+
-      (p.estado==='Programado' && tienePermisoLocal('MarcarEntregado') ? '<button class="btn-secondary btn-small" onclick="abrirModalEntrega(\''+p.id+'\',\''+p.producto+'\','+p.cantidadProgramada+')">Declarar entrega</button>' : '');
-    cont.appendChild(div);
-  });
-  if(!(r.programa||[]).length) cont.innerHTML = '<p style="font-size:12px;color:var(--ink-soft);">Sin ítems en el programa todavía.</p>';
-}
-async function abrirPrograma(forzar){
-  irA('screen-programa');
-  document.getElementById('btn-nuevo-programa').style.display = tienePermisoLocal('EditarPrograma') ? '' : 'none';
-  if(forzar) cacheModulo.programa = null;
-  if(cacheModulo.programa){ pintarPrograma(cacheModulo.programa); return; }
-  document.getElementById('lista-programa').innerHTML = skeletonCards(3);
-  const r = await llamarAPISilencioso('listarPrograma',{});
-  cacheModulo.programa = r;
-  if(document.getElementById('screen-programa').classList.contains('active')) pintarPrograma(r);
-}
-async function guardarPrograma(){
-  const d = { fecha:document.getElementById('pp-fecha').value, producto:valorSearchSelect('ss-pp-producto'), cantidadProgramada:document.getElementById('pp-cantidad').value, responsable:sesion.nombre };
-  if(!d.fecha||!d.producto||!d.cantidadProgramada){ document.getElementById('pp-error').textContent='Completa todos los campos'; return; }
-  const r = await llamarAPI('crearPrograma',{data:d});
-  if(r.ok){ cacheModulo.programa = null; irA('screen-programa'), abrirPrograma(); } else document.getElementById('pp-error').textContent=r.error||'Error al guardar';
-}
-function abrirModalEntrega(programaId, producto, cantidadProgramada){
-  abrirModal(
-    '<h3 style="font-size:15px;">Declarar entrega — '+producto+'</h3>'+
-    '<label>Cantidad entregada</label><input type="number" id="me-cantidad" value="'+cantidadProgramada+'">'+
-    '<div class="error-msg" id="me-error"></div>'+
-    '<div style="display:flex;gap:8px;margin-top:14px;"><button class="btn-secondary" onclick="cerrarModal()">Cancelar</button><button class="btn-primary" onclick="confirmarEntrega(\''+programaId+'\',\''+producto+'\')">Guardar</button></div>'
-  );
-}
-async function confirmarEntrega(programaId, producto){
-  const cantidad = Number(document.getElementById('me-cantidad').value)||0;
-  const r = await llamarAPI('marcarProgramaEntregado',{data:{programaId, entregas:[{producto, cantidadEntregada:cantidad}], responsable:sesion.nombre}});
-  if(r.ok){ cacheModulo.programa = null; cerrarModal(); abrirPrograma(); } else document.getElementById('me-error').textContent=r.error||'Error al guardar';
-}
-
 function pintarInventario(r){
   const cont = document.getElementById('lista-inventario'); cont.innerHTML='';
   (r.inventario||[]).forEach(i=>{
@@ -2491,21 +2413,6 @@ async function abrirListaCompra(forzar){
   cacheModulo.listaCompra = r;
   if(document.getElementById('screen-lista-compra').classList.contains('active')) pintarListaCompra(r);
 }
-
-document.getElementById('screen-programa-nuevo').addEventListener('transitionstart', ()=>{});
-const _irAOriginal = irA;
-irA = function(id){
-  _irAOriginal(id);
-  if(id==='screen-programa-nuevo'){
-    cargarCatalogo().then(()=>{
-      const productosUnicos = [...new Set(cacheCatalogo.map(p=>p.productoProduccion||p.nombre))];
-      initSearchSelect('ss-pp-producto', productosUnicos.map(p=>({value:p, label:p})), {});
-      document.querySelector('#ss-pp-producto input[type=text]').value='';
-      document.getElementById('ss-pp-producto-valor').value='';
-      document.getElementById('pp-fecha').value = fechaLocalISO();
-    });
-  }
-};
 
 pintarUsuarios();
 </script>
