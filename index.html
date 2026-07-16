@@ -60,6 +60,15 @@
 .revision-row-top{padding-right:26px;}
 .revision-badge{display:inline-block;background:var(--surface);color:var(--ink-soft);font-size:12.5px;font-weight:600;padding:2px 8px;border-radius:20px;margin:4px 6px 0 0;}
 
+/* ===== Pedidos (16/07/2026): modo Desde cero, comentario por producto, factor de conversión ===== */
+.revision-row-extra{border-style:dashed;background:var(--paper);}
+.btn-vermas-cat{border:none;background:none;color:var(--ink-soft);font-size:12px;font-weight:700;padding:0 0 12px;cursor:pointer;}
+.btn-comentario-toggle{border:none;background:none;color:var(--ink-soft);font-size:11px;font-weight:700;padding:6px 0 0;cursor:pointer;}
+.revision-detalle-factor{font-size:11px;color:var(--caramel);font-weight:600;margin:6px 0 0;}
+.pedido-vacio{text-align:center;padding:44px 16px;}
+.pedido-vacio p:first-child{font-size:14.5px;font-weight:600;margin:0 0 4px;}
+.pedido-vacio p:last-child{font-size:12.5px;color:var(--ink-soft);margin:0;}
+
 .pauta-grupo-titulo{font-size:11px;color:var(--ink-soft);font-weight:800;text-transform:uppercase;letter-spacing:.4px;margin:16px 0 8px;}
 .pauta-row{border:1px solid var(--border);border-radius:11px;padding:11px 13px;margin-bottom:9px;position:relative;}
 .pauta-row.hecho{background:var(--forest-soft);}
@@ -635,24 +644,51 @@
     <button class="back-link" style="margin-bottom:0;" onclick="irA('screen-home')"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"></path></svg> Volver</button>
     <button class="icon-btn" title="Actualizar" onclick="abrirRevision(true)"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 4v6h-6"></path><path d="M1 20v-6h6"></path><path d="M3.5 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.65 4.36A9 9 0 0 0 20.5 15"></path></svg></button>
   </div>
-  <h2 style="font-size:17px;">Revisión y envío</h2>
-  <div id="revision-lista"></div>
-  <button class="btn-secondary" style="width:100%;margin:12px 0;" onclick="mostrarBuscadorRevision()">+ Agregar producto</button>
-  <div id="ss-rev-producto-wrap" style="display:none;">
-    <div class="search-select" id="ss-rev-producto">
-      <input type="text" placeholder="Buscar producto…" autocomplete="off" onfocus="abrirSearchSelect('ss-rev-producto')" oninput="filtrarSearchSelect('ss-rev-producto')">
-      <input type="hidden" id="ss-rev-producto-valor">
-      <div class="search-select-list" id="ss-rev-producto-list"></div>
+  <h2 style="font-size:17px;">Pedidos</h2>
+
+  <div class="pauta-tabs" id="pedido-tabs">
+    <button class="pauta-tab-btn activo" id="pedido-tab-btn-conteo" onclick="cambiarModoPedido('conteo')">Desde conteo</button>
+    <button class="pauta-tab-btn" id="pedido-tab-btn-cero" onclick="cambiarModoPedido('cero')">Desde cero</button>
+  </div>
+
+  <!-- MODO: DESDE CONTEO (flujo existente, sin cambios de lógica) -->
+  <div id="pedido-modo-conteo">
+    <div class="pedido-vacio" id="pedido-conteo-vacio" style="display:none;">
+      <p>No hay conteo pendiente</p>
+      <p>Usa "Desde cero" para armar un pedido sin conteo previo.</p>
+    </div>
+    <div id="pedido-conteo-contenido">
+      <div id="revision-lista"></div>
+      <button class="btn-secondary" style="width:100%;margin:12px 0;" onclick="mostrarBuscadorRevision()">+ Agregar producto</button>
+      <div id="ss-rev-producto-wrap" style="display:none;">
+        <div class="search-select" id="ss-rev-producto">
+          <input type="text" placeholder="Buscar producto…" autocomplete="off" onfocus="abrirSearchSelect('ss-rev-producto')" oninput="filtrarSearchSelect('ss-rev-producto')">
+          <input type="hidden" id="ss-rev-producto-valor">
+          <div class="search-select-list" id="ss-rev-producto-list"></div>
+        </div>
+      </div>
+      <div id="revision-observacion-wrap" style="display:none;">
+        <label style="font-size:12px;color:var(--ink-soft);display:block;margin:4px 0 6px;">Observación para producción (opcional)</label>
+        <textarea id="revision-observacion" placeholder="Ej: enviar temprano, hoy hay evento" style="width:100%;min-height:56px;font-size:13px;margin-bottom:14px;" oninput="cambiarObservacionRevision(this.value)"></textarea>
+      </div>
+      <div class="error-msg" id="revision-error"></div>
+      <div class="submit-bar">
+        <button class="btn-primary" onclick="enviarRevision()">Enviar a producción</button>
+        <button class="btn-secondary" style="width:100%;margin-top:8px;" onclick="registrarStockSinPedido()">Registrar stock</button>
+      </div>
     </div>
   </div>
-  <div id="revision-observacion-wrap" style="display:none;">
+
+  <!-- MODO: DESDE CERO (NUEVO 16/07/2026, con Osmar) -->
+  <div id="pedido-modo-cero" style="display:none;">
+    <div id="cero-chips" class="conteo-chips"></div>
+    <div id="cero-lista"></div>
     <label style="font-size:12px;color:var(--ink-soft);display:block;margin:4px 0 6px;">Observación para producción (opcional)</label>
-    <textarea id="revision-observacion" placeholder="Ej: enviar temprano, hoy hay evento" style="width:100%;min-height:56px;font-size:13px;margin-bottom:14px;" oninput="cambiarObservacionRevision(this.value)"></textarea>
-  </div>
-  <div class="error-msg" id="revision-error"></div>
-  <div class="submit-bar">
-    <button class="btn-primary" onclick="enviarRevision()">Enviar a producción</button>
-    <button class="btn-secondary" style="width:100%;margin-top:8px;" onclick="registrarStockSinPedido()">Registrar stock</button>
+    <textarea id="cero-observacion" placeholder="Ej: enviar temprano, hoy hay evento" style="width:100%;min-height:56px;font-size:13px;margin-bottom:14px;" oninput="cambiarObservacionCero(this.value)"></textarea>
+    <div class="error-msg" id="cero-error"></div>
+    <div class="submit-bar">
+      <button class="btn-primary" onclick="enviarPedidoDesdeCero()">Enviar a producción</button>
+    </div>
   </div>
 </div>
 
@@ -1134,7 +1170,7 @@ function agregarBloqueProduccion(cont) {
   if (!(tienePermisoLocal('RegistrarConteo') || tienePermisoLocal('VerPrograma') || tienePermisoLocal('GestionarPauta'))) return;
   cont.insertAdjacentHTML('beforeend','<div class="menu-grupo-titulo">Producción</div>');
   if (tienePermisoLocal('RegistrarConteo')) cont.appendChild(crearMenuCard(ICONS.conteo,'Contar stock','Conteo diario para Cima',()=>abrirConteo(),true,'caramel'));
-  if (tienePermisoLocal('VerPrograma')) cont.appendChild(crearMenuCard(ICONS.programa,'Revisión y envío','Revisar conteos y pedir a producción',()=>abrirRevision(),true,'caramel'));
+  if (tienePermisoLocal('VerPrograma')) cont.appendChild(crearMenuCard(ICONS.programa,'Pedidos','Pedir a producción, con o sin conteo',()=>abrirRevision(),true,'caramel'));
   if (tienePermisoLocal('GestionarPauta') || tienePermisoLocal('VerPrograma')) cont.appendChild(crearMenuCard(ICONS.programa,'Pauta de producción', tienePermisoLocal('GestionarPauta')?'Marcar pedidos como listos':'Ver historial de confirmaciones', ()=>abrirPauta(),true,'caramel'));
 }
 
@@ -1226,7 +1262,7 @@ function pintarSidebar(){
 
   let prodHtml='';
   if (tienePermisoLocal('RegistrarConteo')) prodHtml += item('screen-conteo',ICONS.conteo,'Contar stock');
-  if (tienePermisoLocal('VerPrograma')) prodHtml += item('screen-revision',ICONS.programa,'Revisión y envío');
+  if (tienePermisoLocal('VerPrograma')) prodHtml += item('screen-revision',ICONS.programa,'Pedidos');
   // CAMBIO 15/07/2026 (con Osmar): antes VerPrograma (sin GestionarPauta) mostraba la
   // pantalla vieja "Programa de producción" (screen-programa) — ya no corresponde a la
   // versión actual. Ahora entra a la misma "Pauta de producción", pero abrirPauta() la
