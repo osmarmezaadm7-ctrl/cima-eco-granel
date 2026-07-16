@@ -69,6 +69,27 @@
 .pedido-vacio p:first-child{font-size:14.5px;font-weight:600;margin:0 0 4px;}
 .pedido-vacio p:last-child{font-size:12.5px;color:var(--ink-soft);margin:0;}
 
+/* ===== Resumen antes de enviar / confirmar (16/07/2026, con Osmar) ===== */
+.resumen-fila{display:flex;justify-content:space-between;padding:9px 2px;border-bottom:1px solid var(--border);font-size:13.5px;}
+.resumen-fila strong{font-weight:600;}
+.resumen-fila.atenuado span,.resumen-fila.atenuado strong{color:var(--ink-soft);}
+.resumen-fila-nota{font-size:12px;color:var(--ink-soft);font-style:italic;margin:4px 2px 8px;}
+.resumen-seccion-titulo{font-size:11px;text-transform:uppercase;letter-spacing:.4px;font-weight:700;margin:16px 2px 4px;}
+.resumen-seccion-titulo:first-child{margin-top:0;}
+.resumen-seccion-titulo.verde{color:var(--forest);}
+.resumen-seccion-titulo.caramelo{color:var(--caramel);}
+.resumen-seccion-titulo.terracota{color:var(--terracotta);}
+.resumen-seccion-nota{font-weight:400;text-transform:none;color:var(--ink-soft);}
+.resumen-obs-card{background:var(--amber-soft);border:1px solid #E3D2B0;border-radius:12px;padding:11px 13px;margin:14px 0;}
+.resumen-obs-titulo{font-size:11px;color:#7A5A34;font-weight:700;text-transform:uppercase;letter-spacing:.3px;margin:0 0 4px;}
+.resumen-obs-card p:last-child{font-size:12.5px;color:#4A3A22;margin:0;}
+.resumen-total{font-size:11.5px;color:var(--ink-soft);margin:16px 0 14px;}
+
+/* ===== Pauta — vista "Pendientes" de Osmar/Rocío (solo ver + eliminar) ===== */
+.pauta-row-lectura .pauta-row-top{padding-right:0;align-items:flex-start;}
+.pauta-meta{font-size:11.5px;color:var(--ink-soft);margin:2px 0 0;}
+.btn-eliminar-pauta{border:1px solid var(--terracotta);color:var(--terracotta);background:var(--terracotta-soft);font-size:11.5px;font-weight:600;padding:6px 10px;border-radius:8px;flex-shrink:0;cursor:pointer;}
+
 .pauta-grupo-titulo{font-size:11px;color:var(--ink-soft);font-weight:800;text-transform:uppercase;letter-spacing:.4px;margin:16px 0 8px;}
 .pauta-row{border:1px solid var(--border);border-radius:11px;padding:11px 13px;margin-bottom:9px;position:relative;}
 .pauta-row.hecho{background:var(--forest-soft);}
@@ -673,7 +694,7 @@
       </div>
       <div class="error-msg" id="revision-error"></div>
       <div class="submit-bar">
-        <button class="btn-primary" onclick="enviarRevision()">Enviar a producción</button>
+        <button class="btn-primary" onclick="revisarPedidoDesdeConteo()">Enviar a producción</button>
         <button class="btn-secondary" style="width:100%;margin-top:8px;" onclick="registrarStockSinPedido()">Registrar stock</button>
       </div>
     </div>
@@ -687,8 +708,28 @@
     <textarea id="cero-observacion" placeholder="Ej: enviar temprano, hoy hay evento" style="width:100%;min-height:56px;font-size:13px;margin-bottom:14px;" oninput="cambiarObservacionCero(this.value)"></textarea>
     <div class="error-msg" id="cero-error"></div>
     <div class="submit-bar">
-      <button class="btn-primary" onclick="enviarPedidoDesdeCero()">Enviar a producción</button>
+      <button class="btn-primary" onclick="revisarPedidoDesdeCero()">Enviar a producción</button>
     </div>
+  </div>
+</div>
+
+<div class="screen" id="screen-resumen-pedido">
+  <div class="header-row" style="margin-bottom:10px;">
+    <button class="back-link" style="margin-bottom:0;" onclick="volverAEditarPedido()"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"></path></svg> Volver</button>
+  </div>
+  <h2 style="font-size:17px;">Revisar antes de enviar</h2>
+  <div id="resumen-pedido-lista"></div>
+  <div id="resumen-pedido-observacion-wrap" style="display:none;">
+    <div class="resumen-obs-card">
+      <p class="resumen-obs-titulo">Observación</p>
+      <p id="resumen-pedido-observacion-texto"></p>
+    </div>
+  </div>
+  <p class="resumen-total" id="resumen-pedido-total"></p>
+  <div class="error-msg" id="resumen-pedido-error"></div>
+  <div class="submit-bar">
+    <button class="btn-primary" onclick="confirmarEnvioPedido()">Confirmar y enviar</button>
+    <button class="btn-secondary" style="width:100%;margin-top:8px;" onclick="volverAEditarPedido()">Volver a editar</button>
   </div>
 </div>
 
@@ -704,20 +745,36 @@
   </div>
   <div id="pauta-tab-activa">
     <div id="pauta-lista"></div>
-    <button class="btn-secondary" style="width:100%;margin:12px 0;" onclick="mostrarBuscadorPauta()">+ Agregar producto</button>
-    <div id="ss-pauta-producto-wrap" style="display:none;">
-      <div class="search-select" id="ss-pauta-producto">
-        <input type="text" placeholder="Buscar producto…" autocomplete="off" onfocus="abrirSearchSelect('ss-pauta-producto')" oninput="filtrarSearchSelect('ss-pauta-producto')">
-        <input type="hidden" id="ss-pauta-producto-valor">
-        <div class="search-select-list" id="ss-pauta-producto-list"></div>
+    <div id="pauta-agregar-wrap">
+      <button class="btn-secondary" style="width:100%;margin:12px 0;" onclick="mostrarBuscadorPauta()">+ Agregar producto</button>
+      <div id="ss-pauta-producto-wrap" style="display:none;">
+        <div class="search-select" id="ss-pauta-producto">
+          <input type="text" placeholder="Buscar producto…" autocomplete="off" onfocus="abrirSearchSelect('ss-pauta-producto')" oninput="filtrarSearchSelect('ss-pauta-producto')">
+          <input type="hidden" id="ss-pauta-producto-valor">
+          <div class="search-select-list" id="ss-pauta-producto-list"></div>
+        </div>
       </div>
     </div>
     <div class="error-msg" id="pauta-error"></div>
-    <div class="submit-bar"><button class="btn-primary" onclick="confirmarProduccion()">Confirmar producción</button></div>
+    <div class="submit-bar" id="pauta-confirmar-wrap"><button class="btn-primary" onclick="revisarPauta()">Confirmar producción</button></div>
   </div>
   <div id="pauta-tab-historial" style="display:none;">
     <div id="historial-lista"></div>
     <button class="btn-secondary" style="width:100%;margin:12px 0;display:none;" id="historial-vermas" onclick="cargarHistorialPauta(false)">Ver más</button>
+  </div>
+</div>
+
+<div class="screen" id="screen-resumen-pauta">
+  <div class="header-row" style="margin-bottom:10px;">
+    <button class="back-link" style="margin-bottom:0;" onclick="irA('screen-pauta')"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"></path></svg> Volver</button>
+  </div>
+  <h2 style="font-size:17px;">Revisar antes de confirmar</h2>
+  <div id="resumen-pauta-lista"></div>
+  <p class="resumen-total" id="resumen-pauta-total"></p>
+  <div class="error-msg" id="resumen-pauta-error"></div>
+  <div class="submit-bar">
+    <button class="btn-primary" onclick="confirmarProduccion()">Confirmar producción</button>
+    <button class="btn-secondary" style="width:100%;margin-top:8px;" onclick="irA('screen-pauta')">Volver a editar</button>
   </div>
 </div>
 
@@ -731,7 +788,21 @@
   <div id="conteo-chips" class="conteo-chips"></div>
   <div id="conteo-lista"></div>
   <div class="error-msg" id="conteo-error"></div>
-  <div class="submit-bar"><button class="btn-primary" onclick="guardarConteo()">Guardar conteo</button></div>
+  <div class="submit-bar"><button class="btn-primary" onclick="revisarConteo()">Guardar conteo</button></div>
+</div>
+
+<div class="screen" id="screen-resumen-conteo">
+  <div class="header-row" style="margin-bottom:10px;">
+    <button class="back-link" style="margin-bottom:0;" onclick="irA('screen-conteo')"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"></path></svg> Volver</button>
+  </div>
+  <h2 style="font-size:17px;">Revisar antes de guardar</h2>
+  <div id="resumen-conteo-lista"></div>
+  <p class="resumen-total" id="resumen-conteo-total"></p>
+  <div class="error-msg" id="resumen-conteo-error"></div>
+  <div class="submit-bar">
+    <button class="btn-primary" onclick="confirmarGuardarConteo()">Confirmar y guardar</button>
+    <button class="btn-secondary" style="width:100%;margin-top:8px;" onclick="irA('screen-conteo')">Volver a editar</button>
+  </div>
 </div>
 
 <div class="screen desktop-wide" id="screen-inventario">
