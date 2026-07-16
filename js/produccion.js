@@ -1108,7 +1108,7 @@ function pintarHistorialPauta() {
       (h.faltantes.length ? '<div class="hist-grupo-titulo pend">Pendiente</div>' + h.faltantes.map(filaItem).join('') : '');
     return '<div class="card-dia verde" onclick="var e=document.getElementById(\'' + idDet + '\');e.style.display=(e.style.display===\'block\'?\'none\':\'block\');">' +
       '<div class="c-top"><strong>' + h.fecha + (h.hora ? ', ' + h.hora : '') + '</strong><span class="badge-completado">' + h.completados.length + ' de ' + total + '</span></div>' +
-      '<p style="font-size:12px;color:var(--ink-soft);margin:2px 0 0;">Confirmado por ' + h.responsable + '</p>' +
+      '<p class="hist-confirmado" style="color:var(--ink-soft);margin:2px 0 0;">Confirmado por ' + h.responsable + '</p>' +
       '<div class="hist-metricas">' +
         '<span class="m-ok">' + h.completados.length + ' completado' + (h.completados.length === 1 ? '' : 's') + '</span>' +
         (h.faltantes.length ? '<span class="m-pend">' + h.faltantes.length + ' pendiente' + (h.faltantes.length === 1 ? '' : 's') + '</span>' : '') +
