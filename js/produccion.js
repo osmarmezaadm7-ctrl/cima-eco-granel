@@ -197,6 +197,13 @@ function factorDe_(productoProduccion) {
   const p = cacheCatalogoCompleto.catalogo.find(x => x.productoProduccion === productoProduccion);
   return p ? (p.factorConversion || 1) : 1;
 }
+// NUEVO 16/07/2026 (con Osmar): salto del +/- al pedir (ej. Rollitos de canela de a 16).
+// Solo aplica a los steppers de Pedidos — Conteo sigue contando de a 1 siempre.
+function pasoDe_(productoProduccion) {
+  if (!cacheCatalogoCompleto || !cacheCatalogoCompleto.catalogo) return 1;
+  const p = cacheCatalogoCompleto.catalogo.find(x => x.productoProduccion === productoProduccion);
+  return p ? (p.pasoPedido || 1) : 1;
+}
 // Ítems con factor > 1 (ej. tartas/kuchenes/queques, 1 unidad = 8 trozos) se piden por
 // unidad entera — esta etiqueta lo deja explícito en vez de depender de que se recuerde.
 function etiquetaFactorHtml_(productoProduccion) {
@@ -297,7 +304,11 @@ function pintarRevision() {
       '<button class="revision-quitar" title="Quitar" onclick="quitarProductoRevision(\'' + clave + '\')"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"></path><path d="M6 6l12 12"></path></svg></button>' +
       '<div class="revision-row-top">' +
         '<span>' + it.productoProduccion + '</span>' +
-        '<input type="number" min="0" placeholder="0" value="' + val + '" oninput="cambiarPedidoRevision(\'' + clave + '\',this.value)">' +
+        '<div class="conteo-stepper">' +
+          '<button type="button" onclick="cambiarPedidoRevisionPaso(\'' + clave + '\',-1)">\u2212</button>' +
+          '<input type="number" min="0" placeholder="0" value="' + val + '" oninput="cambiarPedidoRevision(\'' + clave + '\',this.value)">' +
+          '<button type="button" onclick="cambiarPedidoRevisionPaso(\'' + clave + '\',1)">+</button>' +
+        '</div>' +
       '</div>' +
       '<p class="revision-detalle">' + badgesDetalleRevision_(it.detalle, it.stockCongeladoVC) + '</p>' +
       etiquetaFactorHtml_(it.productoProduccion) +
@@ -311,7 +322,11 @@ function pintarRevision() {
       '<button class="revision-quitar" title="Quitar" onclick="quitarAgregadoRevision(' + idx + ')"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"></path><path d="M6 6l12 12"></path></svg></button>' +
       '<div class="revision-row-top">' +
         '<span>' + a.nombre + '</span>' +
-        '<input type="number" min="0" placeholder="0" value="' + val + '" oninput="cambiarPedidoRevision(\'' + clave + '\',this.value)">' +
+        '<div class="conteo-stepper">' +
+          '<button type="button" onclick="cambiarPedidoRevisionPaso(\'' + clave + '\',-1)">\u2212</button>' +
+          '<input type="number" min="0" placeholder="0" value="' + val + '" oninput="cambiarPedidoRevision(\'' + clave + '\',this.value)">' +
+          '<button type="button" onclick="cambiarPedidoRevisionPaso(\'' + clave + '\',1)">+</button>' +
+        '</div>' +
       '</div>' +
       '<p class="revision-detalle">Agregado manualmente</p>' +
       etiquetaFactorHtml_(a.productoProduccion) +
@@ -342,6 +357,12 @@ function cambiarPedidoRevision(clave, val) {
   const n = Number(val);
   if (val === '' || isNaN(n)) delete revisionPedidos[clave];
   else revisionPedidos[clave] = Math.max(0, n);
+}
+function cambiarPedidoRevisionPaso(clave, signo) {
+  const paso = pasoDe_(clave);
+  const actual = revisionPedidos[clave] !== undefined ? revisionPedidos[clave] : 0;
+  revisionPedidos[clave] = Math.max(0, actual + signo * paso);
+  pintarRevision();
 }
 
 async function mostrarBuscadorRevision() {
@@ -440,9 +461,11 @@ function toggleCategoriaCero(cat) {
   if (ceroCategoriasActivas.has(cat)) ceroCategoriasActivas.delete(cat); else ceroCategoriasActivas.add(cat);
   pintarCero();
 }
-function cambiarCantidadCero(key, delta) {
+function cambiarCantidadCero(key, signo) {
+  const productoProduccion = key.split('|')[0];
+  const paso = pasoDe_(productoProduccion);
   const actual = ceroCantidades[key] !== undefined ? ceroCantidades[key] : 0;
-  ceroCantidades[key] = Math.max(0, actual + delta);
+  ceroCantidades[key] = Math.max(0, actual + signo * paso);
   pintarCero();
 }
 function escribirCantidadCero(key, val) {
