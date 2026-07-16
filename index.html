@@ -286,21 +286,41 @@
         <div style="flex:1;"><label>Hasta</label><input type="date" id="cc-fecha-hasta" autocomplete="off"></div>
       </div>
     </div>
-    <label>Saldo inicial <span style="font-weight:400;color:var(--ink-soft);">— Reporte Z Aronium</span></label>
-    <div class="field-money"><span>$</span><input type="number" id="cc-saldo" autocomplete="off"></div>
-    <label>Efectivo <span style="font-weight:400;color:var(--ink-soft);">— total físico en caja</span></label>
-    <div class="field-money"><span>$</span><input type="number" id="cc-efectivo" autocomplete="off"></div>
-    <button type="button" class="btn-secondary btn-small" style="margin:-4px 0 10px;" onclick="abrirArqueo()">🧮 Contar por denominación</button>
-    <label>Débito <span style="font-weight:400;color:var(--ink-soft);">— voucher Transbank</span></label>
-    <div class="field-money"><span>$</span><input type="number" id="cc-debito" autocomplete="off"></div>
-    <label>Crédito <span style="font-weight:400;color:var(--ink-soft);">— voucher Transbank</span></label>
-    <div class="field-money"><span>$</span><input type="number" id="cc-credito" autocomplete="off"></div>
-    <label>Transferencias <span style="font-weight:400;color:var(--ink-soft);">— Reporte Z Aronium</span></label>
-    <div class="field-money"><span>$</span><input type="number" id="cc-transferencia" autocomplete="off"></div>
-    <label>Pedidos Ya <span style="font-weight:400;color:var(--ink-soft);">— total POS Pedidos Ya</span></label>
-    <div class="field-money"><span>$</span><input type="number" id="cc-pedidosya" autocomplete="off"></div>
-    <label>Retiro <span style="font-weight:400;color:var(--ink-soft);">— Efectivo</span></label>
-    <div class="field-money"><span>$</span><input type="number" id="cc-retiro" autocomplete="off"></div>
+    <div class="desktop-grid2">
+      <div>
+        <label>Saldo inicial <span style="font-weight:400;color:var(--ink-soft);">— Reporte Z Aronium</span></label>
+        <div class="field-money"><span>$</span><input type="number" id="cc-saldo" autocomplete="off"></div>
+      </div>
+      <div>
+        <label>Efectivo <span style="font-weight:400;color:var(--ink-soft);">— total físico en caja</span></label>
+        <div class="field-money"><span>$</span><input type="number" id="cc-efectivo" autocomplete="off"></div>
+        <button type="button" class="btn-secondary btn-small" style="margin:8px 0 0;width:100%;" onclick="abrirArqueo()">🧮 Contar por denominación</button>
+      </div>
+    </div>
+    <div class="desktop-grid2">
+      <div>
+        <label>Débito <span style="font-weight:400;color:var(--ink-soft);">— voucher Transbank</span></label>
+        <div class="field-money"><span>$</span><input type="number" id="cc-debito" autocomplete="off"></div>
+      </div>
+      <div>
+        <label>Crédito <span style="font-weight:400;color:var(--ink-soft);">— voucher Transbank</span></label>
+        <div class="field-money"><span>$</span><input type="number" id="cc-credito" autocomplete="off"></div>
+      </div>
+    </div>
+    <div class="desktop-grid2">
+      <div>
+        <label>Transferencias <span style="font-weight:400;color:var(--ink-soft);">— Reporte Z Aronium</span></label>
+        <div class="field-money"><span>$</span><input type="number" id="cc-transferencia" autocomplete="off"></div>
+      </div>
+      <div>
+        <label>Pedidos Ya <span style="font-weight:400;color:var(--ink-soft);">— total POS Pedidos Ya</span></label>
+        <div class="field-money"><span>$</span><input type="number" id="cc-pedidosya" autocomplete="off"></div>
+      </div>
+    </div>
+    <div class="cc-retiro-wrap">
+      <label>Retiro <span style="font-weight:400;color:var(--ink-soft);">— Efectivo</span></label>
+      <div class="field-money"><span>$</span><input type="number" id="cc-retiro" autocomplete="off"></div>
+    </div>
     <div class="error-msg" id="cc-error"></div>
     <div class="submit-bar"><button class="btn-primary" onclick="revisarCierreCaja()">Revisar y guardar</button></div>
   </div>
@@ -309,84 +329,106 @@
   <div class="screen desktop-wide" id="screen-venta-vegan">
     <button class="back-link" onclick="irA('screen-home')"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"></path></svg> Volver</button>
     <h2 style="font-size:17px;">Venta · Vegan Corner</h2>
-    <label>Fecha</label><input type="date" id="vv-fecha">
-    <label>Cliente</label>
-    <div class="search-select" id="ss-vv-cliente">
-      <input type="text" placeholder="Buscar cliente…" autocomplete="off" onfocus="abrirSearchSelect('ss-vv-cliente')" oninput="filtrarSearchSelect('ss-vv-cliente')">
-      <input type="hidden" id="ss-vv-cliente-valor">
-      <div class="search-select-list" id="ss-vv-cliente-list"></div>
-    </div>
-    <label>N° de orden</label><input type="text" id="vv-orden">
-
-    <label>Productos</label>
-    <div id="vv-carrito"></div>
-    <button class="btn-secondary" style="margin-top:4px;" onclick="abrirModalAgregarProductos()">+ Agregar productos</button>
-
-    <div class="cart-total">
-      <div class="rowline"><span>Subtotal</span><b class="mono" id="vv-subtotal">$0</b></div>
-      <label style="margin-top:6px;">Descuento</label>
-      <div style="display:flex;gap:8px;">
-        <div class="field-money" style="flex:1;"><span>$</span><input type="number" id="vv-descuento" value="0" oninput="recalcularCarrito()"></div>
-        <select id="vv-descuento-tipo" style="flex:0 0 90px;" onchange="recalcularCarrito()"><option value="monto">$</option><option value="pct">%</option></select>
+    <div class="vv-checkout">
+    <div>
+      <div class="desktop-grid2">
+        <div><label>Fecha</label><input type="date" id="vv-fecha"></div>
+        <div><label>N° de orden</label><input type="text" id="vv-orden"></div>
       </div>
-      <div class="rowline"><span>Neto</span><b class="mono" id="vv-neto">$0</b></div>
-      <label>¿Con factura?</label>
-      <div class="toggle-group" id="vv-factura-group">
-        <button type="button" onclick="seleccionarToggle('vv-factura-group',this,'SI');recalcularCarrito();">Sí</button>
-        <button type="button" onclick="seleccionarToggle('vv-factura-group',this,'NO');recalcularCarrito();">No</button>
+      <label>Cliente</label>
+      <div class="search-select" id="ss-vv-cliente">
+        <input type="text" placeholder="Buscar cliente…" autocomplete="off" onfocus="abrirSearchSelect('ss-vv-cliente')" oninput="filtrarSearchSelect('ss-vv-cliente')">
+        <input type="hidden" id="ss-vv-cliente-valor">
+        <div class="search-select-list" id="ss-vv-cliente-list"></div>
       </div>
-      <div class="rowline"><span>IVA (19%)</span><b class="mono" id="vv-iva">$0</b></div>
-      <div class="rowline" style="font-size:14px;font-weight:700;"><span>TOTAL</span><b class="mono" id="vv-total">$0</b></div>
+
+      <label>Productos</label>
+      <div id="vv-carrito"></div>
+      <button class="btn-secondary" style="margin-top:4px;" onclick="abrirModalAgregarProductos()">+ Agregar productos</button>
     </div>
 
-    <label>Estado</label>
-    <div class="toggle-group" id="vv-estado-group">
-      <button type="button" onclick="seleccionarEstadoPago('vv',this,'Pagado')">Pagado</button>
-      <button type="button" onclick="seleccionarEstadoPago('vv',this,'Pendiente de pago')">Pendiente</button>
-    </div>
-    <div id="vv-parcial-wrap" style="display:none;">
-      <label style="display:flex;align-items:center;gap:7px;margin-top:8px;font-weight:400;">
-        <input type="checkbox" id="vv-parcial-check" onchange="togglePagoParcial('vv')">Pago parcial (dejar un saldo pendiente)
+    <div class="vv-resumen-panel">
+      <div class="cart-total" style="border:none;padding:0;">
+        <div class="rowline"><span>Subtotal</span><b class="mono" id="vv-subtotal">$0</b></div>
+        <label style="margin-top:6px;">Descuento</label>
+        <div style="display:flex;gap:8px;">
+          <div class="field-money" style="flex:1;"><span>$</span><input type="number" id="vv-descuento" value="0" oninput="recalcularCarrito()"></div>
+          <select id="vv-descuento-tipo" style="flex:0 0 90px;" onchange="recalcularCarrito()"><option value="monto">$</option><option value="pct">%</option></select>
+        </div>
+        <div class="rowline"><span>Neto</span><b class="mono" id="vv-neto">$0</b></div>
+        <label>¿Con factura?</label>
+        <div class="toggle-group" id="vv-factura-group">
+          <button type="button" onclick="seleccionarToggle('vv-factura-group',this,'SI');recalcularCarrito();">Sí</button>
+          <button type="button" onclick="seleccionarToggle('vv-factura-group',this,'NO');recalcularCarrito();">No</button>
+        </div>
+        <div class="rowline"><span>IVA (19%)</span><b class="mono" id="vv-iva">$0</b></div>
+        <div class="rowline" style="font-size:14px;font-weight:700;"><span>TOTAL</span><b class="mono" id="vv-total">$0</b></div>
+      </div>
+
+      <label>Estado</label>
+      <div class="toggle-group" id="vv-estado-group">
+        <button type="button" onclick="seleccionarEstadoPago('vv',this,'Pagado')">Pagado</button>
+        <button type="button" onclick="seleccionarEstadoPago('vv',this,'Pendiente de pago')">Pendiente</button>
+      </div>
+      <div id="vv-parcial-wrap" style="display:none;">
+        <label style="display:flex;align-items:center;gap:7px;margin-top:8px;font-weight:400;">
+          <input type="checkbox" id="vv-parcial-check" onchange="togglePagoParcial('vv')">Pago parcial (dejar un saldo pendiente)
+        </label>
+        <div id="vv-abono-wrap" style="display:none;">
+          <label>Abono ahora</label>
+          <div class="field-money"><span>$</span><input type="number" id="vv-abono" oninput="actualizarResumenPagos('vv')"></div>
+        </div>
+      </div>
+
+      <label style="margin-top:10px;">Medios de pago</label>
+      <div id="vv-pagos-lista"></div>
+      <label style="display:flex;align-items:center;gap:7px;margin-top:2px;font-weight:400;">
+        <input type="checkbox" id="vv-multi-check" onchange="toggleSegundoPago('vv')">Agregar otro medio de pago
       </label>
-      <div id="vv-abono-wrap" style="display:none;">
-        <label>Abono ahora</label>
-        <div class="field-money"><span>$</span><input type="number" id="vv-abono" oninput="actualizarResumenPagos('vv')"></div>
-      </div>
+      <div id="vv-pagos-resumen" style="font-size:12px;margin-top:6px;"></div>
+      <div class="error-msg" id="vv-error"></div>
+      <div class="submit-bar"><button class="btn-primary" onclick="enviarVentaVegan()">Guardar venta</button></div>
     </div>
-
-    <label style="margin-top:10px;">Medios de pago</label>
-    <div id="vv-pagos-lista"></div>
-    <label style="display:flex;align-items:center;gap:7px;margin-top:2px;font-weight:400;">
-      <input type="checkbox" id="vv-multi-check" onchange="toggleSegundoPago('vv')">Agregar otro medio de pago
-    </label>
-    <div id="vv-pagos-resumen" style="font-size:12px;margin-top:6px;"></div>
-    <div class="error-msg" id="vv-error"></div>
-    <div class="submit-bar"><button class="btn-primary" onclick="enviarVentaVegan()">Guardar venta</button></div>
+    </div>
   </div>
 
   <!-- COMPRA / GASTO (Admin + Rocío) -->
   <div class="screen" id="screen-compra">
     <button class="back-link" onclick="irA('screen-home')"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"></path></svg> Volver</button>
     <h2 style="font-size:17px;">Compra / gasto</h2>
-    <label>Fecha</label><input type="date" id="co-fecha" autocomplete="off">
-    <label>Negocio</label><div class="toggle-group" id="co-negocio-group" style="flex-wrap:wrap;"></div>
-    <label>Categoría</label>
-    <div class="search-select" id="ss-co-naturaleza">
-      <input type="text" placeholder="Buscar categoría…" autocomplete="off" onfocus="abrirSearchSelect('ss-co-naturaleza')" oninput="filtrarSearchSelect('ss-co-naturaleza')">
-      <input type="hidden" id="ss-co-naturaleza-valor">
-      <div class="search-select-list" id="ss-co-naturaleza-list"></div>
+    <div class="desktop-grid2">
+      <div><label>Fecha</label><input type="date" id="co-fecha" autocomplete="off"></div>
+      <div><label>Negocio</label><div class="toggle-group" id="co-negocio-group" style="flex-wrap:wrap;"></div></div>
     </div>
-    <label>Proveedor</label>
-    <div class="search-select" id="ss-co-proveedor">
-      <input type="text" placeholder="Buscar proveedor…" autocomplete="off" onfocus="abrirSearchSelect('ss-co-proveedor')" oninput="filtrarSearchSelect('ss-co-proveedor')">
-      <input type="hidden" id="ss-co-proveedor-valor">
-      <div class="search-select-list" id="ss-co-proveedor-list"></div>
+    <div class="desktop-grid2">
+      <div>
+        <label>Categoría</label>
+        <div class="search-select" id="ss-co-naturaleza">
+          <input type="text" placeholder="Buscar categoría…" autocomplete="off" onfocus="abrirSearchSelect('ss-co-naturaleza')" oninput="filtrarSearchSelect('ss-co-naturaleza')">
+          <input type="hidden" id="ss-co-naturaleza-valor">
+          <div class="search-select-list" id="ss-co-naturaleza-list"></div>
+        </div>
+      </div>
+      <div>
+        <label>Proveedor</label>
+        <div class="search-select" id="ss-co-proveedor">
+          <input type="text" placeholder="Buscar proveedor…" autocomplete="off" onfocus="abrirSearchSelect('ss-co-proveedor')" oninput="filtrarSearchSelect('ss-co-proveedor')">
+          <input type="hidden" id="ss-co-proveedor-valor">
+          <div class="search-select-list" id="ss-co-proveedor-list"></div>
+        </div>
+      </div>
     </div>
-    <label>Tipo de documento</label>
-    <select id="co-tipo-doc"><option>Factura</option><option>Boleta</option><option>Nota de Crédito</option><option>Sin documento</option><option>Otro</option></select>
-    <label>N° de documento</label><input type="text" id="co-ndoc" autocomplete="off">
-    <label>Monto</label><div class="field-money"><span>$</span><input type="number" id="co-monto" autocomplete="off"></div>
-    <label>Descripción</label><input type="text" id="co-desc" autocomplete="off"></input>
+    <div class="desktop-grid2">
+      <div>
+        <label>Tipo de documento</label>
+        <select id="co-tipo-doc"><option>Factura</option><option>Boleta</option><option>Nota de Crédito</option><option>Sin documento</option><option>Otro</option></select>
+      </div>
+      <div><label>N° de documento</label><input type="text" id="co-ndoc" autocomplete="off"></div>
+    </div>
+    <div class="desktop-grid2">
+      <div><label>Monto</label><div class="field-money"><span>$</span><input type="number" id="co-monto" autocomplete="off"></div></div>
+      <div><label>Descripción</label><input type="text" id="co-desc" autocomplete="off"></div>
+    </div>
     <label>Estado</label>
     <div class="toggle-group" id="co-estado-group">
       <button type="button" onclick="seleccionarEstadoPago('co',this,'Pagado')">Pagado</button>
@@ -1476,14 +1518,16 @@ function pintarPanel(r, anio, mes){
       '<div class="kpi"><div class="lbl">Retiros</div><div class="val">'+fmt(r.retiros)+'</div></div>'+
     '</div>'+
     '<div class="kpi-resultado"><div class="lbl">Resultado final</div><div class="val">'+fmt(r.resultadoFinal)+'</div></div>'+
+    '<div class="desktop-grid2">'+
     '<div class="panelc"><h3>Alertas pendientes</h3>'+alertasHtml+
       '<div class="rowline" style="margin-top:10px;font-size:14px;font-weight:700;"><span>Cuentas por pagar · '+cxp.cantidad+' documento(s)</span><b>'+fmt(cxp.total)+'</b></div>'+
       '<button class="btn-line" onclick="abrirCuentasPorPagar()">Ver cuentas por pagar</button>'+
     '</div>'+
+    '<div class="panelc"><h3>Cima vs Vegan Corner — resultado del mes</h3>'+renderComparativaCards(cima, vegan)+'</div>'+
+    '</div>'+
     '<div class="panelc"><h3>Últimos movimientos</h3><div id="panel-movimientos">'+skeletonCards(3)+'</div>'+
       '<button class="btn-line" onclick="abrirMovimientos()">Ver todos los movimientos</button>'+
     '</div>'+
-    '<div class="panelc"><h3>Cima vs Vegan Corner — resultado del mes</h3>'+renderComparativaCards(cima, vegan)+'</div>'+
     '<div class="panelc">'+
       '<div class="header-row"><h3 style="margin:0;">Flujo de ventas por día</h3>'+
         '<div class="pillbar" id="flujo-toggle" style="margin:0;">'+
@@ -1539,6 +1583,23 @@ function htmlMovimiento(m){
     '<div class="mov-right"><div class="mov-monto '+(esIngreso?'pos':'neg')+'">'+(esIngreso?'+':'-')+fmt(m.monto)+'</div><div class="mov-fecha">'+m.fecha+'</div></div>'+
   '</div>';
 }
+function htmlMovimientoDesktop(m){
+  const esIngreso = m.tipo==='Ingreso';
+  let meta = m.negocio;
+  if(esIngreso){
+    if(m.responsable) meta += ' · Responsable: '+m.responsable;
+    else if(m.cliente) meta += ' · Cliente: '+m.cliente;
+  } else {
+    if(m.proveedor) meta += ' · '+m.proveedor;
+    if(m.descripcion) meta += ' · '+m.descripcion;
+  }
+  return '<div class="mov-desktop">'+
+    '<div class="mov-fecha-col">'+m.fecha+'</div>'+
+    '<div class="mov-ico '+(esIngreso?'ingreso':'egreso')+'">'+(esIngreso?ICONS.ingreso:ICONS.egreso)+'</div>'+
+    '<div class="mov-txt"><div class="mov-cat">'+m.categoria+'</div><div class="mov-meta">'+meta+'</div></div>'+
+    '<div class="mov-monto '+(esIngreso?'pos':'neg')+'">'+(esIngreso?'+':'-')+fmt(m.monto)+'</div>'+
+  '</div>';
+}
 function pintarMovimientos(r){
   const cont = document.getElementById('panel-movimientos');
   if(!cont) return;
@@ -1560,10 +1621,16 @@ async function abrirMovimientos(forzar){
   const r = movimientosCache;
   if(!r || !r.ok){ cont.innerHTML = '<p style="font-size:13px;color:var(--danger);">'+((r&&r.error)||'Error al cargar')+'</p>'; return; }
   const movs = r.movimientos||[];
+  const esAncho = window.matchMedia('(min-width: 900px)').matches;
   cont.innerHTML = movs.length
-    ? '<div class="panelc">'+movs.map(htmlMovimiento).join('')+'</div>'
+    ? '<div class="panelc">'+(esAncho ? movs.map(htmlMovimientoDesktop).join('') : movs.map(htmlMovimiento).join(''))+'</div>'
     : '<p style="font-size:13px;color:var(--ink-soft);">Sin movimientos registrados todavía.</p>';
 }
+window.addEventListener('resize', ()=>{
+  if(document.getElementById('screen-movimientos') && document.getElementById('screen-movimientos').classList.contains('active') && movimientosCache){
+    abrirMovimientos();
+  }
+});
 
 const DENOMINACIONES = [
   { valor:20000, tipo:'Billete' }, { valor:10000, tipo:'Billete' }, { valor:5000, tipo:'Billete' }, { valor:2000, tipo:'Billete' }, { valor:1000, tipo:'Billete' },
