@@ -1046,7 +1046,7 @@ async function cargarNotificaciones(){
     // botón de acción marca vista Y navega en un solo clic. Notificaciones sin accionNotif
     // (como las de Conciliación) se ven exactamente igual que antes.
     const accionBtn = n.accionNotif==='abrirRevision'
-      ? '<button class="btn-primary" onclick="accionNotificacion(this,\''+n.id+'\',\'abrirRevision\')">Ver revisión</button>'
+      ? '<button class="btn-primary" onclick="accionNotificacion(this,\''+n.id+'\',\'abrirRevision\')">Ver pedido</button>'
       : n.accionNotif==='abrirPauta'
       ? '<button class="btn-primary" onclick="accionNotificacion(this,\''+n.id+'\',\'abrirPauta\')">Ver pauta</button>'
       : '';
@@ -1077,7 +1077,7 @@ async function accionNotificacion(btn, id, accion){
   btn.disabled = true;
   await llamarAPISilencioso('marcarNotificacionVista', {id});
   const card = btn.closest('.notif-card'); if(card) card.remove();
-  if(accion==='abrirRevision' && typeof abrirRevision==='function') abrirRevision();
+  if(accion==='abrirRevision' && typeof abrirRevision==='function') abrirRevision(false, true);
   if(accion==='abrirPauta' && typeof abrirPauta==='function') abrirPauta();
 }
 
