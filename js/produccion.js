@@ -110,24 +110,23 @@ function escribirCantidadConteo(key, val) {
   conteoCantidades[key] = Math.max(0, Number(val) || 0);
 }
 
-async function guardarConteo() {
+let resumenConteoProductos = [];
+let resumenConteoOrigenVC = false;
+
+function revisarConteo() {
   document.getElementById('conteo-error').textContent = '';
 
   if (esVeganCorner_()) {
     const productos = cacheConteoCatalogo.catalogo.filter(p => p.categoria === 'Empanadas Congeladas');
     if (!productos.length) { document.getElementById('conteo-error').textContent = 'No hay productos para guardar.'; return; }
-    for (const p of productos) {
+    const items = productos.map(p => {
       const key = p.productoProduccion + '|' + p.categoria;
-      const cantidad = conteoCantidades[key] !== undefined ? conteoCantidades[key] : 0;
-      const r = await llamarAPI('actualizarStockCongeladoVC', { data: { producto: p.productoProduccion, stockActual: cantidad, responsable: sesion.nombre } });
-      if (!r.ok) { document.getElementById('conteo-error').textContent = r.error || 'Error al guardar el stock'; return; }
-    }
-    conteoCantidades = {};
-    document.getElementById('confirm-title').textContent = 'Stock actualizado';
-    document.getElementById('confirm-msg').textContent = 'Se guardó tu stock congelado — Rocío lo va a ver en Revisión.';
-    document.getElementById('confirm-detalle').innerHTML = '';
-    ocultarBotonOtro();
-    irA('screen-confirm');
+      return { nombre: p.nombre, productoProduccion: p.productoProduccion, categoria: p.categoria, cantidadContada: conteoCantidades[key] !== undefined ? conteoCantidades[key] : 0 };
+    });
+    resumenConteoProductos = items;
+    resumenConteoOrigenVC = true;
+    pintarResumenConteo(items);
+    irA('screen-resumen-conteo');
     return;
   }
 
@@ -148,16 +147,56 @@ async function guardarConteo() {
     document.getElementById('conteo-error').textContent = 'No hay productos para guardar.';
     return;
   }
+  resumenConteoProductos = productos;
+  resumenConteoOrigenVC = false;
+  pintarResumenConteo(productos);
+  irA('screen-resumen-conteo');
+}
+
+function pintarResumenConteo(productos) {
+  const categorias = [...new Set(productos.map(p => p.categoria))];
+  let html = '';
+  let totalUnidades = 0;
+  categorias.forEach(cat => {
+    const items = productos.filter(p => p.categoria === cat);
+    html += '<p class="resumen-seccion-titulo">' + cat + '</p>' +
+      items.map(p => {
+        totalUnidades += p.cantidadContada;
+        return '<div class="resumen-fila"><span>' + p.nombre + '</span><strong>' + p.cantidadContada + '</strong></div>';
+      }).join('');
+  });
+  document.getElementById('resumen-conteo-lista').innerHTML = html;
+  document.getElementById('resumen-conteo-total').textContent =
+    productos.length + ' producto' + (productos.length === 1 ? '' : 's') + ' · ' + totalUnidades + ' unidad' + (totalUnidades === 1 ? '' : 'es') + ' en total';
+}
+
+async function confirmarGuardarConteo() {
+  document.getElementById('resumen-conteo-error').textContent = '';
+
+  if (resumenConteoOrigenVC) {
+    for (const p of resumenConteoProductos) {
+      const r = await llamarAPI('actualizarStockCongeladoVC', { data: { producto: p.productoProduccion, stockActual: p.cantidadContada, responsable: sesion.nombre } });
+      if (!r.ok) { document.getElementById('resumen-conteo-error').textContent = r.error || 'Error al guardar el stock'; return; }
+    }
+    conteoCantidades = {};
+    document.getElementById('confirm-title').textContent = 'Stock actualizado';
+    document.getElementById('confirm-msg').textContent = 'Se guardó tu stock congelado — Rocío lo va a ver en Revisión.';
+    document.getElementById('confirm-detalle').innerHTML = '';
+    ocultarBotonOtro();
+    irA('screen-confirm');
+    return;
+  }
+
   const r = await llamarAPI('guardarConteoStock', {
-    data: { responsable: sesion.nombre, categorias: [...conteoCategoriasActivas], productos }
+    data: { responsable: sesion.nombre, categorias: [...conteoCategoriasActivas], productos: resumenConteoProductos }
   });
   if (!r.ok) {
-    document.getElementById('conteo-error').textContent = r.error || 'Error al guardar el conteo';
+    document.getElementById('resumen-conteo-error').textContent = r.error || 'Error al guardar el conteo';
     return;
   }
   conteoCantidades = {};
   document.getElementById('confirm-title').textContent = 'Conteo guardado';
-  document.getElementById('confirm-msg').textContent = 'Se registraron ' + productos.length + ' productos. Rocío u Osmar lo revisan antes de pedir a producción.';
+  document.getElementById('confirm-msg').textContent = 'Se registraron ' + resumenConteoProductos.length + ' productos. Rocío u Osmar lo revisan antes de pedir a producción.';
   document.getElementById('confirm-detalle').innerHTML = '';
   ocultarBotonOtro();
   // Aviso corto a Rocío y Osmar, con botón directo a Revisión — el detalle completo se ve
@@ -394,7 +433,7 @@ function agregarProductoRevision(valor, opciones) {
   pintarRevision();
 }
 
-async function enviarRevision() {
+function revisarPedidoDesdeConteo() {
   document.getElementById('revision-error').textContent = '';
   const items = [];
   cacheRevision.items.forEach(it => {
@@ -410,26 +449,10 @@ async function enviarRevision() {
     document.getElementById('revision-error').textContent = 'Escribe una cantidad a pedir en al menos un producto.';
     return;
   }
-
-  const r = await llamarAPI('enviarProgramacionProduccion', {
-    data: { responsable: sesion.nombre, conteoIds: cacheRevision.conteoIds, items }
-  });
-  if (!r.ok) { document.getElementById('revision-error').textContent = r.error || 'Error al enviar el pedido'; return; }
-
-  // Notificación liviana a Rosa y Katherine — mensaje corto (el resumen completo lo ve el
-  // que envió en la pantalla de confirmación); no es pantalla propia, es parte de enviar.
-  const resumen = items.map(it => it.productoProduccion + ' x' + it.cantidadProgramada).join(', ');
-  const mensajeNotif = JSON.stringify({ tipo: 'pedidoProduccion', nombre: sesion.nombre, observacion: revisionObservacion || '' });
-  await llamarAPI('crearNotificacion', { para: ['Rosa Merino', 'Katherine Bustamante'], mensaje: mensajeNotif, accionNotif: 'abrirPauta' });
-
-  cacheRevision = null; revisionPedidos = {}; revisionAgregados = []; revisionEliminados = new Set(); revisionObservacion = ''; revisionComentarios = {};
-  document.getElementById('confirm-title').textContent = 'Pedido enviado';
-  document.getElementById('confirm-msg').textContent = 'Se avisó a Rosa y Katherine.';
-  document.getElementById('confirm-detalle').innerHTML = items.map(it =>
-    '<div class="check-row" style="background:var(--surface);border:1px solid var(--border);"><span>' + it.productoProduccion + '</span><strong>x' + it.cantidadProgramada + '</strong></div>'
-  ).join('');
-  ocultarBotonOtro();
-  irA('screen-confirm');
+  resumenPedidoItems = items;
+  resumenPedidoOrigen = 'conteo';
+  pintarResumenPedido(items, revisionObservacion);
+  irA('screen-resumen-pedido');
 }
 
 // NUEVO 15/07/2026 (con Osmar): "Registrar stock" — cierra el/los conteo(s) pendientes
@@ -532,7 +555,10 @@ function pintarCero() {
   document.getElementById('cero-lista').innerHTML = html;
 }
 
-async function enviarPedidoDesdeCero() {
+let resumenPedidoItems = [];
+let resumenPedidoOrigen = 'conteo'; // 'conteo' | 'cero'
+
+function revisarPedidoDesdeCero() {
   document.getElementById('cero-error').textContent = '';
   const items = [];
   cacheCatalogoCompleto.catalogo.forEach(p => {
@@ -544,22 +570,60 @@ async function enviarPedidoDesdeCero() {
     document.getElementById('cero-error').textContent = 'Escribe una cantidad a pedir en al menos un producto.';
     return;
   }
+  resumenPedidoItems = items;
+  resumenPedidoOrigen = 'cero';
+  pintarResumenPedido(items, ceroObservacion);
+  irA('screen-resumen-pedido');
+}
+
+// Compartido entre los dos modos de Pedidos — arma la pantalla de resumen antes de enviar.
+function pintarResumenPedido(items, observacion) {
+  const html = items.map(it =>
+    '<div class="resumen-fila"><span>' + it.productoProduccion + '</span><strong>' + it.cantidadProgramada + '</strong></div>' +
+    (it.comentario ? '<p class="resumen-fila-nota">"' + it.comentario + '"</p>' : '')
+  ).join('');
+  document.getElementById('resumen-pedido-lista').innerHTML = html;
+  const wrapObs = document.getElementById('resumen-pedido-observacion-wrap');
+  if (observacion) {
+    document.getElementById('resumen-pedido-observacion-texto').textContent = observacion;
+    wrapObs.style.display = '';
+  } else {
+    wrapObs.style.display = 'none';
+  }
+  document.getElementById('resumen-pedido-total').textContent = items.length + ' producto' + (items.length === 1 ? '' : 's') + ' · se avisa a Rosa y Katherine';
+}
+
+function volverAEditarPedido() {
+  irA('screen-revision');
+  cambiarModoPedido(resumenPedidoOrigen);
+}
+
+async function confirmarEnvioPedido() {
+  document.getElementById('resumen-pedido-error').textContent = '';
+  const conteoIds = resumenPedidoOrigen === 'conteo' ? cacheRevision.conteoIds : [];
 
   const r = await llamarAPI('enviarProgramacionProduccion', {
-    data: { responsable: sesion.nombre, conteoIds: [], items }
+    data: { responsable: sesion.nombre, conteoIds: conteoIds, items: resumenPedidoItems }
   });
-  if (!r.ok) { document.getElementById('cero-error').textContent = r.error || 'Error al enviar el pedido'; return; }
+  if (!r.ok) { document.getElementById('resumen-pedido-error').textContent = r.error || 'Error al enviar el pedido'; return; }
 
-  const mensajeNotif = JSON.stringify({ tipo: 'pedidoProduccion', nombre: sesion.nombre, observacion: ceroObservacion || '' });
+  const observacion = resumenPedidoOrigen === 'conteo' ? revisionObservacion : ceroObservacion;
+  const mensajeNotif = JSON.stringify({ tipo: 'pedidoProduccion', nombre: sesion.nombre, observacion: observacion || '' });
   await llamarAPI('crearNotificacion', { para: ['Rosa Merino', 'Katherine Bustamante'], mensaje: mensajeNotif, accionNotif: 'abrirPauta' });
 
-  ceroCategoriasActivas = new Set(); ceroCantidades = {}; ceroComentarios = {}; ceroVerMas = new Set(); ceroObservacion = '';
-  const taObs = document.getElementById('cero-observacion'); if (taObs) taObs.value = '';
+  const totalItems = resumenPedidoItems.length;
+  if (resumenPedidoOrigen === 'conteo') {
+    cacheRevision = null; revisionPedidos = {}; revisionAgregados = []; revisionEliminados = new Set(); revisionObservacion = ''; revisionComentarios = {};
+    const taObs = document.getElementById('revision-observacion'); if (taObs) taObs.value = '';
+  } else {
+    ceroCategoriasActivas = new Set(); ceroCantidades = {}; ceroComentarios = {}; ceroVerMas = new Set(); ceroObservacion = '';
+    const taObs2 = document.getElementById('cero-observacion'); if (taObs2) taObs2.value = '';
+  }
+  resumenPedidoItems = [];
+
   document.getElementById('confirm-title').textContent = 'Pedido enviado';
-  document.getElementById('confirm-msg').textContent = 'Se avisó a Rosa y Katherine.';
-  document.getElementById('confirm-detalle').innerHTML = items.map(it =>
-    '<div class="check-row" style="background:var(--surface);border:1px solid var(--border);"><span>' + it.productoProduccion + '</span><strong>x' + it.cantidadProgramada + '</strong></div>'
-  ).join('');
+  document.getElementById('confirm-msg').textContent = totalItems + ' producto' + (totalItems === 1 ? '' : 's') + '. Se avisó a Rosa y Katherine.';
+  document.getElementById('confirm-detalle').innerHTML = '';
   ocultarBotonOtro();
   irA('screen-confirm');
 }
@@ -583,23 +647,23 @@ let cacheHistorialPauta = [];       // acumulado de tarjetas ya traídas
 let historialPautaOffset = 0;       // cuántas filas ya se pidieron al servidor
 let historialPautaHayMas = false;
 
+let pautaSoloLectura = false; // true para Osmar/Rocío: ven Pendientes, pero no gestionan
+
 async function abrirPauta(forzar) {
   irA('screen-pauta');
   if (forzar) { cacheHistorialPauta = []; historialPautaOffset = 0; }
 
-  // CAMBIO 15/07/2026 (con Osmar): quien tiene VerPrograma pero no GestionarPauta (Osmar,
-  // Rocío) no gestiona la pauta activa — antes veía la pantalla vieja "Programa de
-  // producción" en el sidebar, ahora entra acá directo, pero solo a Historial (sin tabs,
-  // sin checklist, sin +Agregar ni Confirmar producción — esas acciones son de quien sí
-  // tiene GestionarPauta).
+  // CAMBIO 16/07/2026 (con Osmar): antes, quien tiene VerPrograma pero no GestionarPauta
+  // (Osmar, Rocío) no veía nada de "Pauta activa" — solo Historial. Ahora sí ven esa
+  // pestaña (renombrada "Pendientes" para ellos), pero en modo reducido: sin checklist, sin
+  // +Agregar ni Confirmar producción (eso sigue siendo de quien tiene GestionarPauta) — solo
+  // pueden ver el detalle y Eliminar un ítem atascado (eliminarItemPauta, con motivo).
   const soloHistorial = !tienePermisoLocal('GestionarPauta') && tienePermisoLocal('VerPrograma');
-  document.getElementById('pauta-tabs').style.display = soloHistorial ? 'none' : '';
-  if (soloHistorial) {
-    document.getElementById('pauta-tab-activa').style.display = 'none';
-    document.getElementById('pauta-tab-historial').style.display = '';
-    if (forzar || !cacheHistorialPauta.length) cargarHistorialPauta(true);
-    return;
-  }
+  pautaSoloLectura = soloHistorial;
+  document.getElementById('pauta-tabs').style.display = '';
+  document.getElementById('pauta-tab-btn-activa').textContent = soloHistorial ? 'Pendientes' : 'Pauta activa';
+  document.getElementById('pauta-agregar-wrap').style.display = soloHistorial ? 'none' : '';
+  document.getElementById('pauta-confirmar-wrap').style.display = soloHistorial ? 'none' : '';
 
   cambiarTabPauta('activa');
   if (!cachePauta || forzar) {
@@ -627,11 +691,26 @@ function pintarPauta() {
   const agregados = visibles.filter(it => pautaAgregadosSesion.indexOf(it.id) !== -1);
 
   if (!visibles.length) {
-    cont.innerHTML = '<p style="font-size:13.5px;color:var(--ink-soft);padding:24px 0;text-align:center;">No hay pedidos pendientes en la pauta.</p>';
+    cont.innerHTML = '<p style="font-size:13.5px;color:var(--ink-soft);padding:24px 0;text-align:center;">' +
+      (pautaSoloLectura ? 'No hay ítems pendientes.' : 'No hay pedidos pendientes en la pauta.') + '</p>';
     return;
   }
 
   const filaHtml = (it) => {
+    if (pautaSoloLectura) {
+      const cant = it.cantidadBorrador !== null && it.cantidadBorrador !== undefined ? it.cantidadBorrador : it.cantidadProgramada;
+      const nombreEsc = it.producto.replace(/'/g, "\\'");
+      return '<div class="pauta-row pauta-row-lectura">' +
+        '<div class="pauta-row-top">' +
+          '<div>' +
+            '<span class="pauta-nombre">' + it.producto + '</span>' +
+            '<p class="pauta-meta">' + it.fecha + ' · ' + it.responsable + ' · cantidad ' + cant + '</p>' +
+          '</div>' +
+          '<button class="btn-eliminar-pauta" onclick="abrirEliminarPauta(\'' + it.id + '\',\'' + nombreEsc + '\')">Eliminar</button>' +
+        '</div>' +
+        (it.comentario ? '<p class="pauta-obs">' + it.comentario + '</p>' : '') +
+      '</div>';
+    }
     const hecho = it.estadoBorrador === 'Hecho';
     const cant = it.cantidadBorrador !== null && it.cantidadBorrador !== undefined ? it.cantidadBorrador : it.cantidadProgramada;
     return '<div class="pauta-row' + (hecho ? ' hecho' : '') + '" id="pauta-row-' + it.id + '">' +
@@ -665,6 +744,30 @@ function pintarPauta() {
     html += '<p class="pauta-grupo-titulo">Agregado en esta sesión</p>' + agregados.map(filaHtml).join('');
   }
   cont.innerHTML = html;
+}
+
+// NUEVO 16/07/2026 (con Osmar): eliminar un ítem atascado — solo disponible en modo
+// pautaSoloLectura (Osmar/Rocío). No se borra la fila, queda marcada "Eliminado" con
+// motivo (ver eliminarItemPauta en Produccion.gs).
+function abrirEliminarPauta(id, nombre) {
+  abrirModal(
+    '<h3 style="font-size:15px;">Eliminar "' + nombre + '" de la Pauta</h3>' +
+    '<label style="font-size:11.5px;color:var(--ink-soft);display:block;margin:10px 0 5px;">Motivo</label>' +
+    '<input type="text" id="elim-pauta-motivo" placeholder="Ej: duplicado, ya no se necesita" style="width:100%;">' +
+    '<div class="error-msg" id="elim-pauta-error"></div>' +
+    '<div style="display:flex;gap:8px;margin-top:14px;">' +
+      '<button class="btn-secondary" style="flex:1;" onclick="cerrarModal()">Cancelar</button>' +
+      '<button class="btn-primary" style="flex:1;background:var(--terracotta);" onclick="confirmarEliminarPauta(\'' + id + '\')">Eliminar</button>' +
+    '</div>'
+  );
+}
+async function confirmarEliminarPauta(id) {
+  const motivo = document.getElementById('elim-pauta-motivo').value;
+  const r = await llamarAPI('eliminarItemPauta', { data: { id: id, motivo: motivo, responsable: sesion.nombre } });
+  if (!r.ok) { document.getElementById('elim-pauta-error').textContent = r.error || 'Error al eliminar'; return; }
+  cerrarModal();
+  cachePauta.pauta = cachePauta.pauta.filter(x => x.id !== id);
+  pintarPauta();
 }
 
 // CAMBIO 15/07/2026 (con Osmar): estos dos usaban llamarAPI, que muestra el overlay de
@@ -727,18 +830,63 @@ async function agregarProductoPauta(valor, opciones) {
   pintarPauta();
 }
 
-async function confirmarProduccion() {
+// NUEVO 16/07/2026 (con Osmar): resumen antes de confirmar — se calcula 100% en el cliente,
+// con los mismos datos que ya se editan en pantalla (estadoBorrador/cantidadBorrador), sin
+// llamar al backend todavía. Separa Completados / Agregado en esta sesión (aclarando que no
+// venía en el pedido) / Quedan pendientes — mismo criterio que ya usa pintarPauta.
+function revisarPauta() {
   document.getElementById('pauta-error').textContent = '';
+  const visibles = cachePauta.pauta.filter(it => !pautaOcultos.has(it.id));
+  const completados = visibles.filter(it => it.estadoBorrador === 'Hecho');
+  const faltantes = visibles.filter(it => it.estadoBorrador !== 'Hecho');
+  if (!completados.length && !faltantes.length) {
+    document.getElementById('pauta-error').textContent = 'No hay nada que confirmar.';
+    return;
+  }
+  pintarResumenPauta(completados, faltantes);
+  irA('screen-resumen-pauta');
+}
+
+function filaResumenPauta_(it, atenuado) {
+  const cant = it.cantidadBorrador !== null && it.cantidadBorrador !== undefined ? it.cantidadBorrador : it.cantidadProgramada;
+  return '<div class="resumen-fila' + (atenuado ? ' atenuado' : '') + '"><span>' + it.producto + '</span><strong>' + cant + '</strong></div>' +
+    (it.comentario ? '<p class="resumen-fila-nota">' + it.comentario + '</p>' : '');
+}
+
+function pintarResumenPauta(completados, faltantes) {
+  const compPlanificados = completados.filter(it => pautaAgregadosSesion.indexOf(it.id) === -1);
+  const compAgregados = completados.filter(it => pautaAgregadosSesion.indexOf(it.id) !== -1);
+
+  let html = '';
+  if (compPlanificados.length) {
+    html += '<p class="resumen-seccion-titulo verde">Completados</p>' + compPlanificados.map(it => filaResumenPauta_(it)).join('');
+  }
+  if (compAgregados.length) {
+    html += '<p class="resumen-seccion-titulo caramelo">Agregado en esta sesión <span class="resumen-seccion-nota">· no venía en el pedido</span></p>' +
+      compAgregados.map(it => filaResumenPauta_(it)).join('');
+  }
+  if (faltantes.length) {
+    html += '<p class="resumen-seccion-titulo terracota">Quedan pendientes</p>' + faltantes.map(it => filaResumenPauta_(it, true)).join('');
+  }
+  document.getElementById('resumen-pauta-lista').innerHTML = html;
+
+  const totalCompletados = completados.length;
+  let texto = totalCompletados + ' completado' + (totalCompletados === 1 ? '' : 's');
+  if (compAgregados.length) texto += ' (' + compAgregados.length + ' adicional' + (compAgregados.length === 1 ? '' : 'es') + ' al pedido)';
+  texto += faltantes.length ? ', ' + faltantes.length + ' pendiente' + (faltantes.length === 1 ? '' : 's') + ' para la próxima.' : '.';
+  document.getElementById('resumen-pauta-total').textContent = texto;
+}
+
+async function confirmarProduccion() {
+  document.getElementById('resumen-pauta-error').textContent = '';
   const r = await llamarAPI('confirmarPauta', { data: { responsable: sesion.nombre, agregadosIds: pautaAgregadosSesion } });
-  if (!r.ok) { document.getElementById('pauta-error').textContent = r.error || 'Error al confirmar producción'; return; }
+  if (!r.ok) { document.getElementById('resumen-pauta-error').textContent = r.error || 'Error al confirmar producción'; return; }
 
   cachePauta = null; pautaOcultos = new Set(); pautaAgregadosSesion = [];
   document.getElementById('confirm-title').textContent = 'Producción confirmada';
   document.getElementById('confirm-msg').textContent = r.completados.length + ' producto' + (r.completados.length === 1 ? '' : 's') + ' completado' + (r.completados.length === 1 ? '' : 's') +
     (r.faltantes.length ? ', ' + r.faltantes.length + ' quedaron pendientes para la próxima.' : '.');
-  document.getElementById('confirm-detalle').innerHTML = r.completados.map(it =>
-    '<div class="check-row" style="background:var(--surface);border:1px solid var(--border);"><span>' + it.producto + '</span><strong>x' + it.cantidad + '</strong></div>'
-  ).join('');
+  document.getElementById('confirm-detalle').innerHTML = '';
   ocultarBotonOtro();
   irA('screen-confirm');
 }
