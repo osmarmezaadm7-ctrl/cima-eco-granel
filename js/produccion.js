@@ -166,16 +166,59 @@ async function guardarConteo() {
   irA('screen-confirm');
 }
 
-// ============ REVISIÓN Y ENVÍO ============
+// ============ PEDIDOS (ex "Revisión y envío") — modo Desde conteo / Desde cero (16/07/2026) ============
 let cacheRevision = null;          // { ok, items:[...], conteoIds:[...] } — obtenerConteosPendientes()
-let cacheCatalogoCompleto = null;  // catálogo completo (soloConteo:false), para "+ Agregar producto"
-let revisionPedidos = {};          // productoProduccion -> cantidad a pedir
-let revisionAgregados = [];        // [{productoProduccion, nombre, comentario}] agregados a mano, sin conteo previo
+let cacheCatalogoCompleto = null;  // catálogo completo (soloConteo:false) — compartido entre "+ Agregar
+                                    // producto", el modo Desde cero, y las etiquetas de factor de conversión
+let revisionPedidos = {};          // productoProduccion -> cantidad a pedir (modo Desde conteo)
+let revisionAgregados = [];        // [{productoProduccion, nombre}] agregados a mano, sin conteo previo
 let revisionEliminados = new Set(); // productoProduccion quitados de la lista que vino del conteo (no se envían)
-let revisionObservacion = '';      // observación general opcional para toda la orden
+let revisionObservacion = '';      // observación general opcional (modo Desde conteo)
+let revisionComentarios = {};      // productoProduccion -> comentario opcional por producto (Desde conteo)
+let pedidoModo = 'conteo';         // 'conteo' | 'cero' — modo activo de la pantalla Pedidos
 
-async function abrirRevision(forzar) {
+// Desde cero (NUEVO 16/07/2026, con Osmar): pedir por categoría sin partir de un conteo,
+// mismo patrón visual que Conteo. Por defecto solo se ven los productos marcados
+// ReportarEnConteo=true de cada categoría; "Ver más" despliega el resto.
+let ceroCategoriasActivas = new Set();
+let ceroCantidades = {};           // "productoProduccion|categoria" -> cantidad
+let ceroComentarios = {};          // productoProduccion -> comentario opcional
+let ceroVerMas = new Set();        // categorías con "Ver más" ya desplegado
+let ceroObservacion = '';
+
+async function cargarCatalogoCompletoProduccion_() {
+  if (cacheCatalogoCompleto) return cacheCatalogoCompleto;
+  const r = await llamarAPI('obtenerCatalogoProduccion', { soloConteo: false });
+  if (r.ok) cacheCatalogoCompleto = r;
+  return cacheCatalogoCompleto;
+}
+function factorDe_(productoProduccion) {
+  if (!cacheCatalogoCompleto || !cacheCatalogoCompleto.catalogo) return 1;
+  const p = cacheCatalogoCompleto.catalogo.find(x => x.productoProduccion === productoProduccion);
+  return p ? (p.factorConversion || 1) : 1;
+}
+// Ítems con factor > 1 (ej. tartas/kuchenes/queques, 1 unidad = 8 trozos) se piden por
+// unidad entera — esta etiqueta lo deja explícito en vez de depender de que se recuerde.
+function etiquetaFactorHtml_(productoProduccion) {
+  const f = factorDe_(productoProduccion);
+  if (f <= 1) return '';
+  return '<p class="revision-detalle-factor">Se pide por unidad entera · 1 unidad = ' + f + ' trozos</p>';
+}
+function filaComentarioRevision_(clave) {
+  const claveEsc = clave.replace(/'/g, "\\'");
+  const val = revisionComentarios[clave];
+  if (val !== undefined) {
+    return '<input type="text" placeholder="Comentario (opcional)" value="' + (val || '').replace(/"/g, '&quot;') + '" oninput="cambiarComentarioProducto(\'' + claveEsc + '\',this.value)" style="width:100%;font-size:12.5px;height:32px;margin-top:6px;">';
+  }
+  return '<button type="button" class="btn-comentario-toggle" onclick="abrirComentarioProducto(\'' + claveEsc + '\')">+ Agregar comentario</button>';
+}
+function abrirComentarioProducto(clave) { revisionComentarios[clave] = revisionComentarios[clave] || ''; pintarRevision(); }
+function cambiarComentarioProducto(clave, val) { revisionComentarios[clave] = val; }
+
+async function abrirRevision(forzar, forzarModoConteo) {
   irA('screen-revision');
+  document.getElementById('revision-error').textContent = '';
+  if (!cacheCatalogoCompleto) await cargarCatalogoCompletoProduccion_();
   if (!cacheRevision || forzar) {
     document.getElementById('revision-lista').innerHTML = skeletonCards(3);
     const r = await llamarAPI('obtenerConteosPendientes', {});
@@ -188,10 +231,39 @@ async function abrirRevision(forzar) {
     revisionAgregados = [];
     revisionEliminados = new Set();
     revisionObservacion = '';
+    revisionComentarios = {};
     const taObs = document.getElementById('revision-observacion');
     if (taObs) taObs.value = '';
   }
-  pintarRevision();
+  // CAMBIO 16/07/2026 (con Osmar): si hay conteo pendiente, abre en "Desde conteo" como
+  // siempre. Si no hay, abre en "Desde cero" — salvo que venga forzado (botón de acción de
+  // la notificación "nuevo conteo"), en cuyo caso siempre entra a "Desde conteo", aunque
+  // ese conteo ya no esté pendiente (se ve el mensaje de "no hay conteo", a propósito: no
+  // se debe traer un conteo viejo/ya procesado, para no influenciar pedidos ya entregados).
+  const hayPendiente = !!(cacheRevision.items && cacheRevision.items.length);
+  cambiarModoPedido(forzarModoConteo ? 'conteo' : (hayPendiente ? 'conteo' : 'cero'));
+}
+
+function cambiarModoPedido(modo) {
+  pedidoModo = modo;
+  document.getElementById('pedido-tab-btn-conteo').classList.toggle('activo', modo === 'conteo');
+  document.getElementById('pedido-tab-btn-cero').classList.toggle('activo', modo === 'cero');
+  document.getElementById('pedido-modo-conteo').style.display = modo === 'conteo' ? '' : 'none';
+  document.getElementById('pedido-modo-cero').style.display = modo === 'cero' ? '' : 'none';
+
+  if (modo === 'conteo') {
+    const hayPendiente = !!(cacheRevision && cacheRevision.items && cacheRevision.items.length);
+    document.getElementById('pedido-conteo-vacio').style.display = hayPendiente ? 'none' : '';
+    document.getElementById('pedido-conteo-contenido').style.display = hayPendiente ? '' : 'none';
+    if (hayPendiente) pintarRevision();
+  } else {
+    if (!cacheCatalogoCompleto) {
+      document.getElementById('cero-lista').innerHTML = skeletonCards(3);
+      cargarCatalogoCompletoProduccion_().then(pintarCero);
+    } else {
+      pintarCero();
+    }
+  }
 }
 
 // "Empanadas" / "Empanadas Congeladas" son nombres de categoría técnicos — se muestran
@@ -228,6 +300,8 @@ function pintarRevision() {
         '<input type="number" min="0" placeholder="0" value="' + val + '" oninput="cambiarPedidoRevision(\'' + clave + '\',this.value)">' +
       '</div>' +
       '<p class="revision-detalle">' + badgesDetalleRevision_(it.detalle, it.stockCongeladoVC) + '</p>' +
+      etiquetaFactorHtml_(it.productoProduccion) +
+      filaComentarioRevision_(it.productoProduccion) +
     '</div>';
   });
   revisionAgregados.forEach((a, idx) => {
@@ -240,7 +314,8 @@ function pintarRevision() {
         '<input type="number" min="0" placeholder="0" value="' + val + '" oninput="cambiarPedidoRevision(\'' + clave + '\',this.value)">' +
       '</div>' +
       '<p class="revision-detalle">Agregado manualmente</p>' +
-      '<input type="text" placeholder="Comentario (ej: para cumpleaños del sábado)" value="' + (a.comentario || '').replace(/"/g, '&quot;') + '" oninput="cambiarComentarioAgregado(' + idx + ',this.value)" style="width:100%;font-size:12.5px;height:32px;margin-top:6px;">' +
+      etiquetaFactorHtml_(a.productoProduccion) +
+      filaComentarioRevision_(a.productoProduccion) +
     '</div>';
   });
   cont.innerHTML = html;
@@ -249,16 +324,15 @@ function pintarRevision() {
 function quitarProductoRevision(clave) {
   revisionEliminados.add(clave);
   delete revisionPedidos[clave];
+  delete revisionComentarios[clave];
   pintarRevision();
 }
 function quitarAgregadoRevision(idx) {
   const clave = revisionAgregados[idx].productoProduccion;
   delete revisionPedidos[clave];
+  delete revisionComentarios[clave];
   revisionAgregados.splice(idx, 1);
   pintarRevision();
-}
-function cambiarComentarioAgregado(idx, val) {
-  revisionAgregados[idx].comentario = val;
 }
 function cambiarObservacionRevision(val) {
   revisionObservacion = val;
@@ -272,11 +346,8 @@ function cambiarPedidoRevision(clave, val) {
 
 async function mostrarBuscadorRevision() {
   document.getElementById('revision-error').textContent = '';
-  if (!cacheCatalogoCompleto) {
-    const r = await llamarAPI('obtenerCatalogoProduccion', { soloConteo: false });
-    if (!r.ok) { document.getElementById('revision-error').textContent = r.error || 'Error al cargar el catálogo'; return; }
-    cacheCatalogoCompleto = r;
-  }
+  await cargarCatalogoCompletoProduccion_();
+  if (!cacheCatalogoCompleto) { document.getElementById('revision-error').textContent = 'Error al cargar el catálogo'; return; }
   // Dedupe por productoProduccion — Revisión pide por sabor, no por estado (Horneada/Congelada)
   const vistos = new Set();
   const opciones = [];
@@ -296,6 +367,7 @@ function agregarProductoRevision(valor, opciones) {
   if (ya) { document.getElementById('revision-error').textContent = 'Ese producto ya está en la lista.'; return; }
   const opt = opciones.find(o => o.value === valor);
   revisionAgregados.push({ productoProduccion: valor, nombre: opt ? opt.label : valor });
+  revisionPedidos[valor] = 1; // NUEVO 16/07/2026 (con Osmar): cantidad por defecto 1 al agregar manual
   document.getElementById('ss-rev-producto-wrap').style.display = 'none';
   document.querySelector('#ss-rev-producto input[type=text]').value = '';
   pintarRevision();
@@ -307,11 +379,11 @@ async function enviarRevision() {
   cacheRevision.items.forEach(it => {
     if (revisionEliminados.has(it.productoProduccion)) return;
     const cant = revisionPedidos[it.productoProduccion];
-    if (cant > 0) items.push({ productoProduccion: it.productoProduccion, cantidadProgramada: cant, cantidadContada: it.contadoTotal });
+    if (cant > 0) items.push({ productoProduccion: it.productoProduccion, cantidadProgramada: cant, cantidadContada: it.contadoTotal, comentario: revisionComentarios[it.productoProduccion] || '' });
   });
   revisionAgregados.forEach(a => {
     const cant = revisionPedidos[a.productoProduccion];
-    if (cant > 0) items.push({ productoProduccion: a.productoProduccion, cantidadProgramada: cant, comentario: a.comentario || '' });
+    if (cant > 0) items.push({ productoProduccion: a.productoProduccion, cantidadProgramada: cant, comentario: revisionComentarios[a.productoProduccion] || '' });
   });
   if (!items.length) {
     document.getElementById('revision-error').textContent = 'Escribe una cantidad a pedir en al menos un producto.';
@@ -329,7 +401,7 @@ async function enviarRevision() {
   const mensajeNotif = JSON.stringify({ tipo: 'pedidoProduccion', nombre: sesion.nombre, observacion: revisionObservacion || '' });
   await llamarAPI('crearNotificacion', { para: ['Rosa Merino', 'Katherine Bustamante'], mensaje: mensajeNotif, accionNotif: 'abrirPauta' });
 
-  cacheRevision = null; revisionPedidos = {}; revisionAgregados = []; revisionEliminados = new Set(); revisionObservacion = '';
+  cacheRevision = null; revisionPedidos = {}; revisionAgregados = []; revisionEliminados = new Set(); revisionObservacion = ''; revisionComentarios = {};
   document.getElementById('confirm-title').textContent = 'Pedido enviado';
   document.getElementById('confirm-msg').textContent = 'Se avisó a Rosa y Katherine.';
   document.getElementById('confirm-detalle').innerHTML = items.map(it =>
@@ -351,10 +423,120 @@ async function registrarStockSinPedido() {
   const r = await llamarAPI('registrarConteoSinPedido', { data: { conteoIds: cacheRevision.conteoIds } });
   if (!r.ok) { document.getElementById('revision-error').textContent = r.error || 'Error al registrar el stock'; return; }
 
-  cacheRevision = null; revisionPedidos = {}; revisionAgregados = []; revisionEliminados = new Set(); revisionObservacion = '';
+  cacheRevision = null; revisionPedidos = {}; revisionAgregados = []; revisionEliminados = new Set(); revisionObservacion = ''; revisionComentarios = {};
   document.getElementById('confirm-title').textContent = 'Stock registrado';
   document.getElementById('confirm-msg').textContent = 'El conteo quedó guardado, sin generar pedido a producción.';
   document.getElementById('confirm-detalle').innerHTML = '';
+  ocultarBotonOtro();
+  irA('screen-confirm');
+}
+
+// ============ PEDIDOS — DESDE CERO (NUEVO 16/07/2026, con Osmar) ============
+// Mismo patrón visual que Conteo: chips de categoría, se despliegan los productos de la(s)
+// categoría(s) activa(s). Por defecto solo los marcados ReportarEnConteo=true (los mismos
+// que aparecen en Conteo) — "Ver más" despliega el resto de esa categoría. Al enviar, solo
+// van los que quedaron en más de 0. No pasa por ningún conteo (conteoIds va vacío).
+function toggleCategoriaCero(cat) {
+  if (ceroCategoriasActivas.has(cat)) ceroCategoriasActivas.delete(cat); else ceroCategoriasActivas.add(cat);
+  pintarCero();
+}
+function cambiarCantidadCero(key, delta) {
+  const actual = ceroCantidades[key] !== undefined ? ceroCantidades[key] : 0;
+  ceroCantidades[key] = Math.max(0, actual + delta);
+  pintarCero();
+}
+function escribirCantidadCero(key, val) {
+  ceroCantidades[key] = Math.max(0, Number(val) || 0);
+}
+function toggleVerMasCero(cat) {
+  if (ceroVerMas.has(cat)) ceroVerMas.delete(cat); else ceroVerMas.add(cat);
+  pintarCero();
+}
+function abrirComentarioCero(clave) { ceroComentarios[clave] = ceroComentarios[clave] || ''; pintarCero(); }
+function cambiarComentarioCero(clave, val) { ceroComentarios[clave] = val; }
+function cambiarObservacionCero(val) { ceroObservacion = val; }
+
+function filaComentarioCero_(clave) {
+  const claveEsc = clave.replace(/'/g, "\\'");
+  const val = ceroComentarios[clave];
+  if (val !== undefined) {
+    return '<input type="text" placeholder="Comentario (opcional)" value="' + (val || '').replace(/"/g, '&quot;') + '" oninput="cambiarComentarioCero(\'' + claveEsc + '\',this.value)" style="width:100%;font-size:12.5px;height:32px;margin-top:6px;">';
+  }
+  return '<button type="button" class="btn-comentario-toggle" onclick="abrirComentarioCero(\'' + claveEsc + '\')">+ Agregar comentario</button>';
+}
+function filaProductoCero_(p, esExtra) {
+  const key = p.productoProduccion + '|' + p.categoria;
+  const val = ceroCantidades[key] !== undefined ? ceroCantidades[key] : 0;
+  const keyEsc = key.replace(/'/g, "\\'");
+  return '<div class="revision-row' + (esExtra ? ' revision-row-extra' : '') + '">' +
+    '<div class="revision-row-top">' +
+      '<span>' + p.nombre + '</span>' +
+      '<div class="conteo-stepper">' +
+        '<button type="button" onclick="cambiarCantidadCero(\'' + keyEsc + '\',-1)">\u2212</button>' +
+        '<input type="number" min="0" value="' + val + '" oninput="escribirCantidadCero(\'' + keyEsc + '\',this.value)">' +
+        '<button type="button" onclick="cambiarCantidadCero(\'' + keyEsc + '\',1)">+</button>' +
+      '</div>' +
+    '</div>' +
+    etiquetaFactorHtml_(p.productoProduccion) +
+    filaComentarioCero_(p.productoProduccion) +
+  '</div>';
+}
+
+function pintarCero() {
+  const categorias = [...new Set(cacheCatalogoCompleto.catalogo.map(p => p.categoria))];
+  document.getElementById('cero-chips').innerHTML = categorias.map(c => {
+    const activo = ceroCategoriasActivas.has(c);
+    return '<span class="chip-cat' + (activo ? ' activo' : '') + '" onclick="toggleCategoriaCero(\'' + c.replace(/'/g, "\\'") + '\')">' + c + '</span>';
+  }).join('');
+
+  let html = '';
+  categorias.filter(c => ceroCategoriasActivas.has(c)).forEach(cat => {
+    const productosCat = cacheCatalogoCompleto.catalogo.filter(p => p.categoria === cat);
+    if (!productosCat.length) return;
+    const marcados = productosCat.filter(p => p.marcado);
+    const noMarcados = productosCat.filter(p => !p.marcado);
+    html += '<p class="conteo-seccion-titulo">' + cat + '</p>';
+    html += marcados.map(p => filaProductoCero_(p)).join('');
+    if (noMarcados.length) {
+      if (ceroVerMas.has(cat)) {
+        html += noMarcados.map(p => filaProductoCero_(p, true)).join('');
+      } else {
+        html += '<button type="button" class="btn-vermas-cat" onclick="toggleVerMasCero(\'' + cat.replace(/'/g, "\\'") + '\')">Ver más de ' + cat + '</button>';
+      }
+    }
+  });
+  if (!html) html = '<p style="font-size:13.5px;color:var(--ink-soft);padding:24px 0;text-align:center;">Elige qué categoría(s) vas a pedir.</p>';
+  document.getElementById('cero-lista').innerHTML = html;
+}
+
+async function enviarPedidoDesdeCero() {
+  document.getElementById('cero-error').textContent = '';
+  const items = [];
+  cacheCatalogoCompleto.catalogo.forEach(p => {
+    const key = p.productoProduccion + '|' + p.categoria;
+    const cant = ceroCantidades[key];
+    if (cant > 0) items.push({ productoProduccion: p.productoProduccion, cantidadProgramada: cant, comentario: ceroComentarios[p.productoProduccion] || '' });
+  });
+  if (!items.length) {
+    document.getElementById('cero-error').textContent = 'Escribe una cantidad a pedir en al menos un producto.';
+    return;
+  }
+
+  const r = await llamarAPI('enviarProgramacionProduccion', {
+    data: { responsable: sesion.nombre, conteoIds: [], items }
+  });
+  if (!r.ok) { document.getElementById('cero-error').textContent = r.error || 'Error al enviar el pedido'; return; }
+
+  const mensajeNotif = JSON.stringify({ tipo: 'pedidoProduccion', nombre: sesion.nombre, observacion: ceroObservacion || '' });
+  await llamarAPI('crearNotificacion', { para: ['Rosa Merino', 'Katherine Bustamante'], mensaje: mensajeNotif, accionNotif: 'abrirPauta' });
+
+  ceroCategoriasActivas = new Set(); ceroCantidades = {}; ceroComentarios = {}; ceroVerMas = new Set(); ceroObservacion = '';
+  const taObs = document.getElementById('cero-observacion'); if (taObs) taObs.value = '';
+  document.getElementById('confirm-title').textContent = 'Pedido enviado';
+  document.getElementById('confirm-msg').textContent = 'Se avisó a Rosa y Katherine.';
+  document.getElementById('confirm-detalle').innerHTML = items.map(it =>
+    '<div class="check-row" style="background:var(--surface);border:1px solid var(--border);"><span>' + it.productoProduccion + '</span><strong>x' + it.cantidadProgramada + '</strong></div>'
+  ).join('');
   ocultarBotonOtro();
   irA('screen-confirm');
 }
