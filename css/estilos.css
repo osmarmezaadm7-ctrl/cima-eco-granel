@@ -189,6 +189,21 @@ td{padding:8px 6px;border-bottom:1px solid var(--border);}
 .mov-monto.pos{color:var(--success);}
 .mov-monto.neg{color:var(--ink);}
 .mov-fecha{font-size:12px;color:var(--ink-soft);margin-top:2px;font-weight:600;}
+@media(min-width:900px){.cc-retiro-wrap{max-width:calc(50% - 8px);}}
+@media(min-width:900px){#panel-movimientos{display:grid;grid-template-columns:1fr 1fr;gap:0 20px;}}
+
+/* movimientos — fila desktop con fecha en columna propia; no reemplaza .mov (móvil intacto) */
+@media(min-width:900px){
+  .mov-desktop{display:flex;align-items:center;gap:16px;padding:14px 6px;border-bottom:1.5px solid var(--border);}
+  .mov-desktop:last-child{border:none;}
+  .mov-desktop .mov-fecha-col{width:60px;flex-shrink:0;font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--ink-soft);font-weight:600;}
+}
+
+/* venta vegan corner — layout de 2 columnas con resumen fijo; debajo de 900px queda en flujo normal (móvil intacto) */
+@media(min-width:900px){
+  .vv-checkout{display:grid;grid-template-columns:1.4fr 1fr;gap:22px;align-items:start;}
+  .vv-resumen-panel{background:var(--surface);border:1.5px solid var(--border);border-radius:14px;padding:16px;position:sticky;top:20px;}
+}
 
 /* modal — overlay sutil */
 .modal-bg{position:fixed;inset:0;background:rgba(250,249,245,0.72);backdrop-filter:blur(2px);display:none;align-items:center;justify-content:center;padding:20px;z-index:900;}
