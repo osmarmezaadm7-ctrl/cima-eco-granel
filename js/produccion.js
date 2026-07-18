@@ -858,6 +858,9 @@ function pintarPautaDesktop_() {
   cont.innerHTML = html;
 }
 function pintarPauta() {
+  const hayPendientes = cachePauta.pauta.filter(it => !pautaOcultos.has(it.id)).length > 0;
+  document.getElementById('pauta-observacion-wrap').style.display = (pautaSoloLectura || !hayPendientes) ? 'none' : '';
+
   if (window.matchMedia('(min-width: 900px)').matches) { pintarPautaDesktop_(); return; }
   const cont = document.getElementById('pauta-lista');
   const visibles = cachePauta.pauta.filter(it => !pautaOcultos.has(it.id));
