@@ -764,6 +764,7 @@ async function confirmarEnvioPedido() {
 let cachePauta = null;              // { ok, pauta:[...] } — obtenerPautaActiva()
 let pautaOcultos = new Set();       // ids ocultados de la vista en esta sesión (sin guardar)
 let pautaAgregadosSesion = [];      // ids agregados durante esta sesión (para el registro al confirmar)
+let pautaObservacionAbierta = new Set(); // ids con el campo de observación desplegado en esta sesión
 let cacheCatalogoPauta = null;      // catálogo completo, para "+ Agregar producto"
 
 // Historial de Pauta (NUEVO 15/07/2026 — con Osmar): tab de solo lectura sobre
@@ -818,14 +819,15 @@ function filaPautaDesktop_(it) {
       '<td style="padding:9px 6px;color:var(--ink-soft);">' + it.fecha + ' · ' + it.responsable + ' · cantidad ' + cant + '</td>' +
       '<td style="padding:9px 6px;text-align:right;"><button class="btn-eliminar-pauta" onclick="abrirEliminarPauta(\'' + it.id + '\',\'' + nombreEsc + '\')">Eliminar</button></td></tr>';
   }
-  const hecho = it.estadoBorrador === 'Hecho';
-  const cant = it.cantidadBorrador !== null && it.cantidadBorrador !== undefined ? it.cantidadBorrador : it.cantidadProgramada;
-  return '<tr id="pauta-row-' + it.id + '">' +
+    const hecho = it.estadoBorrador === 'Hecho';
+    const cant = it.cantidadBorrador !== null && it.cantidadBorrador !== undefined ? it.cantidadBorrador : it.cantidadProgramada;
+    return '<tr id="pauta-row-' + it.id + '">' +
     '<td style="padding:9px 4px;width:30px;"><button class="pauta-check' + (hecho ? ' marcado' : '') + '" onclick="toggleHechoPauta(\'' + it.id + '\')" aria-label="Marcar hecho">' +
       (hecho ? '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"></path></svg>' : '') +
     '</button></td>' +
-    '<td style="padding:9px 6px;font-weight:700;">' + it.producto + (it.comentario ? '<div style="font-size:10.5px;color:var(--ink-soft);font-weight:400;margin-top:2px;">' + it.comentario + '</div>' : '') + '</td>' +
+    '<td style="padding:9px 6px;font-weight:700;">' + it.producto + '</td>' +
     '<td style="padding:6px;width:90px;"><input type="text" inputmode="numeric" value="' + cant + '" id="pauta-cant-' + it.id + '" onchange="cambiarCantidadBorradorPauta(\'' + it.id + '\',this.value)" style="width:70px;text-align:center;font-family:\'JetBrains Mono\',monospace;font-weight:700;border:1px solid var(--border);border-radius:7px;padding:6px 8px;"></td>' +
+    '<td style="padding:9px 6px;min-width:160px;">' + filaObservacionPauta_(it) + '</td>' +
     '<td style="padding:9px 6px;width:30px;text-align:right;"><button class="pauta-quitar" title="Quitar" onclick="ocultarItemPauta(\'' + it.id + '\')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"></path><path d="M6 6l12 12"></path></svg></button></td></tr>';
 }
 function pintarPautaDesktop_() {
@@ -893,7 +895,7 @@ function pintarPauta() {
         '<span class="pauta-nombre">' + it.producto + '</span>' +
         '<input type="text" inputmode="numeric" value="' + cant + '" id="pauta-cant-' + it.id + '" onchange="cambiarCantidadBorradorPauta(\'' + it.id + '\',this.value)">' +
       '</div>' +
-      (it.comentario ? '<p class="pauta-obs">' + it.comentario + '</p>' : '') +
+      filaObservacionPauta_(it) +
     '</div>';
   };
 
@@ -959,6 +961,27 @@ async function cambiarCantidadBorradorPauta(id, val) {
   if (!it) return;
   it.cantidadBorrador = Math.max(0, Number(val) || 0);
   await llamarAPISilencioso('actualizarBorradorPauta', { data: { id: id, estadoBorrador: it.estadoBorrador, cantidadBorrador: it.cantidadBorrador } });
+}
+
+function filaObservacionPauta_(it) {
+  const idEsc = it.id.replace(/'/g, "\\'");
+  if (pautaObservacionAbierta.has(it.id)) {
+    return '<input type="text" placeholder="Observación (opcional)" value="' + (it.comentario || '').replace(/"/g, '&quot;') + '" oninput="escribirObservacionPauta(\'' + idEsc + '\',this.value)" onchange="guardarObservacionPauta(\'' + idEsc + '\')" class="pauta-obs-input">';
+  }
+  if (it.comentario) {
+    return '<p class="pauta-obs" onclick="abrirObservacionPauta(\'' + idEsc + '\')" style="cursor:pointer;">' + it.comentario + '</p>';
+  }
+  return '<button type="button" class="btn-comentario-toggle" onclick="abrirObservacionPauta(\'' + idEsc + '\')">+ Agregar observación</button>';
+}
+function abrirObservacionPauta(id) { pautaObservacionAbierta.add(id); pintarPauta(); }
+function escribirObservacionPauta(id, val) {
+  const it = cachePauta.pauta.find(x => x.id === id);
+  if (it) it.comentario = val;
+}
+async function guardarObservacionPauta(id) {
+  const it = cachePauta.pauta.find(x => x.id === id);
+  if (!it) return;
+  await llamarAPISilencioso('actualizarBorradorPauta', { data: { id: id, estadoBorrador: it.estadoBorrador, cantidadBorrador: it.cantidadBorrador, comentario: it.comentario || '' } });
 }
 
 function ocultarItemPauta(id) {
@@ -1120,7 +1143,11 @@ function pintarHistorialPauta() {
   btnMas.style.display = historialPautaHayMas ? '' : 'none';
 }
 
+let anchoDesktopAnterior_ = window.matchMedia('(min-width: 900px)').matches;
 window.addEventListener('resize', () => {
+  const esAnchoAhora = window.matchMedia('(min-width: 900px)').matches;
+  if (esAnchoAhora === anchoDesktopAnterior_) return; // evita redibujar por el teclado móvil (solo cambia el alto, no cruza el breakpoint)
+  anchoDesktopAnterior_ = esAnchoAhora;
   const activa = (id) => document.getElementById(id) && document.getElementById(id).classList.contains('active');
   if (activa('screen-conteo') && cacheConteoCatalogo) pintarConteo();
   if (activa('screen-revision')) {
