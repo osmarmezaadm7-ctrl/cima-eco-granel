@@ -764,7 +764,7 @@ async function confirmarEnvioPedido() {
 let cachePauta = null;              // { ok, pauta:[...] } — obtenerPautaActiva()
 let pautaOcultos = new Set();       // ids ocultados de la vista en esta sesión (sin guardar)
 let pautaAgregadosSesion = [];      // ids agregados durante esta sesión (para el registro al confirmar)
-let pautaObservacionAbierta = new Set(); // ids con el campo de observación desplegado en esta sesión
+let pautaObservacionBorrador = '';  // observación única de la pauta activa — en memoria hasta confirmar, igual que el resto de Producción
 let cacheCatalogoPauta = null;      // catálogo completo, para "+ Agregar producto"
 
 // Historial de Pauta (NUEVO 15/07/2026 — con Osmar): tab de solo lectura sobre
@@ -791,6 +791,8 @@ async function abrirPauta(forzar) {
   document.getElementById('pauta-tab-btn-activa').textContent = soloHistorial ? 'Pendientes' : 'Pauta activa';
   document.getElementById('pauta-agregar-wrap').style.display = soloHistorial ? 'none' : '';
   document.getElementById('pauta-confirmar-wrap').style.display = soloHistorial ? 'none' : '';
+  document.getElementById('pauta-observacion-wrap').style.display = soloHistorial ? 'none' : '';
+  document.getElementById('pauta-observacion').value = pautaObservacionBorrador;
 
   cambiarTabPauta('activa');
   if (!cachePauta || forzar) {
@@ -825,9 +827,8 @@ function filaPautaDesktop_(it) {
     '<td style="padding:9px 4px;width:30px;"><button class="pauta-check' + (hecho ? ' marcado' : '') + '" onclick="toggleHechoPauta(\'' + it.id + '\')" aria-label="Marcar hecho">' +
       (hecho ? '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"></path></svg>' : '') +
     '</button></td>' +
-    '<td style="padding:9px 6px;font-weight:700;">' + it.producto + '</td>' +
+    '<td style="padding:9px 6px;font-weight:700;">' + it.producto + (it.comentario ? '<div style="font-size:10.5px;color:var(--ink-soft);font-weight:400;margin-top:2px;">' + it.comentario + '</div>' : '') + '</td>' +
     '<td style="padding:6px;width:90px;"><input type="text" inputmode="numeric" value="' + cant + '" id="pauta-cant-' + it.id + '" onchange="cambiarCantidadBorradorPauta(\'' + it.id + '\',this.value)" style="width:70px;text-align:center;font-family:\'JetBrains Mono\',monospace;font-weight:700;border:1px solid var(--border);border-radius:7px;padding:6px 8px;"></td>' +
-    '<td style="padding:9px 6px;min-width:160px;">' + filaObservacionPauta_(it) + '</td>' +
     '<td style="padding:9px 6px;width:30px;text-align:right;"><button class="pauta-quitar" title="Quitar" onclick="ocultarItemPauta(\'' + it.id + '\')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"></path><path d="M6 6l12 12"></path></svg></button></td></tr>';
 }
 function pintarPautaDesktop_() {
@@ -895,7 +896,7 @@ function pintarPauta() {
         '<span class="pauta-nombre">' + it.producto + '</span>' +
         '<input type="text" inputmode="numeric" value="' + cant + '" id="pauta-cant-' + it.id + '" onchange="cambiarCantidadBorradorPauta(\'' + it.id + '\',this.value)">' +
       '</div>' +
-      filaObservacionPauta_(it) +
+      (it.comentario ? '<p class="pauta-obs">' + it.comentario + '</p>' : '') +
     '</div>';
   };
 
@@ -963,27 +964,6 @@ async function cambiarCantidadBorradorPauta(id, val) {
   await llamarAPISilencioso('actualizarBorradorPauta', { data: { id: id, estadoBorrador: it.estadoBorrador, cantidadBorrador: it.cantidadBorrador } });
 }
 
-function filaObservacionPauta_(it) {
-  const idEsc = it.id.replace(/'/g, "\\'");
-  if (pautaObservacionAbierta.has(it.id)) {
-    return '<input type="text" placeholder="Observación (opcional)" value="' + (it.comentario || '').replace(/"/g, '&quot;') + '" oninput="escribirObservacionPauta(\'' + idEsc + '\',this.value)" onchange="guardarObservacionPauta(\'' + idEsc + '\')" class="pauta-obs-input">';
-  }
-  if (it.comentario) {
-    return '<p class="pauta-obs" onclick="abrirObservacionPauta(\'' + idEsc + '\')" style="cursor:pointer;">' + it.comentario + '</p>';
-  }
-  return '<button type="button" class="btn-comentario-toggle" onclick="abrirObservacionPauta(\'' + idEsc + '\')">+ Agregar observación</button>';
-}
-function abrirObservacionPauta(id) { pautaObservacionAbierta.add(id); pintarPauta(); }
-function escribirObservacionPauta(id, val) {
-  const it = cachePauta.pauta.find(x => x.id === id);
-  if (it) it.comentario = val;
-}
-async function guardarObservacionPauta(id) {
-  const it = cachePauta.pauta.find(x => x.id === id);
-  if (!it) return;
-  await llamarAPISilencioso('actualizarBorradorPauta', { data: { id: id, estadoBorrador: it.estadoBorrador, cantidadBorrador: it.cantidadBorrador, comentario: it.comentario || '' } });
-}
-
 function ocultarItemPauta(id) {
   pautaOcultos.add(id);
   pintarPauta();
@@ -1028,6 +1008,12 @@ async function agregarProductoPauta(valor, opciones) {
 // con los mismos datos que ya se editan en pantalla (estadoBorrador/cantidadBorrador), sin
 // llamar al backend todavía. Separa Completados / Agregado en esta sesión (aclarando que no
 // venía en el pedido) / Quedan pendientes — mismo criterio que ya usa pintarPauta.
+function escribirObservacionPautaBorrador(val) { pautaObservacionBorrador = val; }
+function volverAEditarPauta() {
+  document.getElementById('pauta-observacion').value = pautaObservacionBorrador;
+  irA('screen-pauta');
+}
+
 function revisarPauta() {
   document.getElementById('pauta-error').textContent = '';
   const visibles = cachePauta.pauta.filter(it => !pautaOcultos.has(it.id));
@@ -1038,6 +1024,7 @@ function revisarPauta() {
     return;
   }
   pintarResumenPauta(completados, faltantes);
+  document.getElementById('resumen-pauta-observacion').value = pautaObservacionBorrador;
   irA('screen-resumen-pauta');
 }
 
@@ -1080,10 +1067,10 @@ function pintarResumenPauta(completados, faltantes) {
 
 async function confirmarProduccion() {
   document.getElementById('resumen-pauta-error').textContent = '';
-  const r = await llamarAPI('confirmarPauta', { data: { responsable: sesion.nombre, agregadosIds: pautaAgregadosSesion } });
+  const r = await llamarAPI('confirmarPauta', { data: { responsable: sesion.nombre, agregadosIds: pautaAgregadosSesion, observacion: pautaObservacionBorrador } });
   if (!r.ok) { document.getElementById('resumen-pauta-error').textContent = r.error || 'Error al confirmar producción'; return; }
 
-  cachePauta = null; pautaOcultos = new Set(); pautaAgregadosSesion = [];
+  cachePauta = null; pautaOcultos = new Set(); pautaAgregadosSesion = []; pautaObservacionBorrador = '';
   document.getElementById('confirm-title').textContent = 'Producción confirmada';
   document.getElementById('confirm-msg').textContent = r.completados.length + ' producto' + (r.completados.length === 1 ? '' : 's') + ' completado' + (r.completados.length === 1 ? '' : 's') +
     (r.faltantes.length ? ', ' + r.faltantes.length + ' quedaron pendientes para la próxima.' : '.');
@@ -1132,6 +1119,7 @@ function pintarHistorialPauta() {
     return '<div class="card-dia verde" onclick="var e=document.getElementById(\'' + idDet + '\');e.style.display=(e.style.display===\'block\'?\'none\':\'block\');">' +
       '<div class="c-top"><strong>' + h.fecha + (h.hora ? ', ' + h.hora : '') + '</strong><span class="badge-completado">' + h.completados.length + ' de ' + total + '</span></div>' +
       '<p class="hist-confirmado" style="color:var(--ink-soft);margin:2px 0 0;">Confirmado por ' + h.responsable + '</p>' +
+      (h.observacion ? '<div class="hist-observacion"><p>Observación</p><p>' + h.observacion + '</p></div>' : '') +
       '<div class="hist-metricas">' +
         '<span class="m-ok">' + h.completados.length + ' completado' + (h.completados.length === 1 ? '' : 's') + '</span>' +
         (h.faltantes.length ? '<span class="m-pend">' + h.faltantes.length + ' pendiente' + (h.faltantes.length === 1 ? '' : 's') + '</span>' : '') +
