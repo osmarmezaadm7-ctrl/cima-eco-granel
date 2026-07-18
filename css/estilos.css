@@ -193,6 +193,8 @@ td{padding:8px 6px;border-bottom:1px solid var(--border);}
 @media(min-width:900px){.cc-retiro-wrap{max-width:calc(50% - 8px);}}
 @media(min-width:900px){#panel-movimientos{display:grid;grid-template-columns:1fr 1fr;gap:0 20px;}}
 .hist-confirmado{font-size:12px;}
+.pauta-obs-input{width:100%;font-size:12.5px;height:32px;margin:6px 0 0 34px;max-width:calc(100% - 34px);}
+@media(min-width:900px){#pauta-lista .pauta-obs-input{margin:0;max-width:100%;height:30px;font-size:12px;}}
 @media(min-width:900px){
   #historial-lista .card-dia{padding:11px 14px;}
   #historial-lista .card-dia .c-top strong{font-size:13px;}
