@@ -790,6 +790,10 @@
     <button class="pauta-tab-btn" id="pauta-tab-btn-historial" onclick="cambiarTabPauta('historial')">Historial</button>
   </div>
   <div id="pauta-tab-activa">
+    <div id="pauta-observacion-wrap">
+      <label class="pauta-obs-label">Observación de esta pauta <span class="pauta-obs-label-nota">— opcional, se guarda sola</span></label>
+      <textarea id="pauta-observacion" class="pauta-obs-textarea" placeholder="Ej: faltó azúcar flor, se ajustó receta del bombón" oninput="escribirObservacionPautaBorrador(this.value)"></textarea>
+    </div>
     <div id="pauta-lista"></div>
     <div id="pauta-agregar-wrap">
       <button class="btn-secondary" style="width:100%;margin:12px 0;" onclick="mostrarBuscadorPauta()">+ Agregar producto</button>
@@ -817,10 +821,14 @@
   <h2 style="font-size:17px;">Revisar antes de confirmar</h2>
   <div id="resumen-pauta-lista"></div>
   <p class="resumen-total" id="resumen-pauta-total"></p>
+  <div id="resumen-pauta-observacion-wrap">
+    <label class="pauta-obs-label">Observación de esta pauta</label>
+    <textarea id="resumen-pauta-observacion" class="pauta-obs-textarea" oninput="escribirObservacionPautaBorrador(this.value)"></textarea>
+  </div>
   <div class="error-msg" id="resumen-pauta-error"></div>
   <div class="submit-bar">
     <button class="btn-primary" onclick="confirmarProduccion()">Confirmar producción</button>
-    <button class="btn-secondary" style="width:100%;margin-top:8px;" onclick="irA('screen-pauta')">Volver a editar</button>
+    <button class="btn-secondary" style="width:100%;margin-top:8px;" onclick="volverAEditarPauta()">Volver a editar</button>
   </div>
 </div>
 
