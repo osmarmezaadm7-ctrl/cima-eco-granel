@@ -290,7 +290,7 @@ function filaComentarioRevision_(clave) {
   }
   return '<button type="button" class="btn-comentario-toggle" onclick="abrirComentarioProducto(\'' + claveEsc + '\')">+ Agregar comentario</button>';
 }
-function abrirComentarioProducto(clave) { revisionComentarios[clave] = revisionComentarios[clave] || ''; pintarRevision(); }
+function abrirComentarioProducto(clave) { revisionComentarios[clave] = revisionComentarios[clave] || ''; pintarRevisionPedido(); }
 function cambiarComentarioProducto(clave, val) { revisionComentarios[clave] = val; }
 
 async function abrirRevision(forzar, forzarModoConteo) {
@@ -333,7 +333,7 @@ function cambiarModoPedido(modo) {
     const hayPendiente = !!(cacheRevision && cacheRevision.items && cacheRevision.items.length);
     document.getElementById('pedido-conteo-vacio').style.display = hayPendiente ? 'none' : '';
     document.getElementById('pedido-conteo-contenido').style.display = hayPendiente ? '' : 'none';
-    if (hayPendiente) pintarRevision();
+    if (hayPendiente) pintarRevisionPedido();
   } else {
     if (!cacheCatalogoCompleto) {
       document.getElementById('cero-lista').innerHTML = skeletonCards(3);
@@ -375,7 +375,7 @@ function comentarioInputDesktop_(clave, claveEsc) {
   const val = revisionComentarios[clave] || '';
   return '<input type="text" placeholder="Comentario (opcional)" value="' + val.replace(/"/g, '&quot;') + '" oninput="cambiarComentarioProducto(\'' + claveEsc + '\',this.value)" style="width:100%;font-size:12.5px;height:32px;">';
 }
-function pintarRevisionDesktop_() {
+function pintarRevisionPedidoDesktop_() {
   const cont = document.getElementById('revision-lista');
   const itemsVisibles = cacheRevision.items.filter(it => !revisionEliminados.has(it.productoProduccion));
   if (!itemsVisibles.length && !revisionAgregados.length) {
@@ -401,8 +401,8 @@ function pintarRevisionDesktop_() {
   });
   cont.innerHTML = '<table><thead><tr><th></th><th>Producto</th><th>Stock</th><th style="text-align:center;">Pedir</th><th>Comentario</th></tr></thead><tbody>' + filas + '</tbody></table>';
 }
-function pintarRevision() {
-  if (window.matchMedia('(min-width: 900px)').matches) { pintarRevisionDesktop_(); return; }
+function pintarRevisionPedido() {
+  if (window.matchMedia('(min-width: 900px)').matches) { pintarRevisionPedidoDesktop_(); return; }
   const cont = document.getElementById('revision-lista');
   const itemsVisibles = cacheRevision.items.filter(it => !revisionEliminados.has(it.productoProduccion));
   if (!itemsVisibles.length && !revisionAgregados.length) {
@@ -455,14 +455,14 @@ function quitarProductoRevision(clave) {
   revisionEliminados.add(clave);
   delete revisionPedidos[clave];
   delete revisionComentarios[clave];
-  pintarRevision();
+  pintarRevisionPedido();
 }
 function quitarAgregadoRevision(idx) {
   const clave = revisionAgregados[idx].productoProduccion;
   delete revisionPedidos[clave];
   delete revisionComentarios[clave];
   revisionAgregados.splice(idx, 1);
-  pintarRevision();
+  pintarRevisionPedido();
 }
 function cambiarObservacionRevision(val) {
   revisionObservacion = val;
@@ -477,7 +477,7 @@ function cambiarPedidoRevisionPaso(clave, signo) {
   const paso = pasoDe_(clave);
   const actual = revisionPedidos[clave] !== undefined ? revisionPedidos[clave] : 0;
   revisionPedidos[clave] = Math.max(0, actual + signo * paso);
-  pintarRevision();
+  pintarRevisionPedido();
 }
 
 async function mostrarBuscadorRevision() {
@@ -506,7 +506,7 @@ function agregarProductoRevision(valor, opciones) {
   revisionPedidos[valor] = 1; // NUEVO 16/07/2026 (con Osmar): cantidad por defecto 1 al agregar manual
   document.getElementById('ss-rev-producto-wrap').style.display = 'none';
   document.querySelector('#ss-rev-producto input[type=text]').value = '';
-  pintarRevision();
+  pintarRevisionPedido();
 }
 
 function revisarPedidoDesdeConteo() {
@@ -1142,7 +1142,7 @@ window.addEventListener('resize', () => {
   const activa = (id) => document.getElementById(id) && document.getElementById(id).classList.contains('active');
   if (activa('screen-conteo') && cacheConteoCatalogo) pintarConteo();
   if (activa('screen-revision')) {
-    if (pedidoModo === 'conteo' && cacheRevision && cacheRevision.items && cacheRevision.items.length) pintarRevision();
+    if (pedidoModo === 'conteo' && cacheRevision && cacheRevision.items && cacheRevision.items.length) pintarRevisionPedido();
     if (pedidoModo === 'cero' && cacheCatalogoCompleto) pintarCero();
   }
   if (activa('screen-pauta') && cachePauta) pintarPauta();
