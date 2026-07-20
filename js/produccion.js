@@ -37,23 +37,31 @@ async function abrirConteo(forzar) {
   if (document.getElementById('screen-conteo').classList.contains('active')) pintarConteo();
 }
 
-function filaConteoDesktop_(p, key, val, keyEsc) {
+// NUEVO 20/07/2026 (con Osmar — "revisar el último conteo", Opción B): texto de
+// referencia neutro, sin alertas ni resaltado (decisión explícita de Osmar).
+function refUltimoConteoHtml_(p) {
+  if (!p.ultimoConteo) return '<span style="font-size:11px;color:var(--ink-soft);">Sin conteo previo</span>';
+  return '<span style="font-size:11px;color:var(--ink-soft);">Últ: ' + p.ultimoConteo.cantidad + ' · ' + p.ultimoConteo.fecha + '</span>';
+}
+function filaConteoDesktop_(p, key, val, keyEsc, incluirUltimo) {
   return '<tr><td style="padding:9px 6px;font-weight:600;color:var(--ink);">' + p.nombre + '</td>' +
     '<td style="padding:9px 6px;">' + p.categoria + '</td>' +
+    (incluirUltimo ? '<td style="padding:9px 6px;">' + refUltimoConteoHtml_(p) + '</td>' : '') +
     '<td style="padding:6px;text-align:right;"><div class="conteo-stepper" style="display:inline-flex;">' +
       '<button type="button" onclick="cambiarCantidadConteo(\'' + keyEsc + '\',-1)">\u2212</button>' +
       '<input type="number" min="0" value="' + val + '" oninput="escribirCantidadConteo(\'' + keyEsc + '\',this.value)">' +
       '<button type="button" onclick="cambiarCantidadConteo(\'' + keyEsc + '\',1)">+</button>' +
     '</div></td></tr>';
 }
-function pintarConteoDesktop_(productos) {
+function pintarConteoDesktop_(productos, incluirUltimo) {
   const titulo = document.querySelector('#screen-conteo h2');
   const boton = document.querySelector('#screen-conteo .submit-bar button');
-  let html = '<table><thead><tr><th>Producto</th><th>Categoría</th><th style="text-align:right;">Cantidad</th></tr></thead><tbody>';
+  let html = '<table><thead><tr><th>Producto</th><th>Categoría</th>' +
+    (incluirUltimo ? '<th>Último conteo</th>' : '') + '<th style="text-align:right;">Cantidad</th></tr></thead><tbody>';
   productos.forEach(p => {
     const key = p.productoProduccion + '|' + p.categoria;
     const val = conteoCantidades[key] !== undefined ? conteoCantidades[key] : 0;
-    html += filaConteoDesktop_(p, key, val, key.replace(/'/g, "\\'"));
+    html += filaConteoDesktop_(p, key, val, key.replace(/'/g, "\\'"), incluirUltimo);
   });
   html += '</tbody></table>';
   if (!productos.length) html = '<p style="font-size:13.5px;color:var(--ink-soft);padding:24px 0;text-align:center;">' +
@@ -65,12 +73,15 @@ function pintarConteo() {
   const boton = document.querySelector('#screen-conteo .submit-bar button');
   const esAncho = window.matchMedia('(min-width: 900px)').matches;
 
+  const btnUltimo = document.getElementById('btn-ultimo-conteo');
+
   if (esVeganCorner_()) {
+    if (btnUltimo) btnUltimo.style.display = 'none'; // Rosa/Katherine cuentan StockCongeladoVC, no ConteoStockCima — no aplica
     document.getElementById('conteo-chips').style.display = 'none';
     if (titulo) titulo.textContent = 'Stock congelado';
     if (boton) boton.textContent = 'Guardar stock';
     const productos = cacheConteoCatalogo.catalogo.filter(p => p.categoria === 'Empanadas Congeladas');
-    if (esAncho) { pintarConteoDesktop_(productos); return; }
+    if (esAncho) { pintarConteoDesktop_(productos, false); return; }
     let html = '';
     productos.forEach(p => {
       const key = p.productoProduccion + '|' + p.categoria;
@@ -89,6 +100,7 @@ function pintarConteo() {
     return;
   }
 
+  if (btnUltimo) btnUltimo.style.display = '';
   document.getElementById('conteo-chips').style.display = '';
   if (titulo) titulo.textContent = 'Contar stock';
   if (boton) boton.textContent = 'Guardar conteo';
@@ -100,7 +112,7 @@ function pintarConteo() {
   }).join('');
 
   const productosActivos = cacheConteoCatalogo.catalogo.filter(p => conteoCategoriasActivas.has(p.categoria));
-  if (esAncho) { pintarConteoDesktop_(productosActivos); return; }
+  if (esAncho) { pintarConteoDesktop_(productosActivos, true); return; }
 
   let html = '';
   categorias.filter(c => conteoCategoriasActivas.has(c)).forEach(cat => {
@@ -111,8 +123,8 @@ function pintarConteo() {
       const key = p.productoProduccion + '|' + p.categoria;
       const val = conteoCantidades[key] !== undefined ? conteoCantidades[key] : 0;
       const keyEsc = key.replace(/'/g, "\\'");
-      html += '<div class="conteo-row">' +
-        '<span>' + p.nombre + '</span>' +
+      html += '<div class="conteo-row" style="flex-wrap:wrap;">' +
+        '<span>' + p.nombre + '<br>' + refUltimoConteoHtml_(p) + '</span>' +
         '<div class="conteo-stepper">' +
           '<button type="button" onclick="cambiarCantidadConteo(\'' + keyEsc + '\',-1)">\u2212</button>' +
           '<input type="number" min="0" value="' + val + '" oninput="escribirCantidadConteo(\'' + keyEsc + '\',this.value)">' +
@@ -123,6 +135,38 @@ function pintarConteo() {
   });
   if (!html) html = '<p style="font-size:13.5px;color:var(--ink-soft);padding:24px 0;text-align:center;">Elige qué categoría(s) vas a contar.</p>';
   document.getElementById('conteo-lista').innerHTML = html;
+}
+
+// NUEVO 20/07/2026 (con Osmar — "revisar el último conteo", Opción A): snapshot de
+// solo lectura de la última fila de ConteoStockCima, cualquier estado. No toca
+// conteoCantidades ni el flujo de Revisión — es solo consulta. Usa el modal genérico
+// (abrirModal/cerrarModal) ya existente en index.html, mismo patrón que el resto del
+// sistema (Cierre de caja, Cliente nuevo, etc.).
+async function abrirUltimoConteo() {
+  abrirModal('<p style="text-align:center;color:var(--ink-soft);padding:20px 0;">Cargando…</p>');
+  const r = await llamarAPI('obtenerUltimoConteoCompleto', {});
+  if (!r.ok) {
+    abrirModal('<p class="error-msg">' + (r.error || 'Error al cargar el último conteo') + '</p>' +
+      '<div style="margin-top:14px;"><button class="btn-secondary" style="width:100%;" onclick="cerrarModal()">Cerrar</button></div>');
+    return;
+  }
+  if (!r.conteo) {
+    abrirModal('<h3 style="margin:0 0 8px;">Último conteo</h3>' +
+      '<p style="font-size:13.5px;color:var(--ink-soft);">Todavía no hay ningún conteo registrado.</p>' +
+      '<div style="margin-top:14px;"><button class="btn-secondary" style="width:100%;" onclick="cerrarModal()">Cerrar</button></div>');
+    return;
+  }
+  const c = r.conteo;
+  const filas = (c.productos || []).map(p =>
+    '<div class="resumen-fila"><span>' + p.nombre + '</span><strong>' + p.cantidadContada + '</strong></div>'
+  ).join('');
+  abrirModal(
+    '<h3 style="margin:0 0 4px;">Último conteo</h3>' +
+    '<p style="font-size:12px;color:var(--ink-soft);margin:0 0 2px;">' + c.fecha + ' · ' + (c.responsable || '') + '</p>' +
+    '<p style="font-size:12px;color:var(--ink-soft);margin:0 0 10px;">Categorías: ' + (c.categorias || '') + '</p>' +
+    '<div style="max-height:320px;overflow-y:auto;">' + (filas || '<p style="font-size:13.5px;color:var(--ink-soft);">Sin productos.</p>') + '</div>' +
+    '<div style="margin-top:14px;"><button class="btn-secondary" style="width:100%;" onclick="cerrarModal()">Cerrar</button></div>'
+  );
 }
 
 function toggleCategoriaConteo(cat) {
