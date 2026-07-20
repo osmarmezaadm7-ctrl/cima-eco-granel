@@ -590,7 +590,7 @@ function pintarRevision(r){
     '<div class="rev-leyenda">'+
       '<span><span class="punto verde"></span> Todo cuadra</span>'+
       '<span><span class="punto amarillo"></span> Digitación no calza, o error de medio de pago en Aronium</span>'+
-      '<span><span class="punto rojo"></span> Descuadre de caja (Efectivo/Transferencia) — posible plata real</span>'+
+      '<span><span class="punto rojo"></span> Descuadre sin explicar — caja (posible plata real) o venta no registrada en Aronium</span>'+
     '</div>';
   const tablaOCards = esAncho ? tablaRevisionDesktop(r.dias) : tarjetasRevisionMobile(r.dias);
   cont.innerHTML = kpiHtml + tablaOCards +
@@ -674,6 +674,7 @@ const CATEGORIA_CORTA_HALLAZGO = {
   'Conciliación: Pedidos Ya vs digitado':'Pedidos Ya vs digitado',
   'Conciliación: Swap medio de pago Aronium':'Swap medio de pago Aronium',
   'Conciliación: Descuadre de caja':'Descuadre de caja',
+  'Conciliación: Venta no registrada en Aronium':'Venta no registrada en Aronium',
   'Conciliación: Sin cierre de caja':'Sin cierre de caja'
 };
 const ACCION_TEXTO_HALLAZGO = {
@@ -682,6 +683,7 @@ const ACCION_TEXTO_HALLAZGO = {
   'Conciliación: Pedidos Ya vs digitado':'Confirmar y corregir',
   'Conciliación: Swap medio de pago Aronium':'Marcar revisado',
   'Conciliación: Descuadre de caja':'Marcar revisado',
+  'Conciliación: Venta no registrada en Aronium':'Marcar revisado',
   'Conciliación: Sin cierre de caja':'Confirmar'
 };
 
@@ -770,6 +772,7 @@ function resumenHallazgo_(h){
   if(h.categoria === 'Conciliación: Sin cierre de caja') return 'Se detectó '+fmt(h.real)+' en Débito/Crédito/Pedidos Ya ese día';
   if(h.categoria === 'Conciliación: Swap medio de pago Aronium') return 'Caja '+fmtSigno(d.deltaCaja)+' · Tarjetas '+fmtSigno(d.deltaTarjetas);
   if(h.categoria === 'Conciliación: Descuadre de caja') return 'Diferencia '+fmt(Math.abs(d.deltaCaja||0))+' sin explicar';
+  if(h.categoria === 'Conciliación: Venta no registrada en Aronium') return 'Diferencia '+fmt(Math.abs(d.residualMonto||0))+' en Débito/Crédito sin registrar en Aronium';
   return 'Diferencia '+fmt(Math.abs(valorHallazgo_(h.real) - valorHallazgo_(h.esperado)));
 }
 
@@ -801,6 +804,11 @@ function tablaHallazgo_(h){
       filaTablaHallazgo_('Transferencia', d.transferenciaAronium, d.transferenciaComprobado)+
       '</tbody></table>';
   }
+  if(h.categoria === 'Conciliación: Venta no registrada en Aronium'){
+    return '<table style="width:100%;border-collapse:collapse;margin:10px 0;"><thead><tr>'+th_('Medio')+th_('Aronium',1)+th_('Comprobado (Transbank)',1)+th_('Delta',1)+'</tr></thead><tbody>'+
+      filaTablaHallazgo_('Débito + Crédito', d.tarjetasAronium, d.tarjetasComprobado)+
+      '</tbody></table>';
+  }
   // Digitación (Débito/Crédito/Pedidos Ya vs digitado) — Aronium es solo referencia, no
   // forma parte de la comparación oficial de esta categoría (esa es Digitado vs Comprobado).
   const medioNombre = h.categoria.indexOf('Débito')!==-1 ? 'Débito' : (h.categoria.indexOf('Crédito')!==-1 ? 'Crédito' : 'Pedidos Ya');
@@ -817,13 +825,23 @@ function tablaHallazgo_(h){
 function explicacionHallazgo_(h){
   const d = h.detalle || {};
   if(h.categoria === 'Conciliación: Swap medio de pago Aronium'){
-    return '<p style="font-size:11.5px;color:var(--ink-soft);margin:0 0 8px;">Se cancela casi exacto — no falta plata, quedó mal categorizada en Aronium. No corrige ningún dato, solo deja constancia.</p>';
+    const texto = d.esParcial
+      ? 'Explica '+fmt(d.montoSwapParcial||0)+' del descuadre — una venta con un medio de pago digitada como otro en Aronium. No falta plata, quedó mal categorizada. El resto del descuadre de ese día se explica aparte, como otro hallazgo.'
+      : 'Se cancela casi exacto — no falta plata, quedó mal categorizada en Aronium.';
+    return '<p style="font-size:11.5px;color:var(--ink-soft);margin:0 0 8px;">'+texto+' No corrige ningún dato, solo deja constancia.</p>';
   }
   if(h.categoria === 'Conciliación: Descuadre de caja'){
     const falta = (d.deltaCaja||0) > 0; // Aronium > Comprobado: el POS registró más ventas en caja que las que se contaron
     const texto = falta
       ? 'Aronium registra más venta en efectivo/transferencia que lo contado en caja — posible plata que no llegó a completar el arqueo.'
       : 'Se contó más plata en caja que lo que las ventas explican — origen no comprobado, no se registra como ingreso automáticamente.';
+    return '<p style="font-size:11.5px;color:var(--danger);margin:0 0 8px;">'+texto+' No corrige ningún dato, solo deja constancia.</p>';
+  }
+  if(h.categoria === 'Conciliación: Venta no registrada en Aronium'){
+    const faltaEnAronium = (d.residualSigno||0) < 0; // Aronium < Comprobado en tarjetas: hubo venta real que Aronium nunca capturó
+    const texto = faltaEnAronium
+      ? 'Transbank confirma más venta con Débito/Crédito que la que Aronium digitó — hubo venta real que Aronium nunca registró en ningún medio. No es plata perdida, es venta no capturada por el POS.'
+      : 'Aronium registra venta con Débito/Crédito que Transbank no confirma — revisar si quedó una venta duplicada o no reversada en Aronium.';
     return '<p style="font-size:11.5px;color:var(--danger);margin:0 0 8px;">'+texto+' No corrige ningún dato, solo deja constancia.</p>';
   }
   return '';
@@ -851,7 +869,7 @@ function tarjetaHallazgo(h){
     '<label style="display:flex;align-items:center;gap:6px;font-size:11.5px;color:var(--ink-soft);margin:0 0 8px;cursor:pointer;"><input type="checkbox" id="notif-chk-'+idDom+'" checked style="width:auto;margin:0;"> Notificar a '+h.responsable+'</label>' :
     '<p style="font-size:11.5px;color:var(--ink-soft);margin:0 0 8px;">Sin responsable de jornada — no se notifica</p>';
 
-  const sinRechazo = h.categoria === 'Conciliación: Sin cierre de caja' || h.categoria === 'Conciliación: Descuadre de caja';
+  const sinRechazo = h.categoria === 'Conciliación: Sin cierre de caja' || h.categoria === 'Conciliación: Descuadre de caja' || h.categoria === 'Conciliación: Venta no registrada en Aronium';
 
   // Colapsada por defecto — el resumen de una línea ya dice qué pasó, sin abrir la tarjeta.
   return '<div class="hallazgo'+claseCritica+'">'+
