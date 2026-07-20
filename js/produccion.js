@@ -157,9 +157,12 @@ async function abrirUltimoConteo() {
     return;
   }
   const c = r.conteo;
-  const filas = (c.productos || []).map(p =>
-    '<div class="resumen-fila"><span>' + p.nombre + '</span><strong>' + p.cantidadContada + '</strong></div>'
-  ).join('');
+  const categorias = [...new Set((c.productos || []).map(p => p.categoria))];
+  const filas = categorias.map(cat => {
+    const items = (c.productos || []).filter(p => p.categoria === cat);
+    return '<p class="resumen-seccion-titulo">' + cat + '</p>' +
+      items.map(p => '<div class="resumen-fila"><span>' + p.nombre + '</span><strong>' + p.cantidadContada + '</strong></div>').join('');
+  }).join('');
   abrirModal(
     '<h3 style="margin:0 0 4px;">Último conteo</h3>' +
     '<p style="font-size:12px;color:var(--ink-soft);margin:0 0 2px;">' + c.fecha + ' · ' + (c.responsable || '') + '</p>' +
