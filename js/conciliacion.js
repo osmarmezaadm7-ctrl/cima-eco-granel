@@ -668,6 +668,66 @@ let cacheHallazgosActual = {};
 let ultimoHallazgosResp = null;
 let filtroHallazgos = 'Pendiente';
 
+// Título + frase en lenguaje simple, sin jerga ni números — para Historial de caja. Las
+// cifras van aparte (bloque mono), esto es solo "qué pasó en la práctica".
+// Bloque de cifras reales (mono) por categoría — mismos datos que ya trae el detalle,
+// solo con otro layout, pensado para leerse dentro de una tarjeta de período.
+function cifrasHallazgo_(h){
+  const d = h.detalle || {};
+  if(h.categoria === 'Conciliación: Swap medio de pago Aronium'){
+    return 'Caja: '+fmt(d.cajaComprobado)+' esperado → '+fmt(d.cajaAronium)+' en Aronium<br>Tarjetas: '+fmt(d.tarjetasComprobado)+' esperado → '+fmt(d.tarjetasAronium)+' en Aronium';
+  }
+  if(h.categoria === 'Conciliación: Descuadre de caja'){
+    return 'Efectivo: '+fmt(d.efectivoComprobado)+' → '+fmt(d.efectivoAronium)+'<br>Transferencia: '+fmt(d.transferenciaComprobado)+' → '+fmt(d.transferenciaAronium);
+  }
+  if(h.categoria === 'Conciliación: Venta no registrada en Aronium'){
+    return '<b>'+fmt(Math.abs(d.residualMonto||0))+' sin registrar</b><br>Débito + Crédito: '+fmt(d.tarjetasComprobado)+' banco → '+fmt(d.tarjetasAronium)+' Aronium';
+  }
+  if(h.categoria === 'Conciliación: Sin cierre de caja') return '';
+  return fmt(h.esperado)+' → '+fmt(h.real);
+}
+
+function explicacionSimpleHallazgo_(h){
+  const d = h.detalle || {};
+  const medioNombre = h.categoria.indexOf('Débito')!==-1 ? 'Débito' : (h.categoria.indexOf('Crédito')!==-1 ? 'Crédito' : 'Pedidos Ya');
+  switch(h.categoria){
+    case 'Conciliación: Débito Transbank vs digitado':
+    case 'Conciliación: Crédito Transbank vs digitado':
+    case 'Conciliación: Pedidos Ya vs digitado':
+      return {
+        titulo: 'Monto de '+medioNombre+' no coincidía con el banco',
+        frase: 'El monto que se escribió en el cierre de caja para '+medioNombre+' no coincidía con lo que confirma la fuente oficial.'+(h.aplicado?' Ya se corrigió al valor correcto.':'')
+      };
+    case 'Conciliación: Swap medio de pago Aronium':
+      return {
+        titulo: 'Venta con el medio de pago equivocado',
+        frase: 'Una venta se cobró con un medio de pago pero quedó digitada como otro en Aronium. No falta plata — fue un error al categorizar la venta.'
+      };
+    case 'Conciliación: Descuadre de caja': {
+      const falta = (d.deltaCaja||0) > 0;
+      return {
+        titulo: falta ? 'Efectivo/transferencia no calzó con lo vendido' : 'Se contó más plata de la que las ventas explican',
+        frase: falta
+          ? 'Aronium registra más venta en efectivo o transferencia que lo contado en caja — posible plata que no llegó a completar el arqueo.'
+          : 'Se contó más plata en caja que lo que las ventas explican — origen no comprobado.'
+      };
+    }
+    case 'Conciliación: Venta no registrada en Aronium': {
+      const faltaEnAronium = (d.residualSigno||0) < 0;
+      return {
+        titulo: faltaEnAronium ? 'Venta que no quedó registrada en Aronium' : 'Aronium tiene una venta que el banco no confirma',
+        frase: faltaEnAronium
+          ? 'Hubo una venta con tarjeta que el banco confirma, pero que nunca se digitó en Aronium. No es plata perdida — hay que estar más atento a que cada venta quede registrada.'
+          : 'Aronium registra una venta con tarjeta que el banco no confirma — revisar si quedó una venta duplicada o no reversada.'
+      };
+    }
+    case 'Conciliación: Sin cierre de caja':
+      return { titulo: 'No se hizo el cierre de caja ese día', frase: 'Ese día no se alcanzó a registrar el cierre de caja.' };
+    default:
+      return { titulo: CATEGORIA_CORTA_HALLAZGO[h.categoria] || h.categoria, frase: '' };
+  }
+}
+
 const CATEGORIA_CORTA_HALLAZGO = {
   'Conciliación: Débito Transbank vs digitado':'Débito Transbank vs digitado',
   'Conciliación: Crédito Transbank vs digitado':'Crédito Transbank vs digitado',
@@ -1040,6 +1100,9 @@ function construirCuerpoNotificacion_(mensaje, fechaCreacion) {
         montoDestacadoHtml = '<div style="font-size:13px;font-weight:700;color:var(--warn);margin-top:2px;">'+fmt(it.montoSwap)+' mal clasificado</div>'+
           '<div class="item-sub">Caja '+fmt(it.cajaContado)+' → '+fmt(it.cajaSistema)+'</div>'+
           '<div class="item-sub">Tarjetas '+fmt(it.tarjetasContado)+' → '+fmt(it.tarjetasSistema)+'</div>';
+      } else if(it.montoNoRegistrado!=null){
+        montoDestacadoHtml = '<div style="font-size:13px;font-weight:700;color:var(--danger);margin-top:2px;">'+fmt(it.montoNoRegistrado)+' sin registrar en Aronium</div>'+
+          '<div class="item-sub">Débito/Crédito '+fmt(it.tarjetasContado)+' → '+fmt(it.tarjetasSistema)+'</div>';
       }
       const subHtml = it.corregido ? ('Corregido'+(it.nota?' — '+it.nota:'')) : (it.nota || 'Revisado');
       cuerpo += '<div class="item-row"><div class="item-cat">'+it.categoria+montoHtml+'</div>'+montoDestacadoHtml+'<div class="item-sub" style="font-style:italic;">'+(montoDestacadoHtml?'Nota: ':'')+subHtml+'</div></div>';
@@ -1067,6 +1130,8 @@ async function cargarNotificaciones(){
       ? '<button class="btn-primary" onclick="accionNotificacion(this,\''+n.id+'\',\'abrirRevision\')">Ver pedido</button>'
       : n.accionNotif==='abrirPauta'
       ? '<button class="btn-primary" onclick="accionNotificacion(this,\''+n.id+'\',\'abrirPauta\')">Ver pauta</button>'
+      : n.accionNotif && n.accionNotif.indexOf('verHistorialCaja:')===0
+      ? '<button class="btn-primary" onclick="accionNotificacion(this,\''+n.id+'\',\''+n.accionNotif.replace(/'/g,"\\'")+'\')">Ver detalle</button>'
       : '';
     const marcarBtn = '<button class="'+(n.accionNotif?'btn-secondary':'btn-primary')+'" style="'+(n.accionNotif?'':'width:100%;')+'" onclick="marcarNotificacionComoVista(this,\''+n.id+'\')">Marcar como vista</button>';
     const div = document.createElement('div');
@@ -1097,6 +1162,69 @@ async function accionNotificacion(btn, id, accion){
   const card = btn.closest('.notif-card'); if(card) card.remove();
   if(accion==='abrirRevision' && typeof abrirRevision==='function') abrirRevision(false, true);
   if(accion==='abrirPauta' && typeof abrirPauta==='function') abrirPauta();
+  if(accion.indexOf('verHistorialCaja:')===0) abrirHistorialCaja(accion.slice('verHistorialCaja:'.length));
+}
+
+/* ===================================================================
+   HISTORIAL DE CAJA — hallazgos propios agrupados por período (19/07/2026)
+   =================================================================== */
+async function abrirHistorialCaja(procesoIdDestacar){
+  irA('screen-historial-caja');
+  const cont = document.getElementById('historial-caja-lista');
+  cont.innerHTML = skeletonCards(3);
+  const r = await llamarAPI('obtenerHistorialCajaPersona', { nombre: sesion.nombre, procesoIdDestacar: procesoIdDestacar || null });
+  if(!r.ok){ cont.innerHTML = '<p style="font-size:13px;color:var(--danger);">'+(r.error||'Error al cargar')+'</p>'; return; }
+  pintarHistorialCaja(r);
+}
+
+function pintarHistorialCaja(r){
+  const cont = document.getElementById('historial-caja-lista');
+  if(!r.periodos.length){ cont.innerHTML = '<p style="font-size:13px;color:var(--ink-soft);">Todavía no tienes hallazgos de conciliación registrados.</p>'; return; }
+
+  cont.innerHTML = r.periodos.map((p, i) => {
+    const idDom = p.procesoId.replace(/[^a-zA-Z0-9]/g,'_');
+    const abierto = p.destacar;
+    const itemsHtml = p.hallazgos.map(h => {
+      const exp = explicacionSimpleHallazgo_(h);
+      const cifras = cifrasHallazgo_(h);
+      const badge = h.aplicado
+        ? '<span class="pill pill-ok">Corregido</span>'
+        : '<span class="pill pill-alerta">Revisado</span>';
+      return '<div style="border-top:1px solid var(--border);padding-top:12px;margin-top:12px;">'+
+        '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:4px;gap:8px;">'+
+          '<div style="font-size:13px;font-weight:700;color:var(--ink);">'+exp.titulo+'</div>'+badge+
+        '</div>'+
+        (exp.frase ? '<p style="font-size:12px;color:var(--ink-soft);margin:0 0 6px;line-height:1.4;">'+exp.frase+'</p>' : '')+
+        (h.nota ? '<p style="font-size:11.5px;color:var(--ink-soft);font-style:italic;margin:0 0 6px;">Nota: '+h.nota+'</p>' : '')+
+        (cifras ? '<div style="background:var(--surface-2,#F1EFE8);border-radius:8px;padding:8px 10px;font-family:\'JetBrains Mono\',monospace;font-size:11.5px;color:var(--ink);">'+cifras+'</div>' : '')+
+        '<div style="font-size:11px;color:var(--caramel);margin-top:6px;">'+h.fechaInicioReal+'</div>'+
+      '</div>';
+    }).join('');
+
+    return '<div class="hist-caja-periodo'+(abierto?' abierto':'')+'" id="hcp-'+idDom+'">'+
+      '<div class="hist-caja-periodo-top" onclick="toggleHistorialCajaPeriodo(\''+idDom+'\')">'+
+        '<div><div style="font-size:13.5px;font-weight:700;color:var(--ink);">'+p.desde+' – '+p.hasta+'</div>'+
+        '<div style="font-size:11px;color:var(--ink-soft);margin-top:2px;">'+p.hallazgos.length+' hallazgo'+(p.hallazgos.length===1?'':'s')+'</div></div>'+
+        '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" class="hist-caja-chevron"><path d="M9 6l6 6-6 6"></path></svg>'+
+      '</div>'+
+      '<div class="hist-caja-periodo-body" style="display:'+(abierto?'block':'none')+';">'+itemsHtml+'</div>'+
+    '</div>';
+  }).join('');
+
+  if(r.periodos.some(p=>p.destacar)){
+    const dest = r.periodos.find(p=>p.destacar);
+    const idDom = dest.procesoId.replace(/[^a-zA-Z0-9]/g,'_');
+    setTimeout(()=>{ const el=document.getElementById('hcp-'+idDom); if(el) el.scrollIntoView({behavior:'smooth', block:'start'}); }, 100);
+  }
+}
+
+function toggleHistorialCajaPeriodo(idDom){
+  const el = document.getElementById('hcp-'+idDom);
+  if(!el) return;
+  const body = el.querySelector('.hist-caja-periodo-body');
+  const abierto = body.style.display !== 'none';
+  body.style.display = abierto ? 'none' : 'block';
+  el.classList.toggle('abierto', !abierto);
 }
 
 /* ===================================================================
@@ -1310,16 +1438,27 @@ async function ejecutarRegistrarGasto(fuente){
 }
 
 function abrirModalCerrarConciliacion(){
+  const propios = (cacheHallazgosActual ? Object.values(cacheHallazgosActual) : []).filter(h => h.estado==='Resuelta' && h.responsable && !h.notificado);
+  const personas = [...new Set(propios.map(h=>h.responsable))];
+  const checkHtml = personas.length
+    ? '<label style="display:flex;align-items:flex-start;gap:8px;font-size:12.5px;color:var(--ink);margin-bottom:16px;cursor:pointer;background:var(--surface-2,#F1EFE8);border-radius:9px;padding:10px 12px;">'+
+        '<input type="checkbox" id="cierre-notificar-check" checked style="margin-top:2px;">'+
+        '<span>Notificar a los responsables — '+personas.length+' persona'+(personas.length===1?'':'s')+' ('+personas.join(', ')+'), '+propios.length+' hallazgo'+(propios.length===1?'':'s')+'</span>'+
+      '</label>'
+    : '';
   abrirModal(
     '<h3 style="font-size:16px;margin:0 0 8px;">¿Cerrar esta conciliación?</h3>'+
     '<p style="font-size:12.5px;color:var(--ink-soft);margin:0 0 14px;">El proceso queda de solo lectura. No se van a poder volver a subir fuentes ni cambiar hallazgos de este período.</p>'+
+    checkHtml+
     '<div class="error-msg" id="cierre-modal-error"></div>'+
     '<div style="display:flex;gap:8px;"><button class="btn-secondary" onclick="cerrarModal()">Cancelar</button><button class="btn-primary" onclick="ejecutarCerrarConciliacion()">Cerrar conciliación</button></div>'
   );
 }
 
 async function ejecutarCerrarConciliacion(){
-  const r = await llamarAPI('cerrarConciliacion', {procesoId: procesoActualGlobal});
+  const chk = document.getElementById('cierre-notificar-check');
+  const notificar = chk ? chk.checked : false;
+  const r = await llamarAPI('cerrarConciliacion', {procesoId: procesoActualGlobal, notificar});
   if(!r.ok){ const e=document.getElementById('cierre-modal-error'); if(e) e.textContent = r.error||'No se pudo cerrar'; return; }
   cerrarModal();
   cargarCierre(procesoActualGlobal);
