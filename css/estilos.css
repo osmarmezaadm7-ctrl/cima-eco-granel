@@ -277,3 +277,10 @@ td{padding:8px 6px;border-bottom:1px solid var(--border);}
 .perm-card-fila{display:flex;align-items:center;justify-content:space-between;padding:9px 0;border-top:1px solid var(--border);font-size:14px;cursor:pointer;min-height:44px;}
 .perm-card-fila:first-of-type{border-top:none;}
 .perm-card-fila input[type=checkbox]{width:22px;height:22px;flex-shrink:0;}
+
+/* Abastecimiento — checkbox de la fila de Lista de compra (modo admin).
+   BUGFIX 21/07/2026: sin esta regla el checkbox hereda la regla global de la
+   linea 103 (input,select,textarea{width:100%;padding:11px;}), se infla al ancho
+   del contenedor flex y descoloca el nombre del producto en nombres largos.
+   Mismo patron que .tabla-permisos y .perm-card-fila ya usan. */
+.abast-check{width:18px;height:18px;padding:0;flex-shrink:0;}
