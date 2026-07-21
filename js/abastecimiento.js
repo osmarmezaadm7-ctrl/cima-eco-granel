@@ -259,24 +259,42 @@ async function enviarPedidoAbastecimiento() {
 // Reutiliza el modal genérico (abrirModal/cerrarModal), mismo patrón que Proveedor/Cliente.
 
 function abrirModalCrearInsumo() {
+  const negocio = negocioActualAbast_();
+  const opciones = negocio === 'Vegan Corner'
+    ? ['Insumo', 'Artículo de Aseo', 'Materia Prima']
+    : ['Insumo', 'Artículo de Aseo']; // Cima nunca ve ni puede crear Materia Prima
+  const opcionesHtml = opciones.map(c => '<option value="' + c + '">' + c + '</option>').join('');
   abrirModal(
     '<h3 style="margin:0 0 10px;">Crear insumo nuevo</h3>' +
     '<div style="display:flex;flex-direction:column;gap:10px;">' +
       '<input type="text" id="ins-nombre" placeholder="Nombre del insumo">' +
-      '<select id="ins-categoria"><option value="Insumo">Insumo</option><option value="Materia Prima">Materia Prima</option><option value="Artículo de Aseo">Artículo de Aseo</option></select>' +
+      '<select id="ins-categoria" onchange="actualizarExclusivoInsumo_()">' + opcionesHtml + '</select>' +
       '<select id="ins-unidad"><option value="Un">Un</option><option value="Kg">Kg</option></select>' +
+      '<label id="ins-exclusivo-wrap" style="display:flex;align-items:center;gap:8px;font-size:13px;"><input type="checkbox" id="ins-exclusivo"> Exclusivo de mi negocio</label>' +
     '</div>' +
     '<p class="error-msg" id="ins-error" style="margin-top:8px;"></p>' +
     '<div style="display:flex;gap:8px;margin-top:14px;"><button class="btn-secondary" onclick="cerrarModal()">Cancelar</button><button class="btn-primary" onclick="confirmarCrearInsumo()">Crear y pedir</button></div>'
   );
+  actualizarExclusivoInsumo_();
+}
+
+// El checkbox "Exclusivo de mi negocio" solo tiene sentido para Insumo — Aseo siempre es
+// de ambos, Materia Prima ya es exclusiva de Vegan Corner por definición.
+function actualizarExclusivoInsumo_() {
+  const cat = document.getElementById('ins-categoria').value;
+  const wrap = document.getElementById('ins-exclusivo-wrap');
+  wrap.style.display = (cat === 'Insumo') ? 'flex' : 'none';
+  if (cat !== 'Insumo') document.getElementById('ins-exclusivo').checked = false;
 }
 
 async function confirmarCrearInsumo() {
   const nombre = document.getElementById('ins-nombre').value.trim();
   const categoria = document.getElementById('ins-categoria').value;
   const unidad = document.getElementById('ins-unidad').value;
+  const exclusivo = document.getElementById('ins-exclusivo').checked;
   if (!nombre) { document.getElementById('ins-error').textContent = 'Ingresa el nombre del insumo'; return; }
-  const r = await llamarAPI('crearInsumoNuevo', { data: { nombre: nombre, categoria: categoria, unidad: unidad } });
+  const negocio = negocioActualAbast_();
+  const r = await llamarAPI('crearInsumoNuevo', { data: { nombre: nombre, categoria: categoria, unidad: unidad, negocioSolicitante: negocio, exclusivo: exclusivo } });
   if (!r.ok) { document.getElementById('ins-error').textContent = r.error || 'Error al crear el insumo'; return; }
   cacheAbastCatalogo.catalogo.push({ nombre: nombre, categoria: categoria, subcategoria: '', unidad: unidad });
   abastSeleccionados.add(nombre);
