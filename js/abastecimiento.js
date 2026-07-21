@@ -22,8 +22,20 @@ let cachePendientesNegocio = null;  // Set de nombres ya pendientes en el negoci
 let abastCategoriaActiva = null;
 let abastSubcategoriaActiva = null;
 let abastSeleccionados = new Set(); // nombres marcados para enviar en este pedido
+let abastNegocioElegido = null;     // solo se usa cuando sesion.negocio === 'Ambos' (Osmar)
 
 function esAdminCompras_() { return tienePermisoLocal('GestionarCompras'); }
+
+// BUGFIX 21/07/2026 (con Osmar): el valor real de sesion.negocio NO es 'Cima' — es
+// 'Cima Eco-Granel' (Rocío, Lucas, Cecilia) o 'Ambos' (Osmar, admin de los dos negocios).
+// El backend de Abastecimiento espera literalmente 'Cima' o 'Vegan Corner' (mismo
+// criterio simple que ya usa CatalogoCima), así que acá se traduce. Para 'Ambos', no hay
+// negocio único posible — se le pide elegir con abastNegocioElegido (ver pintarSolicitar).
+function negocioActualAbast_() {
+  if (sesion.negocio === 'Cima Eco-Granel') return 'Cima';
+  if (sesion.negocio === 'Vegan Corner') return 'Vegan Corner';
+  return abastNegocioElegido; // 'Ambos' — null hasta que elija
+}
 
 // ============ LISTA DE COMPRA (adaptiva) ============
 
@@ -40,8 +52,9 @@ async function abrirAbastecimiento(forzar) {
     if (!document.getElementById('screen-abastecimiento').classList.contains('active')) return;
     pintarAbastecimientoAdmin(r);
   } else {
-    document.getElementById('abast-subtitulo').textContent = 'Pendiente en ' + (sesion.negocio || '') + '.';
-    const r = await llamarAPI('obtenerListaCompraStaff', { negocio: sesion.negocio });
+    const negocio = negocioActualAbast_();
+    document.getElementById('abast-subtitulo').textContent = 'Pendiente en ' + (negocio || '') + '.';
+    const r = await llamarAPI('obtenerListaCompraStaff', { negocio: negocio });
     if (!document.getElementById('screen-abastecimiento').classList.contains('active')) return;
     pintarAbastecimientoStaff(r);
   }
@@ -114,12 +127,28 @@ async function confirmarItemsComprados() {
 async function abrirSolicitar() {
   document.getElementById('abast-solicitar-error').textContent = '';
   abastSeleccionados = new Set();
+
+  // Osmar (sesion.negocio === 'Ambos') no tiene un negocio único — hay que preguntarle
+  // para cuál de los dos está solicitando antes de poder cargar catálogo o guardar nada.
+  if (sesion.negocio === 'Ambos' && !abastNegocioElegido) {
+    document.getElementById('abast-chips-cat').innerHTML = '';
+    document.getElementById('abast-chips-subcat').innerHTML = '';
+    document.getElementById('abast-lista-solicitar').innerHTML =
+      '<p style="font-size:13.5px;color:var(--ink-soft);padding:12px 0 8px;text-align:center;">¿Para cuál negocio es?</p>' +
+      '<div style="display:flex;gap:10px;padding:8px 0 24px;">' +
+        '<button class="btn-secondary" style="flex:1;" onclick="elegirNegocioAbast_(\'Cima\')">Cima</button>' +
+        '<button class="btn-secondary" style="flex:1;" onclick="elegirNegocioAbast_(\'Vegan Corner\')">Vegan Corner</button>' +
+      '</div>';
+    return;
+  }
+
+  const negocio = negocioActualAbast_();
   document.getElementById('abast-chips-cat').innerHTML = skeletonCards(1);
   document.getElementById('abast-lista-solicitar').innerHTML = skeletonCards(3);
 
   const [rCat, rPend] = await Promise.all([
-    llamarAPI('obtenerCatalogoAbastecimiento', { negocio: sesion.negocio }),
-    llamarAPI('obtenerListaCompraStaff', { negocio: sesion.negocio })
+    llamarAPI('obtenerCatalogoAbastecimiento', { negocio: negocio }),
+    llamarAPI('obtenerListaCompraStaff', { negocio: negocio })
   ]);
   if (!rCat.ok) {
     document.getElementById('abast-lista-solicitar').innerHTML = '<p class="error-msg">' + (rCat.error || 'Error al cargar el catálogo') + '</p>';
@@ -130,6 +159,11 @@ async function abrirSolicitar() {
   abastCategoriaActiva = null;
   abastSubcategoriaActiva = null;
   pintarSolicitar();
+}
+
+function elegirNegocioAbast_(negocio) {
+  abastNegocioElegido = negocio;
+  abrirSolicitar();
 }
 
 function pintarSolicitar() {
@@ -210,11 +244,12 @@ async function enviarPedidoAbastecimiento() {
     const p = cacheAbastCatalogo.catalogo.find(x => x.nombre === nombre);
     return { nombre: nombre, categoria: p ? p.categoria : '', subcategoria: p ? p.subcategoria : '', unidad: p ? p.unidad : 'Un' };
   });
-  const r = await llamarAPI('guardarPedidoAbastecimiento', { data: { negocio: sesion.negocio, responsable: sesion.nombre, items: items } });
+  const negocio = negocioActualAbast_();
+  const r = await llamarAPI('guardarPedidoAbastecimiento', { data: { negocio: negocio, responsable: sesion.nombre, items: items } });
   if (!r.ok) { document.getElementById('abast-solicitar-error').textContent = r.error || 'Error al enviar el pedido'; return; }
   abastSeleccionados = new Set();
   document.getElementById('confirm-title').textContent = 'Pedido enviado';
-  document.getElementById('confirm-msg').textContent = 'Se agregó a la Lista de compra de ' + sesion.negocio + '.';
+  document.getElementById('confirm-msg').textContent = 'Se agregó a la Lista de compra de ' + negocio + '.';
   document.getElementById('confirm-detalle').innerHTML = '';
   ocultarBotonOtro();
   irA('screen-confirm');
