@@ -900,6 +900,42 @@
     <div id="lista-compra-mp"></div>
   </div>
 
+  <!-- NUEVO 20/07/2026 (con Osmar) — módulo Abastecimiento. Reemplaza Inventario MP y
+       Lista de compra MP de arriba (esas quedan sin usar, ver nota en pintarMenu). Una
+       sola pantalla que se adapta según GestionarCompras: sin el permiso, lista simple
+       por negocio (evitar duplicar pedidos); con el permiso (Osmar), vista consolidada
+       agrupada por proveedor con cantidad y checkbox — mismo criterio que la Pauta
+       activa en modo solo-lectura vs interactivo. -->
+  <div class="screen desktop-wide" id="screen-abastecimiento">
+    <div class="header-row" style="margin-bottom:10px;">
+      <button class="back-link" style="margin-bottom:0;" onclick="irA('screen-home')"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"></path></svg> Volver</button>
+      <div style="display:flex;gap:4px;">
+        <button class="icon-btn" title="Actualizar" onclick="abrirAbastecimiento(true)"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 4v6h-6"></path><path d="M1 20v-6h6"></path><path d="M3.5 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.65 4.36A9 9 0 0 0 20.5 15"></path></svg></button>
+        <button class="icon-btn" id="btn-abast-solicitar" title="Solicitar" onclick="irA('screen-abastecimiento-solicitar')"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg></button>
+      </div>
+    </div>
+    <h2 style="font-size:17px;">Lista de compra</h2>
+    <p id="abast-subtitulo" style="font-size:12px;color:var(--ink-soft);margin:0 0 10px;"></p>
+    <div id="abast-lista"></div>
+    <div class="error-msg" id="abast-error"></div>
+    <div class="submit-bar" id="abast-submit-bar" style="display:none;">
+      <button class="btn-primary" onclick="confirmarItemsComprados()">Marcar seleccionados como comprados</button>
+    </div>
+  </div>
+
+  <div class="screen desktop-wide" id="screen-abastecimiento-solicitar">
+    <div class="header-row" style="margin-bottom:10px;">
+      <button class="back-link" style="margin-bottom:0;" onclick="irA('screen-abastecimiento')"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"></path></svg> Volver</button>
+    </div>
+    <h2 style="font-size:17px;">Solicitar</h2>
+    <div id="abast-chips-cat" class="conteo-chips"></div>
+    <div id="abast-chips-subcat" class="conteo-chips" style="margin-top:-8px;"></div>
+    <div id="abast-lista-solicitar"></div>
+    <button type="button" class="btn-secondary" style="width:100%;margin-top:6px;" onclick="abrirModalCrearInsumo()">+ Crear insumo nuevo</button>
+    <div class="error-msg" id="abast-solicitar-error"></div>
+    <div class="submit-bar"><button class="btn-primary" onclick="enviarPedidoAbastecimiento()">Enviar pedido</button></div>
+  </div>
+
   <div class="screen confirm-screen" id="screen-confirm">
     <div class="confirm-check">✓</div>
     <h2 id="confirm-title" style="font-size:18px;">Registro guardado</h2>
@@ -1409,9 +1445,17 @@ function pintarSidebar(){
   // listarPrograma, crearPrograma, marcarProgramaEntregado, etc.) ya se borraron del todo —
   // no había ningún link vivo hacia ellas desde ninguna combinación de permisos real.
   if (tienePermisoLocal('GestionarPauta') || tienePermisoLocal('VerPrograma')) prodHtml += item('screen-pauta',ICONS.programa,'Pauta de producción');
-  if (tienePermisoLocal('GestionarInventario')) prodHtml += item('screen-inventario',ICONS.inventario,'Inventario MP') + item('screen-lista-compra',ICONS.carrito,'Lista de compra MP');
+  // RETIRADO 20/07/2026 (con Osmar): Inventario MP y Lista de compra MP quedan
+  // reemplazadas por el módulo Abastecimiento. Las pantallas viejas (screen-inventario,
+  // screen-lista-compra) y sus funciones (listarInventarioMP, listaCompraMP, etc.) se
+  // dejan sin usar en vez de borrarlas — no rompen nada, solo ya no son alcanzables
+  // desde el menú.
   if (prodHtml) nav.insertAdjacentHTML('beforeend', '<div class="grupo">Producción</div>'+prodHtml);
   else nav.insertAdjacentHTML('beforeend', '<div class="grupo">Producción</div>'+itemProx(ICONS.produccion,'Producción'));
+
+  let abastHtml='';
+  if (tienePermisoLocal('RegistrarAbastecimiento') || tienePermisoLocal('GestionarCompras')) abastHtml += item('screen-abastecimiento',ICONS.carrito,'Lista de compra');
+  if (abastHtml) nav.insertAdjacentHTML('beforeend', '<div class="grupo">Abastecimiento</div>'+abastHtml);
 
   nav.insertAdjacentHTML('beforeend', '<div class="grupo">Operaciones</div>'+itemProx(ICONS.config,'Operaciones'));
   nav.insertAdjacentHTML('beforeend', '<div class="grupo">CRM</div>'+itemProx(ICONS.crm,'Clientes'));
@@ -1438,6 +1482,8 @@ function onEntrarScreen(id){
   if(id==='screen-conteo') abrirConteo();
   if(id==='screen-inventario') abrirInventario();
   if(id==='screen-lista-compra') abrirListaCompra();
+  if(id==='screen-abastecimiento') abrirAbastecimiento();
+  if(id==='screen-abastecimiento-solicitar') abrirSolicitar();
   if(id==='screen-venta-vegan') abrirVentaVegan();
   if(id==='screen-compra') prepararCompra();
   if(id==='screen-cierre'){ document.getElementById('cc-fecha').value = fechaLocalISO(); setModoCierre('dia',document.querySelector('#cc-modo-group button')); }
@@ -2399,6 +2445,10 @@ const PERMISOS_MODULOS = [
     { clave:'GestionarPauta', label:'Pauta de producción (Vegan Corner)', nuevo:true },
     { clave:'GestionarInventario', label:'Inventario de materia prima' }
   ]},
+  { titulo: 'Abastecimiento', items: [
+    { clave:'RegistrarAbastecimiento', label:'Solicitar productos/insumos', nuevo:true },
+    { clave:'GestionarCompras', label:'Comprar (vista consolidada)', nuevo:true }
+  ]},
   { titulo: 'Conciliación', items: [
     { clave:'ProcesarConciliacion', label:'Procesar conciliación', nuevo:true }
   ]},
@@ -2618,6 +2668,7 @@ pintarUsuarios();
 </script>
 <script src="js/conciliacion.js"></script>
 <script src="js/produccion.js"></script>
+<script src="js/abastecimiento.js"></script>
 
 </body>
 </html>
