@@ -101,12 +101,12 @@ function pintarAbastecimientoAdmin(r) {
   orden.forEach(proveedor => {
     html += '<p class="conteo-seccion-titulo">' + proveedor + '</p>';
     grupos[proveedor].forEach(it => {
-      html += '<div class="abast-item-row" style="display:flex;align-items:center;gap:10px;padding:6px 0;border-top:1px solid var(--border);">' +
-        '<input type="checkbox" class="abast-check" data-id="' + it.id + '">' +
-        puntoNegocio_(it.negocio) +
-        '<span style="font-size:14px;flex:1;">' + it.producto + '</span>' +
-        '<input type="number" min="0" value="' + (it.cantidad === null ? '' : it.cantidad) + '" style="width:52px;text-align:right;" onchange="cambiarCantidadItemCompra(\'' + it.id + '\',this.value)">' +
-        '<span style="font-size:12px;color:var(--ink-soft);min-width:18px;">' + it.unidad + '</span>' +
+      html += '<div class="abast-item-row" style="display:flex;align-items:flex-start;gap:10px;padding:8px 0;border-top:1px solid var(--border);">' +
+        '<input type="checkbox" class="abast-check" data-id="' + it.id + '" style="margin-top:3px;">' +
+        '<span style="width:7px;height:7px;border-radius:50%;background:' + (it.negocio === 'Vegan Corner' ? 'var(--terracotta)' : 'var(--forest)') + ';flex-shrink:0;margin-top:6px;display:inline-block;" aria-hidden="true"></span>' +
+        '<span style="font-size:14px;flex:1;line-height:1.35;">' + it.producto + '</span>' +
+        '<input type="number" min="0" value="' + (it.cantidad === null ? '' : it.cantidad) + '" style="width:52px;text-align:right;flex-shrink:0;" onchange="cambiarCantidadItemCompra(\'' + it.id + '\',this.value)">' +
+        '<span style="font-size:12px;color:var(--ink-soft);min-width:18px;margin-top:6px;">' + it.unidad + '</span>' +
       '</div>';
     });
   });
