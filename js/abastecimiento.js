@@ -1,0 +1,252 @@
+/**
+ * js/abastecimiento.js — módulo Abastecimiento (20/07/2026).
+ * Reemplaza el pedido de mercadería/insumos/MP/aseo por WhatsApp o pizarra, y las
+ * pantallas viejas "Inventario MP"/"Lista de compra MP" (quedan sin usar en index.html,
+ * no se borraron).
+ *
+ * DOS pantallas:
+ * - Lista de compra (screen-abastecimiento): UNA sola pantalla que se adapta según
+ *   GestionarCompras — mismo criterio que la Pauta activa en modo solo-lectura vs
+ *   interactivo. Sin el permiso: lista simple de pendientes del propio negocio, sin
+ *   cantidad ni proveedor (solo para no duplicar pedidos). Con el permiso (Osmar): vista
+ *   consolidada de AMBOS negocios agrupada por proveedor, con cantidad editable y
+ *   checkbox de comprado.
+ * - Solicitar (screen-abastecimiento-solicitar): chips de 2 niveles (Categoría →
+ *   Subcategoría) sobre el catálogo combinado (mercadería de Cima + insumos/MP/aseo).
+ *   Sin cantidad — el staff solo marca qué necesita, la cantidad la define Osmar en
+ *   Comprar. Los productos ya pendientes se muestran atenuados ("Ya en la lista").
+ */
+
+let cacheAbastCatalogo = null;      // { ok, catalogo:[{nombre, categoria, subcategoria, unidad}] }
+let cachePendientesNegocio = null;  // Set de nombres ya pendientes en el negocio de la sesión
+let abastCategoriaActiva = null;
+let abastSubcategoriaActiva = null;
+let abastSeleccionados = new Set(); // nombres marcados para enviar en este pedido
+
+function esAdminCompras_() { return tienePermisoLocal('GestionarCompras'); }
+
+// ============ LISTA DE COMPRA (adaptiva) ============
+
+async function abrirAbastecimiento(forzar) {
+  irA('screen-abastecimiento');
+  const btnSolicitar = document.getElementById('btn-abast-solicitar');
+  if (btnSolicitar) btnSolicitar.style.display = tienePermisoLocal('RegistrarAbastecimiento') ? '' : 'none';
+  document.getElementById('abast-lista').innerHTML = skeletonCards(3);
+  document.getElementById('abast-submit-bar').style.display = esAdminCompras_() ? '' : 'none';
+
+  if (esAdminCompras_()) {
+    document.getElementById('abast-subtitulo').textContent = 'Todo lo pendiente, agrupado por proveedor.';
+    const r = await llamarAPI('obtenerListaCompraAdmin', {});
+    if (!document.getElementById('screen-abastecimiento').classList.contains('active')) return;
+    pintarAbastecimientoAdmin(r);
+  } else {
+    document.getElementById('abast-subtitulo').textContent = 'Pendiente en ' + (sesion.negocio || '') + '.';
+    const r = await llamarAPI('obtenerListaCompraStaff', { negocio: sesion.negocio });
+    if (!document.getElementById('screen-abastecimiento').classList.contains('active')) return;
+    pintarAbastecimientoStaff(r);
+  }
+}
+
+function pintarAbastecimientoStaff(r) {
+  const pendientes = (r && r.pendientes) || [];
+  if (!pendientes.length) {
+    document.getElementById('abast-lista').innerHTML = '<p style="font-size:13.5px;color:var(--ink-soft);padding:24px 0;text-align:center;">No hay nada pendiente por ahora.</p>';
+    return;
+  }
+  let html = '';
+  pendientes.forEach(p => {
+    html += '<div class="conteo-row"><span>' + p.nombre + '</span>' +
+      '<span style="font-size:11px;color:var(--ink-soft);">' + (p.responsables || []).join(', ') + ' · ' + p.fecha + '</span></div>';
+  });
+  document.getElementById('abast-lista').innerHTML = html;
+}
+
+function pintarAbastecimientoAdmin(r) {
+  const items = (r && r.items) || [];
+  if (!items.length) {
+    document.getElementById('abast-lista').innerHTML = '<p style="font-size:13.5px;color:var(--ink-soft);padding:24px 0;text-align:center;">No hay nada pendiente por ahora.</p>';
+    return;
+  }
+  const grupos = {};
+  const orden = [];
+  items.forEach(it => {
+    const clave = it.proveedor || 'Sin proveedor asignado';
+    if (!grupos[clave]) { grupos[clave] = []; orden.push(clave); }
+    grupos[clave].push(it);
+  });
+  // "Sin proveedor asignado" siempre al final, como en el mockup.
+  orden.sort((a, b) => (a === 'Sin proveedor asignado') - (b === 'Sin proveedor asignado'));
+
+  let html = '';
+  orden.forEach(proveedor => {
+    html += '<p class="conteo-seccion-titulo">' + proveedor + '</p>';
+    grupos[proveedor].forEach(it => {
+      const negocioColor = it.negocio === 'Vegan Corner' ? 'var(--caramel)' : 'var(--ink-soft)';
+      html += '<div class="abast-item-row" style="display:flex;align-items:center;gap:10px;padding:9px 0;border-top:1px solid var(--border);">' +
+        '<input type="checkbox" class="abast-check" data-id="' + it.id + '">' +
+        '<div style="flex:1;">' +
+          '<span style="font-size:14px;">' + it.producto + '</span>' +
+          '<span style="font-size:10px;padding:1px 7px;border-radius:999px;margin-left:6px;border:1px solid var(--border);color:' + negocioColor + ';">' + it.negocio + '</span>' +
+        '</div>' +
+        '<input type="number" min="0" placeholder="Cant." value="' + (it.cantidad === null ? '' : it.cantidad) + '" style="width:56px;text-align:right;" onchange="cambiarCantidadItemCompra(\'' + it.id + '\',this.value)">' +
+        '<span style="font-size:12px;color:var(--ink-soft);min-width:20px;">' + it.unidad + '</span>' +
+      '</div>';
+    });
+  });
+  document.getElementById('abast-lista').innerHTML = html;
+}
+
+async function cambiarCantidadItemCompra(id, val) {
+  await llamarAPI('actualizarCantidadItemCompra', { data: { id: id, cantidad: val } });
+}
+
+async function confirmarItemsComprados() {
+  document.getElementById('abast-error').textContent = '';
+  const ids = [...document.querySelectorAll('.abast-check:checked')].map(el => el.dataset.id);
+  if (!ids.length) { document.getElementById('abast-error').textContent = 'Selecciona al menos un ítem.'; return; }
+  const r = await llamarAPI('marcarItemsComprados', { data: { ids: ids } });
+  if (!r.ok) { document.getElementById('abast-error').textContent = r.error || 'Error al marcar comprados'; return; }
+  abrirAbastecimiento(true);
+}
+
+// ============ SOLICITAR ============
+
+async function abrirSolicitar() {
+  document.getElementById('abast-solicitar-error').textContent = '';
+  abastSeleccionados = new Set();
+  document.getElementById('abast-chips-cat').innerHTML = skeletonCards(1);
+  document.getElementById('abast-lista-solicitar').innerHTML = skeletonCards(3);
+
+  const [rCat, rPend] = await Promise.all([
+    llamarAPI('obtenerCatalogoAbastecimiento', { negocio: sesion.negocio }),
+    llamarAPI('obtenerListaCompraStaff', { negocio: sesion.negocio })
+  ]);
+  if (!rCat.ok) {
+    document.getElementById('abast-lista-solicitar').innerHTML = '<p class="error-msg">' + (rCat.error || 'Error al cargar el catálogo') + '</p>';
+    return;
+  }
+  cacheAbastCatalogo = rCat;
+  cachePendientesNegocio = new Set((rPend.pendientes || []).map(p => p.nombre));
+  abastCategoriaActiva = null;
+  abastSubcategoriaActiva = null;
+  pintarSolicitar();
+}
+
+function pintarSolicitar() {
+  const categorias = [...new Set(cacheAbastCatalogo.catalogo.map(p => p.categoria))];
+  document.getElementById('abast-chips-cat').innerHTML = categorias.map(c => {
+    const activo = c === abastCategoriaActiva;
+    return '<span class="chip-cat' + (activo ? ' activo' : '') + '" onclick="toggleCategoriaAbast(\'' + c.replace(/'/g, "\\'") + '\')">' + c + '</span>';
+  }).join('');
+
+  if (!abastCategoriaActiva) {
+    document.getElementById('abast-chips-subcat').innerHTML = '';
+    document.getElementById('abast-lista-solicitar').innerHTML = '<p style="font-size:13.5px;color:var(--ink-soft);padding:24px 0;text-align:center;">Elige una categoría.</p>';
+    return;
+  }
+
+  const productosCategoria = cacheAbastCatalogo.catalogo.filter(p => p.categoria === abastCategoriaActiva);
+  const subcategorias = [...new Set(productosCategoria.map(p => p.subcategoria).filter(s => s))];
+
+  if (subcategorias.length) {
+    document.getElementById('abast-chips-subcat').innerHTML = subcategorias.map(s => {
+      const activo = s === abastSubcategoriaActiva;
+      return '<span class="chip-cat' + (activo ? ' activo' : '') + '" style="font-size:11px;padding:3px 10px;" onclick="toggleSubcategoriaAbast(\'' + s.replace(/'/g, "\\'") + '\')">' + s + '</span>';
+    }).join('');
+  } else {
+    document.getElementById('abast-chips-subcat').innerHTML = '';
+  }
+
+  let productos = productosCategoria;
+  if (subcategorias.length) {
+    productos = abastSubcategoriaActiva ? productosCategoria.filter(p => p.subcategoria === abastSubcategoriaActiva) : [];
+  }
+
+  if (!productos.length) {
+    document.getElementById('abast-lista-solicitar').innerHTML = subcategorias.length
+      ? '<p style="font-size:13.5px;color:var(--ink-soft);padding:24px 0;text-align:center;">Elige una subcategoría.</p>'
+      : '<p style="font-size:13.5px;color:var(--ink-soft);padding:24px 0;text-align:center;">No hay productos en esta categoría.</p>';
+    return;
+  }
+
+  let html = '';
+  productos.forEach(p => {
+    const yaPendiente = cachePendientesNegocio.has(p.nombre);
+    const seleccionado = abastSeleccionados.has(p.nombre);
+    const nombreEsc = p.nombre.replace(/'/g, "\\'");
+    if (yaPendiente) {
+      html += '<div class="conteo-row"><div><span style="color:var(--ink-soft);">' + p.nombre + '</span>' +
+        '<p style="font-size:11px;color:var(--ink-soft);margin:2px 0 0;">Ya en la lista</p></div>' +
+        '<span style="color:var(--ink-soft);">✓</span></div>';
+    } else {
+      html += '<div class="conteo-row"><span>' + p.nombre + '</span>' +
+        '<button type="button" class="icon-btn" style="border-radius:50%;' + (seleccionado ? 'background:var(--forest);color:#fff;' : '') + '" onclick="toggleProductoAbast(\'' + nombreEsc + '\')">' + (seleccionado ? '✓' : '+') + '</button></div>';
+    }
+  });
+  document.getElementById('abast-lista-solicitar').innerHTML = html;
+}
+
+function toggleCategoriaAbast(cat) {
+  abastCategoriaActiva = abastCategoriaActiva === cat ? null : cat;
+  abastSubcategoriaActiva = null;
+  pintarSolicitar();
+}
+function toggleSubcategoriaAbast(sub) {
+  abastSubcategoriaActiva = abastSubcategoriaActiva === sub ? null : sub;
+  pintarSolicitar();
+}
+function toggleProductoAbast(nombre) {
+  if (abastSeleccionados.has(nombre)) abastSeleccionados.delete(nombre); else abastSeleccionados.add(nombre);
+  pintarSolicitar();
+}
+
+async function enviarPedidoAbastecimiento() {
+  document.getElementById('abast-solicitar-error').textContent = '';
+  if (!abastSeleccionados.size) {
+    document.getElementById('abast-solicitar-error').textContent = 'Selecciona al menos un producto.';
+    return;
+  }
+  const items = [...abastSeleccionados].map(nombre => {
+    const p = cacheAbastCatalogo.catalogo.find(x => x.nombre === nombre);
+    return { nombre: nombre, categoria: p ? p.categoria : '', subcategoria: p ? p.subcategoria : '', unidad: p ? p.unidad : 'Un' };
+  });
+  const r = await llamarAPI('guardarPedidoAbastecimiento', { data: { negocio: sesion.negocio, responsable: sesion.nombre, items: items } });
+  if (!r.ok) { document.getElementById('abast-solicitar-error').textContent = r.error || 'Error al enviar el pedido'; return; }
+  abastSeleccionados = new Set();
+  document.getElementById('confirm-title').textContent = 'Pedido enviado';
+  document.getElementById('confirm-msg').textContent = 'Se agregó a la Lista de compra de ' + sesion.negocio + '.';
+  document.getElementById('confirm-detalle').innerHTML = '';
+  ocultarBotonOtro();
+  irA('screen-confirm');
+}
+
+// ============ CREAR INSUMO NUEVO ============
+// Reutiliza el modal genérico (abrirModal/cerrarModal), mismo patrón que Proveedor/Cliente.
+
+function abrirModalCrearInsumo() {
+  abrirModal(
+    '<h3 style="margin:0 0 10px;">Crear insumo nuevo</h3>' +
+    '<div style="display:flex;flex-direction:column;gap:10px;">' +
+      '<input type="text" id="ins-nombre" placeholder="Nombre del insumo">' +
+      '<select id="ins-categoria"><option value="Insumo">Insumo</option><option value="Materia Prima">Materia Prima</option><option value="Artículo de Aseo">Artículo de Aseo</option></select>' +
+      '<select id="ins-unidad"><option value="Un">Un</option><option value="Kg">Kg</option></select>' +
+    '</div>' +
+    '<p class="error-msg" id="ins-error" style="margin-top:8px;"></p>' +
+    '<div style="display:flex;gap:8px;margin-top:14px;"><button class="btn-secondary" onclick="cerrarModal()">Cancelar</button><button class="btn-primary" onclick="confirmarCrearInsumo()">Crear y pedir</button></div>'
+  );
+}
+
+async function confirmarCrearInsumo() {
+  const nombre = document.getElementById('ins-nombre').value.trim();
+  const categoria = document.getElementById('ins-categoria').value;
+  const unidad = document.getElementById('ins-unidad').value;
+  if (!nombre) { document.getElementById('ins-error').textContent = 'Ingresa el nombre del insumo'; return; }
+  const r = await llamarAPI('crearInsumoNuevo', { data: { nombre: nombre, categoria: categoria, unidad: unidad } });
+  if (!r.ok) { document.getElementById('ins-error').textContent = r.error || 'Error al crear el insumo'; return; }
+  cacheAbastCatalogo.catalogo.push({ nombre: nombre, categoria: categoria, subcategoria: '', unidad: unidad });
+  abastSeleccionados.add(nombre);
+  abastCategoriaActiva = categoria;
+  abastSubcategoriaActiva = null;
+  cerrarModal();
+  pintarSolicitar();
+}
