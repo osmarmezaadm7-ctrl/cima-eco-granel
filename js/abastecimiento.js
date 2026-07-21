@@ -76,10 +76,17 @@ function pintarAbastecimientoStaff(r) {
 
 function pintarAbastecimientoAdmin(r) {
   const items = (r && r.items) || [];
+  const leyenda = document.getElementById('abast-leyenda');
   if (!items.length) {
+    leyenda.style.display = 'none';
     document.getElementById('abast-lista').innerHTML = '<p style="font-size:13.5px;color:var(--ink-soft);padding:24px 0;text-align:center;">No hay nada pendiente por ahora.</p>';
     return;
   }
+  leyenda.style.display = 'flex';
+  leyenda.innerHTML =
+    '<span style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--ink-soft);">' + puntoNegocio_('Vegan Corner') + 'Vegan Corner</span>' +
+    '<span style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--ink-soft);">' + puntoNegocio_('Cima') + 'Cima</span>';
+
   const grupos = {};
   const orden = [];
   items.forEach(it => {
@@ -94,19 +101,24 @@ function pintarAbastecimientoAdmin(r) {
   orden.forEach(proveedor => {
     html += '<p class="conteo-seccion-titulo">' + proveedor + '</p>';
     grupos[proveedor].forEach(it => {
-      const negocioColor = it.negocio === 'Vegan Corner' ? 'var(--caramel)' : 'var(--ink-soft)';
-      html += '<div class="abast-item-row" style="display:flex;align-items:center;gap:10px;padding:9px 0;border-top:1px solid var(--border);">' +
+      html += '<div class="abast-item-row" style="display:flex;align-items:center;gap:10px;padding:6px 0;border-top:1px solid var(--border);">' +
         '<input type="checkbox" class="abast-check" data-id="' + it.id + '">' +
-        '<div style="flex:1;">' +
-          '<span style="font-size:14px;">' + it.producto + '</span>' +
-          '<span style="font-size:10px;padding:1px 7px;border-radius:999px;margin-left:6px;border:1px solid var(--border);color:' + negocioColor + ';">' + it.negocio + '</span>' +
-        '</div>' +
-        '<input type="number" min="0" placeholder="Cant." value="' + (it.cantidad === null ? '' : it.cantidad) + '" style="width:56px;text-align:right;" onchange="cambiarCantidadItemCompra(\'' + it.id + '\',this.value)">' +
-        '<span style="font-size:12px;color:var(--ink-soft);min-width:20px;">' + it.unidad + '</span>' +
+        puntoNegocio_(it.negocio) +
+        '<span style="font-size:14px;flex:1;">' + it.producto + '</span>' +
+        '<input type="number" min="0" value="' + (it.cantidad === null ? '' : it.cantidad) + '" style="width:52px;text-align:right;" onchange="cambiarCantidadItemCompra(\'' + it.id + '\',this.value)">' +
+        '<span style="font-size:12px;color:var(--ink-soft);min-width:18px;">' + it.unidad + '</span>' +
       '</div>';
     });
   });
   document.getElementById('abast-lista').innerHTML = html;
+}
+
+// Punto de color por negocio — reemplaza el pill de texto ("se ve desordenado", feedback
+// de Osmar 21/07/2026). Vegan Corner = terracota, Cima = verde, mismos colores de marca
+// que ya usa el resto del sistema (var(--terracotta)/var(--forest)).
+function puntoNegocio_(negocio) {
+  const color = negocio === 'Vegan Corner' ? 'var(--terracotta)' : 'var(--forest)';
+  return '<span style="width:7px;height:7px;border-radius:50%;background:' + color + ';flex-shrink:0;display:inline-block;" aria-hidden="true"></span>';
 }
 
 async function cambiarCantidadItemCompra(id, val) {
