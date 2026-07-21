@@ -1346,10 +1346,20 @@ function agregarBloqueProduccion(cont) {
   if (tienePermisoLocal('GestionarPauta') || tienePermisoLocal('VerPrograma')) cont.appendChild(crearMenuCard(ICONS.programa,'Pauta de producción', tienePermisoLocal('GestionarPauta')?'Marcar pedidos como listos':'Ver historial de confirmaciones', ()=>abrirPauta(),true,'caramel'));
 }
 
+// NUEVO 21/07/2026 (con Osmar — bugfix: la tarjeta de Abastecimiento no aparecía en el
+// Home móvil, solo en el sidebar de escritorio). Mismo patrón que agregarBloqueProduccion
+// de arriba — se llama en ambas ramas de entrarAHome, ver más abajo.
+function agregarBloqueAbastecimiento(cont) {
+  if (!(tienePermisoLocal('RegistrarAbastecimiento') || tienePermisoLocal('GestionarCompras'))) return;
+  cont.insertAdjacentHTML('beforeend','<div class="menu-grupo-titulo">Abastecimiento</div>');
+  cont.appendChild(crearMenuCard(ICONS.carrito,'Lista de compra','Pedir o revisar lo pendiente',()=>abrirAbastecimiento(),true,'caramel'));
+}
+
   const cont = document.getElementById('home-content'); cont.innerHTML='';
   const puedeCima = sesion.rol==='Admin' || sesion.negocio==='Cima Eco-Granel' || sesion.negocio==='Ambos';
 
   let bloqueProduccionAgregado = false;
+  let bloqueAbastecimientoAgregado = false;
   if (tienePermisoLocal('VerDashboardCompleto') || tienePermisoLocal('VisualizarReportes')){
     if (tienePermisoLocal('VerDashboardCompleto')){
       cont.insertAdjacentHTML('beforeend','<div class="menu-grupo-titulo">Panel</div>');
@@ -1373,6 +1383,7 @@ function agregarBloqueProduccion(cont) {
       cont.appendChild(crearMenuCard(ICONS.conciliacion,'Conciliación','Transbank, PedidosYa, Aronium vs. lo registrado',()=>abrirConciliacion(),true,'neutral'));
     }
     agregarBloqueProduccion(cont); bloqueProduccionAgregado = true;
+    agregarBloqueAbastecimiento(cont); bloqueAbastecimientoAgregado = true;
     if (tienePermisoLocal('ConfigurarSistema')){
       cont.insertAdjacentHTML('beforeend','<div class="menu-grupo-titulo">Configuraciones</div>');
       cont.appendChild(crearMenuCardChica(ICONS.banco,'Créditos',()=>abrirCreditos()));
@@ -1395,6 +1406,7 @@ function agregarBloqueProduccion(cont) {
   // el resto (Rosa/Katherine, que no pasan por esa rama), se agrega acá — misma posición
   // relativa de siempre, ya que esas ramas no tienen sección de Configuraciones.
   if (!bloqueProduccionAgregado) agregarBloqueProduccion(cont);
+  if (!bloqueAbastecimientoAgregado) agregarBloqueAbastecimiento(cont);
 
   if (esEscritorio && tienePermisoLocal('VerDashboardCompleto')) { abrirPanel(); return; }
   if (esEscritorio && tienePermisoLocal('VisualizarReportes')) { abrirEstadoResultados(); return; }
