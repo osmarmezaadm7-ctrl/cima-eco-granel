@@ -101,13 +101,13 @@ function pintarAbastecimientoAdmin(r) {
   orden.forEach(proveedor => {
     html += '<p class="conteo-seccion-titulo">' + proveedor + '</p>';
     grupos[proveedor].forEach(it => {
-      html += '<div class="abast-item-row" style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding:8px 0;border-top:1px solid var(--border);">' +
-        '<div style="display:flex;align-items:center;gap:8px;">' +
-          '<input type="checkbox" class="abast-check" data-id="' + it.id + '">' +
+      html += '<div class="abast-item-row" style="display:flex;align-items:center;gap:10px;padding:8px 0;border-top:1px solid var(--border);">' +
+        '<div style="display:flex;align-items:center;gap:8px;flex:1;min-width:0;">' +
+          '<input type="checkbox" class="abast-check" data-id="' + it.id + '" style="flex-shrink:0;">' +
           '<span style="width:7px;height:7px;border-radius:50%;background:' + (it.negocio === 'Vegan Corner' ? 'var(--terracotta)' : 'var(--forest)') + ';flex-shrink:0;display:inline-block;" aria-hidden="true"></span>' +
           '<span style="font-size:14px;">' + it.producto + '</span>' +
         '</div>' +
-        '<div style="display:flex;align-items:center;gap:8px;">' +
+        '<div style="display:flex;align-items:center;gap:8px;flex-shrink:0;">' +
           '<input type="number" min="0" value="' + (it.cantidad === null ? '' : it.cantidad) + '" style="width:52px;text-align:right;" onchange="cambiarCantidadItemCompra(\'' + it.id + '\',this.value)">' +
           '<span style="font-size:12px;color:var(--ink-soft);">' + it.unidad + '</span>' +
         '</div>' +
