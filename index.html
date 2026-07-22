@@ -47,6 +47,16 @@
 .conteo-stepper button:hover{background:var(--forest-soft);}
 .conteo-stepper input{width:48px;height:36px;text-align:center;border:1.5px solid var(--border);border-radius:9px;font-family:'JetBrains Mono',monospace;font-size:14px;padding:0;}
 
+/* Confirmar recepción (22/07/2026) — acento caramelo porque el bloque viene de Vegan Corner */
+.recep-bloque{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px;margin:0 0 16px;}
+.recep-cab{border-left:3px solid var(--caramel);padding-left:11px;margin-bottom:10px;}
+.recep-titulo{font-size:17px;color:var(--forest);line-height:1.3;}
+.recep-sub{font-size:12.5px;color:var(--ink-soft);margin-top:3px;}
+.recep-row{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:11px 0;border-top:1px solid var(--border);}
+.recep-row>span{font-size:15.5px;line-height:1.3;flex:1;min-width:0;}
+.recep-obs{width:100%;margin:12px 0 8px;min-height:60px;font-family:'Work Sans',sans-serif;font-size:14px;line-height:1.45;}
+.recep-listo{font-size:13.5px;color:var(--success);margin:0 0 14px;}
+
 .revision-row{border:1px solid var(--border);border-radius:11px;padding:11px 13px;margin-bottom:9px;}
 .revision-row.alerta{background:var(--terracotta-soft);border-color:var(--terracotta);}
 .revision-row-top{display:flex;justify-content:space-between;align-items:center;gap:10px;}
@@ -849,6 +859,7 @@
     </div>
   </div>
   <h2 style="font-size:17px;">Contar stock</h2>
+  <div id="conteo-recepcion"></div>
   <p style="font-size:12px;color:var(--ink-soft);margin:0 0 10px;">Categorías</p>
   <div id="conteo-chips" class="conteo-chips"></div>
   <div id="conteo-lista"></div>
