@@ -11,14 +11,26 @@
 let cacheConteoCatalogo = null;           // { ok, catalogo:[{nombre, productoProduccion, categoria, stockMinimo}] }
 let conteoCategoriasActivas = new Set();  // categorías con el chip activo
 let conteoCantidades = {};                // clave "productoProduccion|categoria" -> cantidad contada
+let borradorConteoPendiente = null;       // borrador traído del servidor, mientras el modal está abierto
 
 // Rosa/Katherine (Vegan Corner) solo reportan SU propio stock congelado — no cuentan lo
 // de Cima (Horneada/Pasteles/Congelados no son suyos). Esta pantalla se adapta sola:
 // una sola categoría, sin chips, y el guardado va a StockCongeladoVC, no a ConteoStockCima.
 function esVeganCorner_() { return !!(sesion && sesion.negocio === 'Vegan Corner'); }
 
+// NUEVO 21/07/2026 (con Osmar — borrador de Conteo): negocio con el que se guarda y se
+// busca el borrador. Usa el nombre LARGO ('Cima Eco-Granel'), que es la convención del
+// resto del sistema (Usuarios, Respuestas, CatalogoProductos) — NO 'Cima' a secas, que
+// solo usa PedidosAbastecimiento. Único lugar donde se normaliza el caso de Osmar
+// (sesion.negocio === 'Ambos'): la pantalla de Conteo lo manda por el camino de Cima,
+// así que su borrador cae en la fila de Cima Eco-Granel.
+function negocioConteo_() { return esVeganCorner_() ? 'Vegan Corner' : 'Cima Eco-Granel'; }
+
 async function abrirConteo(forzar) {
   irA('screen-conteo');
+  // El botón de refrescar (forzar) borra conteoCantidades — guardamos antes para que un
+  // toque accidental a mitad de conteo no pierda lo contado.
+  if (forzar && Object.keys(conteoCantidades).length) await guardarBorradorConteo_();
   if (!cacheConteoCatalogo || forzar) {
     document.getElementById('conteo-chips').innerHTML = skeletonCards(1);
     document.getElementById('conteo-lista').innerHTML = skeletonCards(4);
@@ -35,6 +47,118 @@ async function abrirConteo(forzar) {
     conteoCantidades = {};
   }
   if (document.getElementById('screen-conteo').classList.contains('active')) pintarConteo();
+  await ofrecerBorradorConteo_();
+}
+
+// ============ BORRADOR AUTOMÁTICO DE CONTEO (NUEVO 21/07/2026 — con Osmar) ============
+// Antes, todo lo contado vivía SOLO en conteoCantidades (memoria del navegador): si el
+// celular mataba la app o se recargaba la página, se perdía todo, porque nada tocaba
+// disco hasta confirmar el conteo. Ahora se deja un borrador silencioso en la hoja
+// BorradorConteo, sin botón y sin que el usuario haga nada.
+//
+// DOS PUNTOS DE GUARDADO (ninguno mientras se cuenta — cero tráfico al escribir):
+//   1. Al salir de la pantalla de Conteo  -> guarda en irA() (index.html)
+//   2. Al pasar la app a segundo plano    -> guarda en visibilitychange (index.html)
+// El (2) es best-effort: en móvil el navegador a veces mata el proceso antes de que la
+// llamada complete. Cubre el caso real de terreno, no el 100%.
+//
+// CUÁNDO APARECE EL MODAL (la regla central, cerrada con Osmar):
+//   conteoCantidades VACÍO  Y  el servidor tiene un borrador con contenido.
+// La memoria vacía ES el síntoma de que se perdió el estado (recarga / app matada /
+// re-login). Si la memoria TIENE datos, el usuario solo fue a mirar otro menú y volvió:
+// preguntarle ahí lo haría RETROCEDER, porque el borrador del servidor es más viejo que
+// lo que tiene en pantalla.
+
+// Guardado silencioso. Usa llamarAPISilencioso a propósito: llamarAPI muestra el overlay
+// de "cargando", que parpadearía cada vez que se sale de Conteo. Los errores se ignoran
+// —es una red de seguridad, no una operación que el usuario pidió; si falla, el flujo
+// normal de confirmar el conteo sigue funcionando igual.
+async function guardarBorradorConteo_() {
+  if (!sesion || !sesion.nombre || !cacheConteoCatalogo) return;
+  try {
+    await llamarAPISilencioso('guardarBorradorConteo', {
+      data: {
+        negocio: negocioConteo_(),
+        responsable: sesion.nombre,
+        categorias: [...conteoCategoriasActivas],
+        productos: conteoCantidades
+      }
+    });
+  } catch (e) { /* silencioso a propósito */ }
+}
+
+async function ofrecerBorradorConteo_() {
+  if (Object.keys(conteoCantidades).length) return;   // ya hay algo en pantalla: no preguntar
+  if (!cacheConteoCatalogo) return;
+  const r = await llamarAPISilencioso('obtenerBorradorConteo', { negocio: negocioConteo_() });
+  if (!r || !r.ok || !r.borrador) return;
+  if (Object.keys(conteoCantidades).length) return;   // por si se contó algo mientras respondía
+  const b = r.borrador;
+  borradorConteoPendiente = b;
+  // Total = productos del catálogo en las categorías que estaban activas. Si alguna
+  // categoría del borrador ya no existe en el catálogo, simplemente no suma — no rompe.
+  const total = cacheConteoCatalogo.catalogo.filter(p => b.categorias.indexOf(p.categoria) !== -1).length;
+  abrirModal(
+    '<div style="display:flex;align-items:center;gap:9px;margin-bottom:12px;">' +
+      '<span style="width:30px;height:30px;border-radius:50%;background:var(--amber-soft);display:flex;align-items:center;justify-content:center;flex-shrink:0;">' +
+        '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#7A5A22" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 2"></path></svg>' +
+      '</span>' +
+      '<span class="serif" style="font-size:18px;">Conteo sin terminar</span>' +
+    '</div>' +
+    '<p style="font-size:14px;line-height:1.55;margin:0 0 4px;">Hay un conteo sin terminar en ' + b.negocio + '.</p>' +
+    '<p style="font-size:12.5px;color:var(--ink-soft);margin:0 0 14px;">' + (b.responsable || 'Sin responsable') + ' · ' + b.fecha + '</p>' +
+    '<div style="background:var(--paper);border:1px solid var(--border);border-radius:12px;padding:11px 13px;margin-bottom:16px;">' +
+      '<div style="display:flex;justify-content:space-between;align-items:baseline;padding:3px 0;">' +
+        '<span style="font-size:13px;color:var(--ink-soft);">Categorías</span>' +
+        '<span style="font-size:13px;">' + (b.categorias.join(', ') || '—') + '</span>' +
+      '</div>' +
+      '<div style="display:flex;justify-content:space-between;align-items:baseline;padding:3px 0;">' +
+        '<span style="font-size:13px;color:var(--ink-soft);">Contados</span>' +
+        '<span class="mono" style="font-size:13px;">' + b.contados + ' de ' + total + '</span>' +
+      '</div>' +
+    '</div>' +
+    '<button class="btn-primary" style="margin-bottom:9px;" onclick="retomarBorradorConteo()">Retomar el conteo</button>' +
+    '<button class="btn-secondary" onclick="descartarBorradorConteo()">Empezar de cero</button>'
+  );
+}
+
+function retomarBorradorConteo() {
+  const b = borradorConteoPendiente;
+  if (!b) { cerrarModal(); return; }
+  conteoCantidades = b.productos || {};
+  // Vegan Corner tiene una sola categoría fija: no se restaura desde el borrador.
+  if (!esVeganCorner_()) conteoCategoriasActivas = new Set(b.categorias || []);
+  borradorConteoPendiente = null;
+  cerrarModal();
+  pintarConteo();
+}
+
+// Opción 3 (decidida con Osmar): si el borrador es TUYO, borra directo — es tu trabajo y
+// no hay por qué agregar fricción. Si lo dejó OTRA persona, pide confirmación antes,
+// porque estarías descartando trabajo ajeno sin vuelta atrás.
+async function descartarBorradorConteo(confirmado) {
+  const b = borradorConteoPendiente;
+  if (!b) { cerrarModal(); return; }
+  const esAjeno = b.responsable && sesion && b.responsable !== sesion.nombre;
+  if (esAjeno && !confirmado) {
+    abrirModal(
+      '<div style="display:flex;align-items:center;gap:9px;margin-bottom:12px;">' +
+        '<span style="width:30px;height:30px;border-radius:50%;background:var(--terracotta-soft);display:flex;align-items:center;justify-content:center;flex-shrink:0;">' +
+          '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--terracotta)" stroke-width="2" stroke-linecap="round"><path d="M12 9v4"></path><path d="M12 17h.01"></path><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"></path></svg>' +
+        '</span>' +
+        '<span class="serif" style="font-size:18px;">¿Descartar?</span>' +
+      '</div>' +
+      '<p style="font-size:14px;line-height:1.55;margin:0 0 16px;">Se va a perder lo que contó ' + b.responsable + ' (' + b.contados + ' producto' + (b.contados === 1 ? '' : 's') + '). No se puede deshacer.</p>' +
+      '<button class="btn-primary" style="margin-bottom:9px;" onclick="retomarBorradorConteo()">Mejor retomarlo</button>' +
+      '<button class="btn-secondary" onclick="descartarBorradorConteo(true)">Sí, empezar de cero</button>'
+    );
+    return;
+  }
+  await llamarAPISilencioso('limpiarBorradorConteo', { negocio: negocioConteo_() });
+  borradorConteoPendiente = null;
+  conteoCantidades = {};
+  cerrarModal();
+  pintarConteo();
 }
 
 // NUEVO 20/07/2026 (con Osmar — "revisar el último conteo", Opción B): texto de
@@ -258,6 +382,9 @@ async function confirmarGuardarConteo() {
       if (!r.ok) { document.getElementById('resumen-conteo-error').textContent = r.error || 'Error al guardar el stock'; return; }
     }
     conteoCantidades = {};
+    // El conteo quedó registrado: el borrador ya no tiene razón de existir. Si no se
+    // limpiara, el próximo que entre a Conteo vería el aviso de un conteo YA confirmado.
+    await llamarAPISilencioso('limpiarBorradorConteo', { negocio: negocioConteo_() });
     document.getElementById('confirm-title').textContent = 'Stock actualizado';
     document.getElementById('confirm-msg').textContent = 'Se guardó tu stock congelado — Rocío lo va a ver en Revisión.';
     document.getElementById('confirm-detalle').innerHTML = '';
@@ -274,6 +401,7 @@ async function confirmarGuardarConteo() {
     return;
   }
   conteoCantidades = {};
+  await llamarAPISilencioso('limpiarBorradorConteo', { negocio: negocioConteo_() });
   document.getElementById('confirm-title').textContent = 'Conteo guardado';
   document.getElementById('confirm-msg').textContent = 'Se registraron ' + resumenConteoProductos.length + ' productos. Rocío u Osmar lo revisan antes de pedir a producción.';
   document.getElementById('confirm-detalle').innerHTML = '';
