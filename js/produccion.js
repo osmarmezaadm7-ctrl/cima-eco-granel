@@ -47,8 +47,11 @@ async function abrirConteo(forzar) {
     conteoCantidades = {};
   }
   if (document.getElementById('screen-conteo').classList.contains('active')) pintarConteo();
+  // CORRECCIÓN 22/07/2026: antes esta llamada iba DESPUÉS de ofrecerBorradorConteo_, así
+  // que cualquier excepción allá dejaba el bloque de recepción sin dibujar y sin rastro.
+  // Ahora va primero y con su propio try/catch: los dos caminos son independientes.
+  try { await cargarRecepcionPendiente_(); } catch (e) { console.error('[recepcion] falló la carga:', e); }
   await ofrecerBorradorConteo_();
-  await cargarRecepcionPendiente_();
 }
 
 // ============ BORRADOR AUTOMÁTICO DE CONTEO (NUEVO 21/07/2026 — con Osmar) ============
@@ -1371,19 +1374,48 @@ window.addEventListener('resize', () => {
 let recepcionPendiente = null;    // { items:[{fila, programaId, producto, cantidadEntregada}], responsable, fecha }
 let recepcionCantidades = {};     // fila de EntregaDetalle -> cantidad que se va a confirmar
 
+// CORRECCIÓN 22/07/2026 (con Osmar): esta función fallaba en silencio. Cualquier problema
+// — API caída, acción no desplegada, contenedor ausente, error al dibujar — terminaba en
+// un `return` mudo que dejaba el contenedor vacío. Un fallo real y "no hay entregas
+// pendientes" se veían exactamente igual, y eso costó una tarde de diagnóstico a ciegas.
+// Ahora el único caso que borra el contenedor sin decir nada es el legítimo: no hay nada
+// pendiente. Todo lo demás se muestra en pantalla y se registra en consola.
+function avisoRecepcionHtml_(mensaje) {
+  return '<div class="recep-bloque"><p class="error-msg" style="margin:0;">Recepción: ' + mensaje + '</p></div>';
+}
+
 async function cargarRecepcionPendiente_() {
   const cont = document.getElementById('conteo-recepcion');
-  if (!cont) return;
+  if (!cont) { console.error('[recepcion] no existe #conteo-recepcion en el DOM — index.html desactualizado'); return; }
   recepcionPendiente = null;
   recepcionCantidades = {};
   if (esVeganCorner_()) { cont.innerHTML = ''; return; }
-  const r = await llamarAPISilencioso('obtenerEntregasPendientesRecepcion');
-  if (!r || !r.ok || !r.items || !r.items.length) { cont.innerHTML = ''; return; }
+
+  let r;
+  try {
+    r = await llamarAPISilencioso('obtenerEntregasPendientesRecepcion');
+  } catch (e) {
+    console.error('[recepcion] excepción al llamar la API:', e);
+    cont.innerHTML = avisoRecepcionHtml_('no se pudo consultar al servidor (' + e.message + ')');
+    return;
+  }
+  console.log('[recepcion] respuesta de la API:', r);
+
+  if (!r) { cont.innerHTML = avisoRecepcionHtml_('el servidor no respondió.'); return; }
+  if (!r.ok) { cont.innerHTML = avisoRecepcionHtml_(r.error || 'el servidor respondió con error.'); return; }
+  if (!r.items || !r.items.length) { cont.innerHTML = ''; return; }   // único vaciado legítimo
+
   recepcionPendiente = r;
   // Prellenado con lo declarado por Vegan Corner. La persona en Cima ajusta solo si llegó
   // distinto — el caso normal es tocar nada y confirmar.
   r.items.forEach(it => { recepcionCantidades[it.fila] = it.cantidadEntregada; });
-  pintarBloqueRecepcion_();
+  try {
+    pintarBloqueRecepcion_();
+    console.log('[recepcion] bloque dibujado con ' + r.items.length + ' productos');
+  } catch (e) {
+    console.error('[recepcion] error al dibujar:', e);
+    cont.innerHTML = avisoRecepcionHtml_('error al dibujar el bloque (' + e.message + ')');
+  }
 }
 
 function pintarBloqueRecepcion_() {
