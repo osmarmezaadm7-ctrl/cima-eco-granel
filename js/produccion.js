@@ -525,6 +525,35 @@ function cambiarModoPedido(modo) {
 // como "Stock", genérico — repetir el nombre de la categoría ahí era redundante. Todos los
 // badges llevan el mismo peso visual (mismo gris), incluido VC — ninguno se destaca más
 // que otro, todos son solo datos de referencia para decidir el Pedir.
+// ===== INDICADOR DE MOVIMIENTO — NUEVO 22/07/2026 (con Osmar) =====
+// El stock pasa a ser el dato protagonista de la fila: antes el total no se veía en ninguna
+// parte, estaba repartido entre los badges de categoría (Horneada 8 / Congelada 6) y había
+// que sumarlo de cabeza para saber cuánto hay. Los badges se mantienen debajo — siguen
+// siendo el desglose, solo dejan de ser lo primero que se lee.
+function bloqueStockRevision_(contadoTotal) {
+  return '<div class="revision-stock"><b>' + contadoTotal + '</b><i>en stock</i></div>';
+}
+
+// Tres estados (ver mapaMovimiento_ en Produccion.gs para cómo se calculan):
+//   normal  -> texto plano. Si los tres estados llevaran fondo, el ojo no distinguiría lo
+//              que necesita atención de lo que está bien.
+//   dudoso  -> fondo ámbar. El número de salidas es válido pero hay entregas sin confirmar.
+//   revisar -> fondo terracota, SIN mostrar el número. Un negativo en pantalla no le dice
+//              nada útil a Rocío; lo accionable es "falta confirmar una entrega".
+// 'sinReferencia' no dibuja nada: sin conteo previo no hay intervalo que medir, y una línea
+// vacía o un "—" suelto solo agrega ruido a la fila.
+function lineaMovimientoHtml_(mov) {
+  if (!mov || mov.estado === 'sinReferencia') return '';
+  if (mov.estado === 'revisar') return '<p class="revision-mov revisar">Movimiento \u2014 \u00b7 falta confirmar entrega</p>';
+  const sale = '<span class="sale">\u2193 ' + mov.salidas + '</span> salió';
+  if (mov.estado === 'dudoso') return '<p class="revision-mov dudoso">' + sale + ' \u00b7 hay ' + mov.transito + ' en tránsito</p>';
+  let txt = sale;
+  if (mov.entradas > 0) txt += ' \u00b7 <span class="entra">\u2191 ' + mov.entradas + '</span> entró';
+  // Los días solo si el intervalo es mayor a 1: "· 1 día" en un conteo diario es ruido.
+  if (mov.dias > 1) txt += ' \u00b7 ' + mov.dias + ' días';
+  return '<p class="revision-mov">' + txt + '</p>';
+}
+
 function badgesDetalleRevision_(detalle, stockVC) {
   const etiqueta = (cat) => cat === 'Empanadas Congeladas' ? 'Congelada' : cat === 'Empanadas' ? 'Horneada' : 'Stock';
   let html = Object.keys(detalle || {}).map(cat =>
@@ -565,7 +594,8 @@ function pintarRevisionPedidoDesktop_() {
     const val = revisionPedidos[it.productoProduccion] !== undefined ? revisionPedidos[it.productoProduccion] : '';
     const clave = it.productoProduccion.replace(/'/g, "\\'");
     filas += filaRevisionDesktop_(it.productoProduccion, it.productoProduccion, val, clave,
-      badgesDetalleRevision_(it.detalle, it.stockCongeladoVC), etiquetaFactorHtml_(it.productoProduccion),
+      bloqueStockRevision_(it.contadoTotal) + lineaMovimientoHtml_(it.movimiento) + badgesDetalleRevision_(it.detalle, it.stockCongeladoVC),
+      etiquetaFactorHtml_(it.productoProduccion),
       comentarioInputDesktop_(it.productoProduccion, clave), 'quitarProductoRevision(\'' + clave + '\')', it.bajoMinimo);
   });
   revisionAgregados.forEach((a, idx) => {
@@ -601,6 +631,8 @@ function pintarRevisionPedido() {
           '<button type="button" onclick="cambiarPedidoRevisionPaso(\'' + clave + '\',1)">+</button>' +
         '</div>' +
       '</div>' +
+      bloqueStockRevision_(it.contadoTotal) +
+      lineaMovimientoHtml_(it.movimiento) +
       '<p class="revision-detalle">' + badgesDetalleRevision_(it.detalle, it.stockCongeladoVC) + '</p>' +
       etiquetaFactorHtml_(it.productoProduccion) +
       filaComentarioRevision_(it.productoProduccion) +
