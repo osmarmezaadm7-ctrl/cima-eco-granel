@@ -48,6 +48,7 @@ async function abrirConteo(forzar) {
   }
   if (document.getElementById('screen-conteo').classList.contains('active')) pintarConteo();
   await ofrecerBorradorConteo_();
+  await cargarRecepcionPendiente_();
 }
 
 // ============ BORRADOR AUTOMÁTICO DE CONTEO (NUEVO 21/07/2026 — con Osmar) ============
@@ -1322,3 +1323,102 @@ window.addEventListener('resize', () => {
   }
   if (activa('screen-pauta') && cachePauta) pintarPauta();
 });
+
+
+// ============ CONFIRMAR RECEPCIÓN — NUEVO 22/07/2026 (con Osmar) ============
+// Bloque que aparece ARRIBA de las categorías en la pantalla de Conteo de Cima, y solo si
+// hay entregas de Vegan Corner sin confirmar. Los días normales no existe: sin pendientes,
+// el contenedor queda vacío y la pantalla se ve exactamente igual que antes.
+//
+// No aplica a Vegan Corner: Rosa/Katherine son quienes ENTREGAN, no quienes reciben.
+//
+// Al confirmar NO se navega a screen-confirm (como sí hace confirmarGuardarConteo): el
+// conteo puede estar a medio hacer y sacar a la persona de la pantalla perdería lo contado
+// en memoria. El resultado se muestra en el mismo bloque, que se reemplaza por una línea
+// de confirmación.
+let recepcionPendiente = null;    // { items:[{fila, programaId, producto, cantidadEntregada}], responsable, fecha }
+let recepcionCantidades = {};     // fila de EntregaDetalle -> cantidad que se va a confirmar
+
+async function cargarRecepcionPendiente_() {
+  const cont = document.getElementById('conteo-recepcion');
+  if (!cont) return;
+  recepcionPendiente = null;
+  recepcionCantidades = {};
+  if (esVeganCorner_()) { cont.innerHTML = ''; return; }
+  const r = await llamarAPISilencioso('obtenerEntregasPendientesRecepcion');
+  if (!r || !r.ok || !r.items || !r.items.length) { cont.innerHTML = ''; return; }
+  recepcionPendiente = r;
+  // Prellenado con lo declarado por Vegan Corner. La persona en Cima ajusta solo si llegó
+  // distinto — el caso normal es tocar nada y confirmar.
+  r.items.forEach(it => { recepcionCantidades[it.fila] = it.cantidadEntregada; });
+  pintarBloqueRecepcion_();
+}
+
+function pintarBloqueRecepcion_() {
+  const cont = document.getElementById('conteo-recepcion');
+  if (!cont || !recepcionPendiente) return;
+  const r = recepcionPendiente;
+  const sub = [r.responsable, r.fecha].filter(x => x).join(' · ');
+
+  let filas = '';
+  r.items.forEach(it => {
+    const val = recepcionCantidades[it.fila] !== undefined ? recepcionCantidades[it.fila] : it.cantidadEntregada;
+    filas += '<div class="recep-row">' +
+      '<span>' + it.producto + '</span>' +
+      '<div class="conteo-stepper">' +
+        '<button type="button" onclick="cambiarCantidadRecepcion(' + it.fila + ',-1)">\u2212</button>' +
+        '<input type="number" min="0" id="recep-in-' + it.fila + '" value="' + val + '" oninput="escribirCantidadRecepcion(' + it.fila + ',this.value)">' +
+        '<button type="button" onclick="cambiarCantidadRecepcion(' + it.fila + ',1)">+</button>' +
+      '</div>' +
+    '</div>';
+  });
+
+  cont.innerHTML = '<div class="recep-bloque">' +
+    '<div class="recep-cab">' +
+      '<div class="recep-titulo serif">Confirmar recepción</div>' +
+      (sub ? '<div class="recep-sub">' + sub + '</div>' : '') +
+    '</div>' +
+    filas +
+    '<textarea id="recep-obs" class="recep-obs" rows="2" placeholder="Observación sobre este pedido (opcional) — se avisa a Vegan Corner"></textarea>' +
+    '<p class="error-msg" id="recep-error" style="margin:0 0 8px;"></p>' +
+    '<button class="btn-primary" onclick="confirmarRecepcion()">Confirmar recepción</button>' +
+  '</div>';
+}
+
+// Se toca solo el input de esa fila, nunca se repinta el bloque entero: un repintado
+// borraría lo que la persona ya escribió en el campo de observación.
+function cambiarCantidadRecepcion(fila, delta) {
+  const actual = Number(recepcionCantidades[fila]) || 0;
+  const nueva = Math.max(0, actual + delta);
+  recepcionCantidades[fila] = nueva;
+  const input = document.getElementById('recep-in-' + fila);
+  if (input) input.value = nueva;
+}
+
+function escribirCantidadRecepcion(fila, valor) {
+  const n = Number(valor);
+  recepcionCantidades[fila] = (valor === '' || isNaN(n) || n < 0) ? 0 : n;
+}
+
+async function confirmarRecepcion() {
+  if (!recepcionPendiente) return;
+  const err = document.getElementById('recep-error');
+  if (err) err.textContent = '';
+  const obsEl = document.getElementById('recep-obs');
+  const items = recepcionPendiente.items.map(it => ({
+    fila: it.fila,
+    cantidadRecibida: Number(recepcionCantidades[it.fila]) || 0
+  }));
+  const r = await llamarAPI('confirmarRecepcionEntregas', {
+    data: { responsable: sesion.nombre, items: items, observacion: obsEl ? obsEl.value : '' }
+  });
+  if (!r.ok) {
+    if (err) err.textContent = r.error || 'Error al confirmar la recepción';
+    return;
+  }
+  const n = r.confirmados || items.length;
+  recepcionPendiente = null;
+  recepcionCantidades = {};
+  const cont = document.getElementById('conteo-recepcion');
+  if (cont) cont.innerHTML = '<p class="recep-listo">Recepción confirmada \u00b7 ' + n + ' producto' + (n === 1 ? '' : 's') + '</p>';
+}
