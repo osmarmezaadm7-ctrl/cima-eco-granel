@@ -1018,6 +1018,13 @@ const ICONS = {
 };
 
 function irA(id){
+  // NUEVO 21/07/2026 — borrador de Conteo: si se ABANDONA la pantalla de conteo, se deja
+  // el borrador guardado sin que el usuario haga nada. Guarda acotada a propósito: para
+  // cualquier otra transición esta función se comporta exactamente igual que antes.
+  if(id!=='screen-conteo' && typeof guardarBorradorConteo_==='function'){
+    const sc=document.getElementById('screen-conteo');
+    if(sc && sc.classList.contains('active')) guardarBorradorConteo_();
+  }
   document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
   document.getElementById(id).classList.add('active');
   document.querySelectorAll('.sidebar .nav-item').forEach(i=>i.classList.remove('activo'));
@@ -1715,6 +1722,17 @@ window.addEventListener('resize', ()=>{
   if(document.getElementById('screen-movimientos') && document.getElementById('screen-movimientos').classList.contains('active') && movimientosCache){
     abrirMovimientos();
   }
+});
+
+// NUEVO 21/07/2026 — borrador de Conteo, segundo punto de guardado. Cubre el caso real de
+// terreno: el sistema mata la app mientras se está contando, sin que el usuario haya
+// "salido" de la pantalla (por eso irA() no alcanza a dispararse). Es best-effort: en
+// móvil el navegador a veces mata el proceso antes de que la llamada complete.
+document.addEventListener('visibilitychange', ()=>{
+  if(document.visibilityState!=='hidden') return;
+  if(typeof guardarBorradorConteo_!=='function') return;
+  const sc=document.getElementById('screen-conteo');
+  if(sc && sc.classList.contains('active')) guardarBorradorConteo_();
 });
 
 const DENOMINACIONES = [
