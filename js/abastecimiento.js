@@ -219,10 +219,13 @@ function pintarAbastecimientoAdmin() {
   });
 
   cont.innerHTML = html;
-  engancharDeslizarAbast_(cont);
   pintarBarraAbast_();
 }
 
+// La fila de administrador NO desliza — decisión de Osmar 22/07/2026. Es la única fila
+// con un campo editable (la cantidad), justo donde el gesto pelea con el toque. Acá la
+// vía es checkbox + botones de la barra; el deslizar quedó solo en la vista del staff,
+// donde la fila no tiene nada editable.
 function filaAdminAbast_(it) {
   const idEsc = escAbast_(it.id);
   const marcado = abastSeleccion.has(it.id);
@@ -232,20 +235,16 @@ function filaAdminAbast_(it) {
     ? '<span class="abast-chip-prov" onclick="abrirProveedorItemAbast(\'' + idEsc + '\')">' + it.proveedor + '</span>'
     : '<span class="abast-chip-prov vacio" onclick="abrirProveedorItemAbast(\'' + idEsc + '\')">asignar proveedor</span>';
 
-  return '<div class="abast-swipe" data-id="' + it.id + '" data-izq="1" data-der="1">' +
-    '<div class="abast-swipe-accion izq"><span>Comprado</span></div>' +
-    '<div class="abast-swipe-accion der"><span>Descartar</span></div>' +
-    '<div class="abast-swipe-cara">' +
-      '<div class="abast-fila-top">' +
-        '<input type="checkbox" class="abast-check" ' + (marcado ? 'checked' : '') + ' onclick="toggleItemAbast(\'' + idEsc + '\',this.checked)" aria-label="Seleccionar">' +
-        '<span class="abast-punto" style="background:' + punto + ';" aria-hidden="true"></span>' +
-        '<span class="abast-nombre">' + it.producto + '</span>' +
-        '<input type="number" min="0" class="abast-cant" value="' + cant + '" onchange="cambiarCantidadItemCompra(\'' + idEsc + '\',this.value)" aria-label="Cantidad">' +
-        '<span class="abast-unidad">' + (it.unidad || '') + '</span>' +
-      '</div>' +
-      '<div class="abast-fila-meta">' +
-        '<span class="abast-quien">' + (String(it.responsable || '').split(' ')[0] || '—') + '</span>' + prov +
-      '</div>' +
+  return '<div class="abast-fila-admin">' +
+    '<div class="abast-fila-top">' +
+      '<input type="checkbox" class="abast-check" ' + (marcado ? 'checked' : '') + ' onclick="toggleItemAbast(\'' + idEsc + '\',this.checked)" aria-label="Seleccionar">' +
+      '<span class="abast-punto" style="background:' + punto + ';" aria-hidden="true"></span>' +
+      '<span class="abast-nombre">' + it.producto + '</span>' +
+      '<input type="number" min="0" class="abast-cant" value="' + cant + '" onchange="cambiarCantidadItemCompra(\'' + idEsc + '\',this.value)" aria-label="Cantidad">' +
+      '<span class="abast-unidad">' + (it.unidad || '') + '</span>' +
+    '</div>' +
+    '<div class="abast-fila-meta">' +
+      '<span class="abast-quien">' + (String(it.responsable || '').split(' ')[0] || '—') + '</span>' + prov +
     '</div>' +
   '</div>';
 }
@@ -278,15 +277,17 @@ function sincronizarCabecerasAbast_() {
   });
 }
 
+// La barra aparece SOLO cuando hay algo seleccionado. Antes estaba siempre con los
+// botones apagados, ocupando espacio para nada. Sin selección se oculta por completo.
 function pintarBarraAbast_() {
   const barra = document.getElementById('abast-submit-bar');
-  if (!esAdminCompras_()) { barra.style.display = 'none'; return; }
   const n = abastSeleccion.size;
+  if (!esAdminCompras_() || !n) { barra.style.display = 'none'; barra.innerHTML = ''; return; }
   barra.style.display = '';
   barra.innerHTML =
     '<div class="abast-barra">' +
-      '<button type="button" class="btn-descartar-abast" ' + (n ? '' : 'disabled') + ' onclick="abrirDescartarAbast()">Descartar' + (n ? ' (' + n + ')' : '') + '</button>' +
-      '<button type="button" class="btn-primary" ' + (n ? '' : 'disabled') + ' onclick="confirmarItemsComprados()">Comprado' + (n ? ' (' + n + ')' : '') + '</button>' +
+      '<button type="button" class="btn-descartar-abast" onclick="abrirDescartarAbast()">Descartar (' + n + ')</button>' +
+      '<button type="button" class="btn-primary" onclick="confirmarItemsComprados()">Comprado (' + n + ')</button>' +
     '</div>';
 }
 
@@ -359,11 +360,11 @@ function cerrarDeslizadosAbast_(excepto) {
 // primer movimiento y no se cambia: si la persona empezó a scrollear vertical, la fila no
 // se mueve más en toda la pasada. Sin esto, un scroll con el pulgar en diagonal abre
 // filas al azar mientras se recorren 43 ítems.
+// Solo en la vista del staff. Un único panel, a la derecha (Quitar), que se revela
+// deslizando hacia la izquierda. El gesto abre; ejecutar es tocar el botón revelado.
 function engancharDeslizarAbast_(cont) {
   cont.querySelectorAll('.abast-swipe').forEach(fila => {
     const cara = fila.querySelector('.abast-swipe-cara');
-    const permiteIzq = fila.dataset.izq === '1';
-    const permiteDer = fila.dataset.der === '1';
     let x0 = 0, y0 = 0, eje = null, dx = 0;
 
     fila.addEventListener('touchstart', e => {
@@ -380,10 +381,7 @@ function engancharDeslizarAbast_(cont) {
         if (eje === 'x') cerrarDeslizadosAbast_(fila);
       }
       if (eje !== 'x') return;
-      dx = ax;
-      if (dx > 0 && !permiteIzq) dx = 0;
-      if (dx < 0 && !permiteDer) dx = 0;
-      dx = Math.max(-ABAST_ANCHO_ACCION, Math.min(ABAST_ANCHO_ACCION, dx));
+      dx = Math.min(0, Math.max(-ABAST_ANCHO_ACCION, ax)); // solo hacia la izquierda
       cara.style.transform = 'translateX(' + dx + 'px)';
     }, { passive: true });
 
@@ -391,55 +389,91 @@ function engancharDeslizarAbast_(cont) {
       cara.style.transition = '';
       cara.style.transform = '';
       if (eje !== 'x') return;
-      fila.classList.remove('abierta-izq', 'abierta-der');
-      if (dx <= -40 && permiteDer) fila.classList.add('abierta-der');
-      else if (dx >= 40 && permiteIzq) fila.classList.add('abierta-izq');
+      fila.classList.toggle('abierta-der', dx <= -40);
     });
 
-    const accIzq = fila.querySelector('.abast-swipe-accion.izq');
     const accDer = fila.querySelector('.abast-swipe-accion.der');
-    if (accIzq) accIzq.addEventListener('click', () => ejecutarDeslizadoAbast_(fila, 'comprado'));
-    if (accDer) accDer.addEventListener('click', () => ejecutarDeslizadoAbast_(fila, 'descartar'));
+    if (accDer) accDer.addEventListener('click', () => ejecutarDeslizadoAbast_(fila));
   });
 }
 
-async function ejecutarDeslizadoAbast_(fila, accion) {
+// El deslizar quedó solo en la vista del staff: quitar lo propio. Se saca la fila al
+// instante y la llamada se va en silencio (sin overlay de pantalla completa). Si el
+// servidor rechaza, la fila vuelve a su lugar y aparece el error — nunca se pierde un
+// ítem por un fallo de red.
+async function ejecutarDeslizadoAbast_(fila) {
   const id = fila.dataset.id;
-  fila.classList.remove('abierta-izq', 'abierta-der');
   const err = document.getElementById('abast-error');
   err.textContent = '';
 
-  let r;
-  if (!esAdminCompras_()) {
-    r = await llamarAPI('quitarItemPropioAbastecimiento', { data: { id: id, responsable: sesion.nombre } });
-  } else if (accion === 'comprado') {
-    r = await llamarAPI('marcarItemsComprados', { data: { ids: [id], responsable: sesion.nombre } });
-  } else {
-    r = await llamarAPI('descartarItemsAbastecimiento', { data: { ids: [id], responsable: sesion.nombre, motivo: '' } });
-  }
+  const idx = abastItems.findIndex(x => x.id === id);
+  if (idx === -1) return;
+  const respaldo = abastItems[idx];
+  abastItems.splice(idx, 1);
+  pintarAbastecimientoStaff();
 
-  if (!r || !r.ok) { err.textContent = (r && r.error) || 'No se pudo completar la acción'; return; }
-  abastSeleccion.delete(id);
-  abrirAbastecimiento(true);
+  const r = await llamarAPISilencioso('quitarItemPropioAbastecimiento', { data: { id: id, responsable: sesion.nombre } });
+  if (!r || !r.ok) {
+    abastItems.splice(idx, 0, respaldo);
+    pintarAbastecimientoStaff();
+    err.textContent = (r && r.error) || 'No se pudo quitar el producto. Intenta de nuevo.';
+  }
 }
 
 // ---- acciones en lote ----
 
-async function cambiarCantidadItemCompra(id, val) {
-  await llamarAPI('actualizarCantidadItemCompra', { data: { id: id, cantidad: val } });
+// La cantidad ya NO muestra el overlay de pantalla completa en cada tecla. Escribir tres
+// cantidades seguidas ya no hace parpadear la pantalla tres veces. La escritura al
+// servidor se agrupa con debounce (250 ms tras la última edición del mismo ítem) y se
+// registra en abastCantPendientes para que Comprado pueda esperarla antes de marcar.
+const abastCantPendientes = {}; // id -> { timer, promesa, resolver }
+
+function cambiarCantidadItemCompra(id, val) {
   const it = abastItems.find(x => x.id === id);
   if (it) it.cantidad = val === '' ? null : Number(val);
+
+  let p = abastCantPendientes[id];
+  if (p && p.timer) clearTimeout(p.timer);
+  if (!p) {
+    p = {};
+    p.promesa = new Promise(res => { p.resolver = res; });
+    abastCantPendientes[id] = p;
+  }
+  p.timer = setTimeout(async () => {
+    try { await llamarAPISilencioso('actualizarCantidadItemCompra', { data: { id: id, cantidad: val } }); }
+    catch (e) { /* silencioso: es un guardado de campo, no una acción crítica */ }
+    finally { const r = abastCantPendientes[id]; delete abastCantPendientes[id]; if (r) r.resolver(); }
+  }, 250);
 }
 
+// Espera a que se completen todas las escrituras de cantidad en vuelo antes de marcar
+// comprado. Cancela el debounce de cada una y la lanza ya, para no retrasar el marcado
+// 250 ms. Sin esto, la cantidad vieja podía quedar en el historial.
+async function esperarCantidadesPendientesAbast_() {
+  const ids = Object.keys(abastCantPendientes);
+  await Promise.all(ids.map(async id => {
+    const p = abastCantPendientes[id];
+    if (p.timer) { clearTimeout(p.timer); p.timer = null; }
+    delete abastCantPendientes[id];
+    const it = abastItems.find(x => x.id === id);
+    const cant = it ? (it.cantidad === null || it.cantidad === undefined ? '' : it.cantidad) : '';
+    try { await llamarAPISilencioso('actualizarCantidadItemCompra', { data: { id: id, cantidad: cant } }); }
+    catch (e) { /* silencioso: es un guardado de campo */ }
+    if (p.resolver) p.resolver();
+  }));
+}
+
+// Antes de marcar, se espera cualquier escritura de cantidad pendiente: si se escribió
+// una cantidad y se apretó Comprado en seguida, sin esto la cantidad vieja podía quedar
+// en el historial (las dos llamadas salían sin orden garantizado).
 async function confirmarItemsComprados() {
   const err = document.getElementById('abast-error');
   err.textContent = '';
   const ids = [...abastSeleccion];
   if (!ids.length) { err.textContent = 'Selecciona al menos un ítem.'; return; }
-  const r = await llamarAPI('marcarItemsComprados', { data: { ids: ids, responsable: sesion.nombre } });
-  if (!r || !r.ok) { err.textContent = (r && r.error) || 'Error al marcar comprados'; return; }
-  abastSeleccion = new Set();
-  abrirAbastecimiento(true);
+  await esperarCantidadesPendientesAbast_();
+  quitarLocalYLlamarAbast_('marcarItemsComprados', ids, { ids: ids, responsable: sesion.nombre },
+    'No se pudo marcar como comprado. Intenta de nuevo.');
 }
 
 // El motivo es opcional a propósito: obligarlo es fricción en la acción que más se va a
@@ -464,13 +498,39 @@ function abrirDescartarAbast() {
 
 async function confirmarDescartarAbast() {
   const motivo = document.getElementById('abast-desc-motivo').value;
-  const r = await llamarAPI('descartarItemsAbastecimiento', {
-    data: { ids: [...abastSeleccion], responsable: sesion.nombre, motivo: motivo }
-  });
-  if (!r || !r.ok) { document.getElementById('abast-desc-error').textContent = (r && r.error) || 'Error al descartar'; return; }
+  const ids = [...abastSeleccion];
   cerrarModal();
+  quitarLocalYLlamarAbast_('descartarItemsAbastecimiento', ids,
+    { ids: ids, responsable: sesion.nombre, motivo: motivo },
+    'No se pudo descartar. Intenta de nuevo.');
+}
+
+// Motor compartido por Comprado y Descartar en lote (vista admin). Saca las filas de
+// abastItems al instante, repinta, y lanza la llamada en silencio. Si el servidor
+// rechaza, restaura las filas quitadas en su posición y vuelve a seleccionarlas para que
+// se pueda reintentar. Nunca recarga toda la lista desde el servidor.
+async function quitarLocalYLlamarAbast_(accion, ids, data, msgError) {
+  const err = document.getElementById('abast-error');
+  err.textContent = '';
+  const quitados = [];
+  ids.forEach(id => {
+    const idx = abastItems.findIndex(x => x.id === id);
+    if (idx !== -1) quitados.push({ idx: idx, it: abastItems[idx] });
+  });
+  // de mayor a menor índice para que los splice no corran las posiciones siguientes
+  quitados.sort((a, b) => b.idx - a.idx).forEach(q => abastItems.splice(q.idx, 1));
   abastSeleccion = new Set();
-  abrirAbastecimiento(true);
+  pintarAbastecimientoAdmin();
+
+  const r = await llamarAPISilencioso(accion, { data: data });
+  if (!r || !r.ok) {
+    quitados.sort((a, b) => a.idx - b.idx).forEach(q => {
+      abastItems.splice(Math.min(q.idx, abastItems.length), 0, q.it);
+      abastSeleccion.add(q.it.id);
+    });
+    pintarAbastecimientoAdmin();
+    err.textContent = (r && r.error) || msgError;
+  }
 }
 
 // ---- asignar proveedor ----
@@ -478,6 +538,15 @@ async function confirmarDescartarAbast() {
 // el proveedor habitual en el catálogo de origen, así que este diálogo se abre una vez
 // por producto y no vuelve a aparecer.
 
+// "Del stock de Cima" NO es un proveedor del maestro: es Vegan Corner surtiéndose del
+// stock físico de Cima (modelo de consignación). Guarda el literal 'Cima Eco-Granel',
+// que es lo que ya usan 17 materias primas del catálogo. Va arriba de la lista para que
+// se pueda elegir sin escribir texto libre, que rompería la agrupación.
+const ABAST_STOCK_CIMA_ = 'Cima Eco-Granel';
+
+// Se guarda y agrupa por ALIAS, no por razón social. Lo que ya está en la pizarra son
+// alias (Fruna, Don Mateo); guardar "ALIMENTOS FRUNA LTDA." partiría el proveedor en dos
+// grupos. El value del <option> es el alias, no el nombre.
 async function abrirProveedorItemAbast(id) {
   const it = abastItems.find(x => x.id === id);
   if (!it) return;
@@ -486,14 +555,26 @@ async function abrirProveedorItemAbast(id) {
     if (!r || !r.ok) { document.getElementById('abast-error').textContent = (r && r.error) || 'No se pudieron cargar los proveedores'; return; }
     abastProveedores = r.proveedores || [];
   }
-  const opciones = ['<option value="">— sin proveedor —</option>'].concat(
-    abastProveedores.map(p => '<option value="' + p.nombre + '"' + (p.nombre === it.proveedor ? ' selected' : '') + '>' + (p.alias || p.nombre) + '</option>')
-  ).join('');
+  const actual = it.proveedor || '';
+  const enLista = abastProveedores.some(p => (p.alias || p.nombre) === actual) || actual === ABAST_STOCK_CIMA_ || actual === '';
+
+  const opciones = [
+    '<option value="">— sin proveedor —</option>',
+    '<option value="' + ABAST_STOCK_CIMA_ + '"' + (actual === ABAST_STOCK_CIMA_ ? ' selected' : '') + '>Del stock de Cima</option>'
+  ].concat(
+    abastProveedores.map(p => {
+      const alias = p.alias || p.nombre;
+      return '<option value="' + alias + '"' + (alias === actual ? ' selected' : '') + '>' + alias + '</option>';
+    })
+  );
+  // Si el proveedor guardado no está en el maestro ni es "stock de Cima" (p. ej. uno
+  // escrito a mano antes), se preserva como opción para no perderlo al reasignar.
+  if (!enLista) opciones.push('<option value="' + actual + '" selected>' + actual + ' (fuera del maestro)</option>');
 
   abrirModal(
     '<h3 style="font-size:15px;margin:0 0 4px;">Proveedor</h3>' +
     '<p style="font-size:12.5px;color:var(--ink-soft);margin:0 0 12px;">' + it.producto + '</p>' +
-    '<select id="abast-prov-sel">' + opciones + '</select>' +
+    '<select id="abast-prov-sel">' + opciones.join('') + '</select>' +
     '<p style="font-size:11px;color:var(--ink-soft);margin:8px 0 0;line-height:1.45;">Queda guardado en el catálogo: la próxima vez que se pida este producto ya viene con su proveedor.</p>' +
     '<div class="error-msg" id="abast-prov-error"></div>' +
     '<div style="display:flex;gap:8px;margin-top:14px;">' +
