@@ -1020,8 +1020,12 @@ async function abrirPauta(forzar) {
   pintarPauta();
 }
 
+// CAMBIO 22/07/2026 (con Osmar): los ítems sin ConteoId (agregados con "+ Agregar
+// producto") se agrupan por persona. Antes cada uno caía en su propio grupo — la clave
+// incluía el id — así que tres productos agregados por Katherine pintaban tres veces el
+// mismo encabezado.
 function claveGrupoPauta_(it) {
-  return it.conteoId || (it.fecha + '|' + it.responsable + '|' + it.id);
+  return it.conteoId || ('directo|' + it.responsable);
 }
 
 function filaPautaDesktop_(it) {
@@ -1101,8 +1105,15 @@ function pintarPauta() {
     }
     const hecho = it.estadoBorrador === 'Hecho';
     const cant = it.cantidadBorrador !== null && it.cantidadBorrador !== undefined ? it.cantidadBorrador : it.cantidadProgramada;
+    // NUEVO 22/07/2026 (con Osmar): la X hace dos cosas distintas según el origen del ítem.
+    // Sin ConteoId lo agregaron ellas -> elimina de verdad (queda 'Eliminado' en el Sheet,
+    // auditable). Con ConteoId vino del pedido de Cima -> sigue solo ocultando de la lista.
+    // Se distinguen por color: terracota elimina, gris esconde. El servidor valida igual
+    // (ver eliminarItemPauta en Produccion.gs) — el color es ayuda, no la barrera.
+    const esPropio = !it.conteoId;
+    const accionX = esPropio ? 'eliminarItemPropioPauta(\'' + it.id + '\')' : 'ocultarItemPauta(\'' + it.id + '\')';
     return '<div class="pauta-row' + (hecho ? ' hecho' : '') + '" id="pauta-row-' + it.id + '">' +
-      '<button class="pauta-quitar" title="Quitar" onclick="ocultarItemPauta(\'' + it.id + '\')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"></path><path d="M6 6l12 12"></path></svg></button>' +
+      '<button class="pauta-quitar' + (esPropio ? ' pauta-quitar-elimina' : '') + '" title="' + (esPropio ? 'Eliminar' : 'Quitar de la lista') + '" onclick="' + accionX + '"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"></path><path d="M6 6l12 12"></path></svg></button>' +
       '<div class="pauta-row-top">' +
         '<button class="pauta-check' + (hecho ? ' marcado' : '') + '" onclick="toggleHechoPauta(\'' + it.id + '\')" aria-label="Marcar hecho">' +
           (hecho ? '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"></path></svg>' : '') +
@@ -1119,19 +1130,46 @@ function pintarPauta() {
   const grupos = {}; const ordenGrupos = [];
   planificados.forEach(it => {
     const clave = claveGrupoPauta_(it);
-    if (!grupos[clave]) { grupos[clave] = { responsable: it.responsable, items: [] }; ordenGrupos.push(clave); }
+    if (!grupos[clave]) { grupos[clave] = { responsable: it.responsable, conteoId: it.conteoId, items: [] }; ordenGrupos.push(clave); }
     grupos[clave].items.push(it);
   });
 
   let html = '';
   ordenGrupos.forEach(clave => {
     const g = grupos[clave];
-    html += '<p class="pauta-grupo-titulo">Pedido por: ' + g.responsable + '</p>' + g.items.map(filaHtml).join('');
+    // "Pedido por" solo si de verdad vino de un pedido. Un ítem que Katherine agregó ayer
+    // aparecía como "Pedido por: Katherine Bustamante", que es falso: nadie lo pidió.
+    const titulo = g.conteoId
+      ? 'Pedido por: ' + g.responsable
+      : 'Agregado por ' + String(g.responsable || '').split(' ')[0];
+    html += '<p class="pauta-grupo-titulo">' + titulo + '</p>' + g.items.map(filaHtml).join('');
   });
   if (agregados.length) {
     html += '<p class="pauta-grupo-titulo">Agregado en esta sesión</p>' + agregados.map(filaHtml).join('');
   }
   cont.innerHTML = html;
+}
+
+// NUEVO 22/07/2026 (con Osmar): eliminar desde la X, sin modal de motivo. Es un ítem que
+// ellas mismas agregaron; si se equivocan lo vuelven a poner en dos toques con "+ Agregar
+// producto", así que pedir un motivo sería fricción sin valor. Igual queda auditable en el
+// Sheet como 'Eliminado', lo mismo que cuando elimina Rocío.
+// El servidor puede rechazar (ítem del pedido, permiso insuficiente): en ese caso la fila
+// NO se saca de la lista y el error se muestra en #pauta-error.
+async function eliminarItemPropioPauta(id) {
+  const err = document.getElementById('pauta-error');
+  if (err) err.textContent = '';
+  const r = await llamarAPI('eliminarItemPauta', {
+    data: { id: id, motivo: 'Eliminado desde la pauta', responsable: sesion.nombre }
+  });
+  if (!r.ok) {
+    if (err) err.textContent = r.error || 'No se pudo eliminar el producto';
+    return;
+  }
+  cachePauta.pauta = cachePauta.pauta.filter(x => x.id !== id);
+  const idx = pautaAgregadosSesion.indexOf(id);
+  if (idx !== -1) pautaAgregadosSesion.splice(idx, 1);
+  pintarPauta();
 }
 
 // NUEVO 16/07/2026 (con Osmar): eliminar un ítem atascado — solo disponible en modo
