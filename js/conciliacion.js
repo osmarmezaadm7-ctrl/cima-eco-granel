@@ -1046,6 +1046,12 @@ function construirCuerpoNotificacion_(mensaje, fechaCreacion) {
       return { titulo: 'Nuevo pedido de producción', fechaDestacada: fechaDestacada, esAlerta: false,
         cuerpo: '<p style="font-size:12.5px;color:var(--ink-soft);margin:0;">Enviado por ' + payload.nombre + (payload.observacion ? ' — ' + payload.observacion : '') + '</p>' };
     }
+    // NUEVO 22/07/2026 — solo se emite cuando la persona en Cima dejó una observación al
+    // confirmar la recepción; la observación ES el mensaje, por eso va en el cuerpo.
+    if (payload.tipo === 'recepcionConfirmada') {
+      return { titulo: 'Observación de Cima', fechaDestacada: fechaDestacada, esAlerta: false,
+        cuerpo: '<p style="font-size:12.5px;color:var(--ink-soft);margin:0;">' + (payload.observacion || '') + ' — ' + payload.nombre + '</p>' };
+    }
     if (payload.tipo === 'produccionConfirmada') {
       return { titulo: 'Producción confirmada', fechaDestacada: fechaDestacada, esAlerta: false,
         cuerpo: '<p style="font-size:12.5px;color:var(--ink-soft);margin:0;">' + (payload.resumen || '') + ' — ' + payload.nombre + '</p>' };
