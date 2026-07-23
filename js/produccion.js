@@ -28,6 +28,7 @@ function negocioConteo_() { return esVeganCorner_() ? 'Vegan Corner' : 'Cima Eco
 
 async function abrirConteo(forzar) {
   irA('screen-conteo');
+  document.getElementById('btn-retiro-vc').style.display = tienePermisoLocal('RegistrarConteo') ? '' : 'none';
   // El botón de refrescar (forzar) borra conteoCantidades — guardamos antes para que un
   // toque accidental a mitad de conteo no pierda lo contado.
   if (forzar && Object.keys(conteoCantidades).length) await guardarBorradorConteo_();
@@ -997,6 +998,158 @@ function pintarCero() {
   });
   if (!html) html = '<p style="font-size:13.5px;color:var(--ink-soft);padding:24px 0;text-align:center;">Elige qué categoría(s) vas a pedir.</p>';
   document.getElementById('cero-lista').innerHTML = html;
+}
+
+// ============ RETIRO HACIA VEGAN CORNER (NUEVO 23/07/2026, con Osmar) ============
+// Unidades que salen del stock físico de Cima para completar una venta al por mayor de
+// Vegan Corner — modelo de consignación, Caso B (ver conversación con Osmar 23/07/2026).
+// Mismo patrón visual que "Desde cero": categorías + productos marcados arriba + Ver más,
+// SIN buscador escondido — acá no hay una lista previa que proteger, siempre se arma desde
+// cero, así que ocultar el catálogo detrás de un botón solo agrega un toque de más.
+// Solo lo ejecuta quien tiene el stock físico delante (permiso RegistrarConteo, mismo que
+// Contar stock) — no depende de que Vegan Corner sepa nada de esto en el momento.
+let retiroVCCategoriasActivas = new Set();
+let retiroVCCantidades = {};    // "productoProduccion|categoria" -> cantidad
+let retiroVCVerMas = new Set();
+let retiroVCCliente = '';
+
+async function abrirRetiroVC() {
+  irA('screen-retiro-vc');
+  retiroVCCategoriasActivas = new Set();
+  retiroVCCantidades = {};
+  retiroVCVerMas = new Set();
+  retiroVCCliente = '';
+  document.getElementById('retiro-vc-cliente').value = '';
+  document.getElementById('retiro-vc-error').textContent = '';
+  if (!cacheCatalogoCompleto) {
+    document.getElementById('retiro-vc-chips').innerHTML = skeletonCards(1);
+    document.getElementById('retiro-vc-lista').innerHTML = skeletonCards(3);
+    await cargarCatalogoCompletoProduccion_();
+  }
+  pintarRetiroVC();
+}
+function toggleCategoriaRetiroVC(cat) {
+  if (retiroVCCategoriasActivas.has(cat)) retiroVCCategoriasActivas.delete(cat); else retiroVCCategoriasActivas.add(cat);
+  pintarRetiroVC();
+}
+function cambiarCantidadRetiroVC(key, signo) {
+  const productoProduccion = key.split('|')[0];
+  const paso = pasoDe_(productoProduccion);
+  const actual = retiroVCCantidades[key] !== undefined ? retiroVCCantidades[key] : 0;
+  retiroVCCantidades[key] = Math.max(0, actual + signo * paso);
+  pintarRetiroVC();
+}
+function escribirCantidadRetiroVC(key, val) {
+  retiroVCCantidades[key] = Math.max(0, Number(val) || 0);
+}
+function toggleVerMasRetiroVC(cat) {
+  if (retiroVCVerMas.has(cat)) retiroVCVerMas.delete(cat); else retiroVCVerMas.add(cat);
+  pintarRetiroVC();
+}
+function cambiarClienteRetiroVC(val) { retiroVCCliente = val; }
+
+function filaProductoRetiroVC_(p) {
+  const key = p.productoProduccion + '|' + p.categoria;
+  const val = retiroVCCantidades[key] !== undefined ? retiroVCCantidades[key] : 0;
+  const keyEsc = key.replace(/'/g, "\\'");
+  return '<div class="revision-row">' +
+    '<div class="revision-row-top">' +
+      '<span>' + p.nombre + '</span>' +
+      '<div class="conteo-stepper">' +
+        '<button type="button" onclick="cambiarCantidadRetiroVC(\'' + keyEsc + '\',-1)">\u2212</button>' +
+        '<input type="number" min="0" value="' + val + '" oninput="escribirCantidadRetiroVC(\'' + keyEsc + '\',this.value)">' +
+        '<button type="button" onclick="cambiarCantidadRetiroVC(\'' + keyEsc + '\',1)">+</button>' +
+      '</div>' +
+    '</div>' +
+  '</div>';
+}
+function filaProductoRetiroVCDesktop_(p) {
+  const key = p.productoProduccion + '|' + p.categoria;
+  const val = retiroVCCantidades[key] !== undefined ? retiroVCCantidades[key] : 0;
+  const keyEsc = key.replace(/'/g, "\\'");
+  return '<tr><td style="padding:9px 6px;font-weight:700;">' + p.nombre + '</td>' +
+    '<td style="padding:6px;text-align:center;"><div class="conteo-stepper" style="display:inline-flex;">' +
+      '<button type="button" onclick="cambiarCantidadRetiroVC(\'' + keyEsc + '\',-1)">\u2212</button>' +
+      '<input type="number" min="0" value="' + val + '" oninput="escribirCantidadRetiroVC(\'' + keyEsc + '\',this.value)">' +
+      '<button type="button" onclick="cambiarCantidadRetiroVC(\'' + keyEsc + '\',1)">+</button>' +
+    '</div></td></tr>';
+}
+function pintarRetiroVCDesktop_() {
+  const categorias = [...new Set(cacheCatalogoCompleto.catalogo.map(p => p.categoria))];
+  document.getElementById('retiro-vc-chips').innerHTML = categorias.map(c => {
+    const activo = retiroVCCategoriasActivas.has(c);
+    return '<span class="chip-cat' + (activo ? ' activo' : '') + '" onclick="toggleCategoriaRetiroVC(\'' + c.replace(/'/g, "\\'") + '\')">' + c + '</span>';
+  }).join('');
+  let html = '';
+  categorias.filter(c => retiroVCCategoriasActivas.has(c)).forEach(cat => {
+    const productosCat = cacheCatalogoCompleto.catalogo.filter(p => p.categoria === cat);
+    if (!productosCat.length) return;
+    const marcados = productosCat.filter(p => p.marcado);
+    const noMarcados = productosCat.filter(p => !p.marcado);
+    html += '<p class="conteo-seccion-titulo">' + cat + '</p><table><tbody>';
+    html += marcados.map(filaProductoRetiroVCDesktop_).join('');
+    html += '</tbody></table>';
+    if (noMarcados.length) {
+      if (retiroVCVerMas.has(cat)) {
+        html += '<table><tbody>' + noMarcados.map(filaProductoRetiroVCDesktop_).join('') + '</tbody></table>';
+      } else {
+        html += '<button type="button" class="btn-vermas-cat" onclick="toggleVerMasRetiroVC(\'' + cat.replace(/'/g, "\\'") + '\')">Ver más de ' + cat + '</button>';
+      }
+    }
+  });
+  if (!html) html = '<p style="font-size:13.5px;color:var(--ink-soft);padding:24px 0;text-align:center;">Elige qué categoría(s) vas a retirar.</p>';
+  document.getElementById('retiro-vc-lista').innerHTML = html;
+}
+function pintarRetiroVC() {
+  if (window.matchMedia('(min-width: 900px)').matches) { pintarRetiroVCDesktop_(); return; }
+  const categorias = [...new Set(cacheCatalogoCompleto.catalogo.map(p => p.categoria))];
+  document.getElementById('retiro-vc-chips').innerHTML = categorias.map(c => {
+    const activo = retiroVCCategoriasActivas.has(c);
+    return '<span class="chip-cat' + (activo ? ' activo' : '') + '" onclick="toggleCategoriaRetiroVC(\'' + c.replace(/'/g, "\\'") + '\')">' + c + '</span>';
+  }).join('');
+  let html = '';
+  categorias.filter(c => retiroVCCategoriasActivas.has(c)).forEach(cat => {
+    const productosCat = cacheCatalogoCompleto.catalogo.filter(p => p.categoria === cat);
+    if (!productosCat.length) return;
+    const marcados = productosCat.filter(p => p.marcado);
+    const noMarcados = productosCat.filter(p => !p.marcado);
+    html += '<p class="conteo-seccion-titulo">' + cat + '</p>';
+    html += marcados.map(filaProductoRetiroVC_).join('');
+    if (noMarcados.length) {
+      if (retiroVCVerMas.has(cat)) {
+        html += noMarcados.map(filaProductoRetiroVC_).join('');
+      } else {
+        html += '<button type="button" class="btn-vermas-cat" onclick="toggleVerMasRetiroVC(\'' + cat.replace(/'/g, "\\'") + '\')">Ver más de ' + cat + '</button>';
+      }
+    }
+  });
+  if (!html) html = '<p style="font-size:13.5px;color:var(--ink-soft);padding:24px 0;text-align:center;">Elige qué categoría(s) vas a retirar.</p>';
+  document.getElementById('retiro-vc-lista').innerHTML = html;
+}
+
+// Registro directo, sin pantalla de resumen — Osmar pidió que sea "lo más fácil para
+// registrar" (23/07/2026); una pantalla de revisión de más sería fricción para algo que se
+// hace parada frente al estante. Valida que haya al menos un producto con cantidad > 0.
+async function confirmarRetiroVC() {
+  const err = document.getElementById('retiro-vc-error');
+  err.textContent = '';
+  const items = [];
+  cacheCatalogoCompleto.catalogo.forEach(p => {
+    const key = p.productoProduccion + '|' + p.categoria;
+    const cant = retiroVCCantidades[key];
+    if (cant && cant > 0) items.push({ productoProduccion: p.productoProduccion, cantidad: cant });
+  });
+  if (!items.length) { err.textContent = 'Marca al menos un producto con cantidad mayor a 0.'; return; }
+  const boton = document.getElementById('retiro-vc-btn-confirmar');
+  boton.disabled = true;
+  const r = await llamarAPI('guardarRetiroStockVC', { data: { responsable: sesion.nombre, clienteMotivo: retiroVCCliente, items: items } });
+  boton.disabled = false;
+  if (!r.ok) { err.textContent = r.error || 'Error al registrar el retiro'; return; }
+  document.getElementById('confirm-title').textContent = 'Retiro registrado';
+  document.getElementById('confirm-msg').textContent = items.length + ' producto' + (items.length === 1 ? '' : 's') + ' registrado' + (items.length === 1 ? '' : 's') + ' hacia Vegan Corner.';
+  document.getElementById('confirm-detalle').innerHTML = '';
+  ocultarBotonOtro();
+  irA('screen-confirm');
 }
 
 let resumenPedidoItems = [];
