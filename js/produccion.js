@@ -1052,12 +1052,15 @@ async function confirmarEnvioPedido() {
   document.getElementById('resumen-pedido-error').textContent = '';
   const conteoIds = resumenPedidoOrigen === 'conteo' ? cacheRevision.conteoIds : [];
 
+  const observacion = resumenPedidoOrigen === 'conteo' ? revisionObservacion : ceroObservacion;
+
+  // NUEVO 23/07/2026 (con Osmar): la observación ahora viaja con el pedido, no solo con
+  // la notificación — antes desaparecía en cuanto alguien tocaba "Marcar como vista".
   const r = await llamarAPI('enviarProgramacionProduccion', {
-    data: { responsable: sesion.nombre, conteoIds: conteoIds, items: resumenPedidoItems }
+    data: { responsable: sesion.nombre, conteoIds: conteoIds, items: resumenPedidoItems, observacion: observacion || '' }
   });
   if (!r.ok) { document.getElementById('resumen-pedido-error').textContent = r.error || 'Error al enviar el pedido'; return; }
 
-  const observacion = resumenPedidoOrigen === 'conteo' ? revisionObservacion : ceroObservacion;
   const mensajeNotif = JSON.stringify({ tipo: 'pedidoProduccion', nombre: sesion.nombre, observacion: observacion || '' });
   await llamarAPI('crearNotificacion', { para: ['Rosa Merino', 'Katherine Bustamante'], mensaje: mensajeNotif, accionNotif: 'abrirPauta' });
 
@@ -1178,7 +1181,11 @@ function pintarPautaDesktop_() {
   let html = '';
   ordenGrupos.forEach(clave => {
     const g = grupos[clave];
-    html += '<p class="pauta-grupo-titulo">Pedido por: ' + g.responsable + '</p><table><tbody>' + g.items.map(filaPautaDesktop_).join('') + '</tbody></table>';
+    // NUEVO 23/07/2026: la observación viene repetida en cada ítem del grupo (mismo envío
+    // de pedido) — se pinta una sola vez, tomada del primer ítem.
+    const obs = g.items[0].observacionPedido;
+    const bloqueObs = obs ? '<div class="hist-observacion"><p>Observación del pedido</p><p>' + obs + '</p></div>' : '';
+    html += '<p class="pauta-grupo-titulo">Pedido por: ' + g.responsable + '</p>' + bloqueObs + '<table><tbody>' + g.items.map(filaPautaDesktop_).join('') + '</tbody></table>';
   });
   if (agregados.length) {
     html += '<p class="pauta-grupo-titulo">Agregado en esta sesión</p><table><tbody>' + agregados.map(filaPautaDesktop_).join('') + '</tbody></table>';
@@ -1255,7 +1262,11 @@ function pintarPauta() {
     const titulo = g.conteoId
       ? 'Pedido por: ' + g.responsable
       : 'Agregado por ' + String(g.responsable || '').split(' ')[0];
-    html += '<p class="pauta-grupo-titulo">' + titulo + '</p>' + g.items.map(filaHtml).join('');
+    // NUEVO 23/07/2026: observación general del pedido, una vez por grupo (no por ítem).
+    // Solo aplica a grupos con conteoId — "Agregado por" no viene de un pedido enviado.
+    const obs = g.conteoId ? g.items[0].observacionPedido : '';
+    const bloqueObs = obs ? '<div class="hist-observacion"><p>Observación del pedido</p><p>' + obs + '</p></div>' : '';
+    html += '<p class="pauta-grupo-titulo">' + titulo + '</p>' + bloqueObs + g.items.map(filaHtml).join('');
   });
   if (agregados.length) {
     html += '<p class="pauta-grupo-titulo">Agregado en esta sesión</p>' + agregados.map(filaHtml).join('');
