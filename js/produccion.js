@@ -1084,12 +1084,13 @@ async function confirmarEnvioPedido() {
 // ============ PAUTA DE PRODUCCIÓN — MODELO DE SESIÓN DE TRABAJO ============
 // Marcar "Hecho" y editar cantidad se guardan de inmediato como borrador (actualizarBorradorPauta)
 // — no se pierde nada si se cae el navegador, y dos personas ven el mismo progreso en vivo.
-// "Quitar" de la vista es puramente local (pautaOcultos) — no tiene consecuencia real, así que
-// no hace falta guardarlo: si se refresca, el ítem simplemente reaparece.
 // "+ Agregar producto" se escribe de inmediato (agregarItemPautaDirecto) — agregar sí es un
 // hecho consumado. Solo "Confirmar producción" resuelve todo de una vez.
+// CAMBIO 23/07/2026 (con Osmar — rediseño): se dio de baja el "quitar" local de un ítem de
+// Cima (pautaOcultos) — era puramente en memoria, no persistía, y el ícono prometía algo que
+// no cumplía. Lo no producido ya queda registrado de forma honesta como pendiente al
+// confirmar, sin necesidad de un botón intermedio.
 let cachePauta = null;              // { ok, pauta:[...] } — obtenerPautaActiva()
-let pautaOcultos = new Set();       // ids ocultados de la vista en esta sesión (sin guardar)
 let pautaAgregadosSesion = [];      // ids agregados durante esta sesión (para el registro al confirmar)
 let pautaObservacionBorrador = '';  // observación única de la pauta activa — en memoria hasta confirmar, igual que el resto de Producción
 let cacheCatalogoPauta = null;      // catálogo completo, para "+ Agregar producto"
@@ -1118,8 +1119,6 @@ async function abrirPauta(forzar) {
   document.getElementById('pauta-tab-btn-activa').textContent = soloHistorial ? 'Pendientes' : 'Pauta activa';
   document.getElementById('pauta-agregar-wrap').style.display = soloHistorial ? 'none' : '';
   document.getElementById('pauta-confirmar-wrap').style.display = soloHistorial ? 'none' : '';
-  document.getElementById('pauta-observacion-wrap').style.display = soloHistorial ? 'none' : '';
-  document.getElementById('pauta-observacion').value = pautaObservacionBorrador;
 
   cambiarTabPauta('activa');
   if (!cachePauta || forzar) {
@@ -1130,18 +1129,89 @@ async function abrirPauta(forzar) {
       return;
     }
     cachePauta = r;
-    pautaOcultos = new Set();
     pautaAgregadosSesion = [];
   }
   pintarPauta();
 }
 
-// CAMBIO 22/07/2026 (con Osmar): los ítems sin ConteoId (agregados con "+ Agregar
-// producto") se agrupan por persona. Antes cada uno caía en su propio grupo — la clave
-// incluía el id — así que tres productos agregados por Katherine pintaban tres veces el
-// mismo encabezado.
-function claveGrupoPauta_(it) {
-  return it.conteoId || ('directo|' + it.responsable);
+// REDISEÑO 23/07/2026 (con Osmar): la Pauta pasa de organizarse por procedencia a
+// organizarse por avance. Dos cambios de fondo:
+// 1) Dos baldes FIJOS en vez de un grupo por persona: "Pedido de Cima" (con sub-bloques
+//    por cada envío — mismo ConteoId — para no mezclar la observación de un pedido con la
+//    de otro) y "Agregado acá" (lista plana, sin observaciones que mostrar). Ya no importa
+//    quién de Cima mandó el pedido, ni si lo agregó Katherine o Rosa.
+// 2) Lo marcado "Hecho" se saca de los dos baldes y baja a una sección colapsada al final
+//    — deja de competir por atención con lo que todavía falta.
+let pautaHechosAbierto = false;
+function togglePautaHechos() { pautaHechosAbierto = !pautaHechosAbierto; pintarPauta(); }
+
+// El Id de un ítem de pauta trae el timestamp de creación embebido (nuevoId_ = 'PROG-' +
+// Date.now() + '-' + random) — se aprovecha solo para mostrar la hora del envío junto a su
+// observación, sin tocar el esquema del Sheet ni pedirle un dato nuevo al servidor.
+function horaDeIdPauta_(id) {
+  const ts = Number(String(id).split('-')[1]);
+  if (!ts) return '';
+  const d = new Date(ts);
+  if (isNaN(d.getTime())) return '';
+  return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+}
+
+// Mapa conteoId -> observación, construido sobre TODOS los ítems (hechos y pendientes).
+// Importante: si se arma solo con los pendientes, la observación puede "desaparecer" en
+// cuanto se marca Hecho justo el ítem que la traía, aunque el resto del mismo pedido
+// siga pendiente. Se busca el primer texto no vacío del grupo completo.
+function mapaObservacionesPorEnvio_(todosLosItems) {
+  const mapa = {};
+  todosLosItems.forEach(it => {
+    if (!it.conteoId) return;
+    if (!mapa[it.conteoId] && it.observacionPedido) mapa[it.conteoId] = it.observacionPedido;
+  });
+  return mapa;
+}
+
+// Agrupa la pauta pendiente en los dos baldes fijos. "envios" preserva el orden de llegada
+// (el Sheet ya entrega las filas en ese orden) — así dos pedidos del mismo día no se mezclan
+// y cada uno conserva su propia observación.
+function agruparPauta_(items, mapaObs) {
+  const porEnvio = {}; const ordenEnvio = [];
+  const agregados = [];
+  items.forEach(it => {
+    if (!it.conteoId) { agregados.push(it); return; }
+    if (!porEnvio[it.conteoId]) {
+      porEnvio[it.conteoId] = { conteoId: it.conteoId, hora: horaDeIdPauta_(it.id), observacion: (mapaObs && mapaObs[it.conteoId]) || '', items: [] };
+      ordenEnvio.push(it.conteoId);
+    }
+    porEnvio[it.conteoId].items.push(it);
+  });
+  return { envios: ordenEnvio.map(c => porEnvio[c]), agregados: agregados };
+}
+
+function bloqueObservacionEnvio_(envio) {
+  if (!envio.observacion) return '';
+  const etiqueta = envio.hora ? 'Observación · ' + envio.hora : 'Observación';
+  return '<div class="hist-observacion"><p>' + etiqueta + '</p><p>' + envio.observacion + '</p></div>';
+}
+
+function pintarBarraProgreso_(hechos, total) {
+  const cont = document.getElementById('pauta-progreso-wrap');
+  if (!cont) return;
+  if (pautaSoloLectura || !total) { cont.innerHTML = ''; return; }
+  const pct = Math.round((hechos / total) * 100);
+  cont.innerHTML =
+    '<div class="pauta-progreso">' +
+      '<div class="pauta-progreso-top"><span class="pauta-progreso-num">' + hechos + ' de ' + total + ' hechos</span>' +
+      '<span class="pauta-progreso-faltan">' + (total - hechos ? 'faltan ' + (total - hechos) : 'todo listo') + '</span></div>' +
+      '<div class="pauta-progreso-barra"><div class="pauta-progreso-relleno" style="width:' + pct + '%;"></div></div>' +
+    '</div>';
+}
+
+function pintarAvisoPendientes_(hechos, total) {
+  const el = document.getElementById('pauta-aviso-pendientes');
+  if (!el) return;
+  const faltan = total - hechos;
+  if (pautaSoloLectura || !faltan) { el.style.display = 'none'; return; }
+  el.style.display = '';
+  el.innerHTML = '<p>Quedan ' + faltan + ' sin marcar</p><p>Al confirmar se cierran como pendientes.</p>';
 }
 
 function filaPautaDesktop_(it) {
@@ -1152,55 +1222,93 @@ function filaPautaDesktop_(it) {
       '<td style="padding:9px 6px;color:var(--ink-soft);">' + it.fecha + ' · ' + it.responsable + ' · cantidad ' + cant + '</td>' +
       '<td style="padding:9px 6px;text-align:right;"><button class="btn-eliminar-pauta" onclick="abrirEliminarPauta(\'' + it.id + '\',\'' + nombreEsc + '\')">Eliminar</button></td></tr>';
   }
-    const hecho = it.estadoBorrador === 'Hecho';
-    const cant = it.cantidadBorrador !== null && it.cantidadBorrador !== undefined ? it.cantidadBorrador : it.cantidadProgramada;
-    return '<tr id="pauta-row-' + it.id + '">' +
+  const hecho = it.estadoBorrador === 'Hecho';
+  const cant = it.cantidadBorrador !== null && it.cantidadBorrador !== undefined ? it.cantidadBorrador : it.cantidadProgramada;
+  // NUEVO 23/07/2026 (con Osmar): la X gris de "quitar" un ítem de Cima se dio de baja —
+  // no persistía (se limpiaba solo con recargar la pantalla) y prometía algo que no
+  // cumplía. Lo no producido ya queda registrado de forma honesta como pendiente al
+  // confirmar. Solo lo que ellas agregaron directo puede eliminarse de verdad.
+  const esPropio = !it.conteoId;
+  const botonQuitar = esPropio
+    ? '<button class="pauta-quitar pauta-quitar-elimina" title="Eliminar" onclick="eliminarItemPropioPauta(\'' + it.id + '\')"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"></path><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"></path></svg></button>'
+    : '';
+  return '<tr id="pauta-row-' + it.id + '"' + (hecho ? ' style="opacity:.65;"' : '') + '>' +
     '<td style="padding:9px 4px;width:30px;"><button class="pauta-check' + (hecho ? ' marcado' : '') + '" onclick="toggleHechoPauta(\'' + it.id + '\')" aria-label="Marcar hecho">' +
       (hecho ? '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"></path></svg>' : '') +
     '</button></td>' +
     '<td style="padding:9px 6px;font-weight:700;">' + it.producto + (it.comentario ? '<div style="font-size:10.5px;color:var(--ink-soft);font-weight:400;margin-top:2px;">' + it.comentario + '</div>' : '') + '</td>' +
     '<td style="padding:6px;width:90px;"><input type="text" inputmode="numeric" value="' + cant + '" id="pauta-cant-' + it.id + '" onchange="cambiarCantidadBorradorPauta(\'' + it.id + '\',this.value)" style="width:70px;text-align:center;font-family:\'JetBrains Mono\',monospace;font-weight:700;border:1px solid var(--border);border-radius:7px;padding:6px 8px;"></td>' +
-    '<td style="padding:9px 6px;width:30px;text-align:right;"><button class="pauta-quitar" title="Quitar" onclick="ocultarItemPauta(\'' + it.id + '\')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"></path><path d="M6 6l12 12"></path></svg></button></td></tr>';
+    '<td style="padding:9px 6px;width:34px;text-align:right;">' + botonQuitar + '</td></tr>';
 }
-function pintarPautaDesktop_() {
+
+function pintarPautaDesktop_(hechos, pendientes, mapaObs) {
   const cont = document.getElementById('pauta-lista');
-  const visibles = cachePauta.pauta.filter(it => !pautaOcultos.has(it.id));
-  const planificados = visibles.filter(it => pautaAgregadosSesion.indexOf(it.id) === -1);
-  const agregados = visibles.filter(it => pautaAgregadosSesion.indexOf(it.id) !== -1);
-  if (!visibles.length) {
-    cont.innerHTML = '<p style="font-size:13.5px;color:var(--ink-soft);padding:24px 0;text-align:center;">' +
-      (pautaSoloLectura ? 'No hay ítems pendientes.' : 'No hay pedidos pendientes en la pauta.') + '</p>';
+
+  if (pautaSoloLectura) {
+    if (!pendientes.length) {
+      cont.innerHTML = '<p style="font-size:13.5px;color:var(--ink-soft);padding:24px 0;text-align:center;">No hay ítems pendientes.</p>';
+      return;
+    }
+    const g = agruparPauta_(pendientes, mapaObs);
+    let htmlLect = '';
+    g.envios.forEach(envio => {
+      htmlLect += '<p class="pauta-grupo-titulo">Pedido de Cima</p><table><tbody>' + envio.items.map(filaPautaDesktop_).join('') + '</tbody></table>';
+    });
+    if (g.agregados.length) {
+      htmlLect += '<p class="pauta-grupo-titulo">Agregado acá</p><table><tbody>' + g.agregados.map(filaPautaDesktop_).join('') + '</tbody></table>';
+    }
+    cont.innerHTML = htmlLect;
     return;
   }
-  const grupos = {}; const ordenGrupos = [];
-  planificados.forEach(it => {
-    const clave = claveGrupoPauta_(it);
-    if (!grupos[clave]) { grupos[clave] = { responsable: it.responsable, items: [] }; ordenGrupos.push(clave); }
-    grupos[clave].items.push(it);
-  });
+
+  if (!pendientes.length && !hechos.length) {
+    cont.innerHTML = '<p style="font-size:13.5px;color:var(--ink-soft);padding:24px 0;text-align:center;">No hay pedidos pendientes en la pauta.</p>';
+    return;
+  }
+
+  const g = agruparPauta_(pendientes, mapaObs);
   let html = '';
-  ordenGrupos.forEach(clave => {
-    const g = grupos[clave];
-    // NUEVO 23/07/2026: la observación viene repetida en cada ítem del grupo (mismo envío
-    // de pedido) — se pinta una sola vez, tomada del primer ítem.
-    const obs = g.items[0].observacionPedido;
-    const bloqueObs = obs ? '<div class="hist-observacion"><p>Observación del pedido</p><p>' + obs + '</p></div>' : '';
-    html += '<p class="pauta-grupo-titulo">Pedido por: ' + g.responsable + '</p>' + bloqueObs + '<table><tbody>' + g.items.map(filaPautaDesktop_).join('') + '</tbody></table>';
-  });
-  if (agregados.length) {
-    html += '<p class="pauta-grupo-titulo">Agregado en esta sesión</p><table><tbody>' + agregados.map(filaPautaDesktop_).join('') + '</tbody></table>';
+  if (!pendientes.length) {
+    html += '<p style="font-size:13.5px;color:var(--ink-soft);padding:16px 0;text-align:center;">Todo marcado — revisa Hechos o confirma la producción.</p>';
+  }
+  if (g.envios.length) {
+    html += '<p class="pauta-grupo-titulo">Pedido de Cima</p>';
+    g.envios.forEach(envio => {
+      html += bloqueObservacionEnvio_(envio) + '<table><tbody>' + envio.items.map(filaPautaDesktop_).join('') + '</tbody></table>';
+    });
+  }
+  if (g.agregados.length) {
+    html += '<p class="pauta-grupo-titulo">Agregado acá</p><table><tbody>' + g.agregados.map(filaPautaDesktop_).join('') + '</tbody></table>';
+  }
+
+  if (hechos.length) {
+    html += '<button class="pauta-hechos-toggle" onclick="togglePautaHechos()">' +
+      '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="transform:rotate(' + (pautaHechosAbierto ? '90' : '0') + 'deg);transition:transform .15s;"><path d="M9 18l6-6-6-6"></path></svg>' +
+      '<span>Hechos</span><span class="pauta-hechos-badge">' + hechos.length + '</span></button>';
+    if (pautaHechosAbierto) {
+      html += '<table><tbody>' + hechos.map(filaPautaDesktop_).join('') + '</tbody></table>';
+    }
   }
   cont.innerHTML = html;
 }
-function pintarPauta() {
-  const hayPendientes = cachePauta.pauta.filter(it => !pautaOcultos.has(it.id)).length > 0;
-  document.getElementById('pauta-observacion-wrap').style.display = (pautaSoloLectura || !hayPendientes) ? 'none' : '';
 
-  if (window.matchMedia('(min-width: 900px)').matches) { pintarPautaDesktop_(); return; }
+function pintarPauta() {
+  if (window.matchMedia('(min-width: 900px)').matches) {
+    const visiblesD = cachePauta.pauta;
+    const hechosD = visiblesD.filter(it => it.estadoBorrador === 'Hecho');
+    const pendientesD = visiblesD.filter(it => it.estadoBorrador !== 'Hecho');
+    pintarBarraProgreso_(hechosD.length, visiblesD.length);
+    pintarAvisoPendientes_(hechosD.length, visiblesD.length);
+    pintarPautaDesktop_(hechosD, pendientesD, mapaObservacionesPorEnvio_(visiblesD));
+    return;
+  }
   const cont = document.getElementById('pauta-lista');
-  const visibles = cachePauta.pauta.filter(it => !pautaOcultos.has(it.id));
-  const planificados = visibles.filter(it => pautaAgregadosSesion.indexOf(it.id) === -1);
-  const agregados = visibles.filter(it => pautaAgregadosSesion.indexOf(it.id) !== -1);
+  const visibles = cachePauta.pauta;
+  const hechos = visibles.filter(it => it.estadoBorrador === 'Hecho');
+  const pendientes = visibles.filter(it => it.estadoBorrador !== 'Hecho');
+  const mapaObs = mapaObservacionesPorEnvio_(visibles);
+  pintarBarraProgreso_(hechos.length, visibles.length);
+  pintarAvisoPendientes_(hechos.length, visibles.length);
 
   if (!visibles.length) {
     cont.innerHTML = '<p style="font-size:13.5px;color:var(--ink-soft);padding:24px 0;text-align:center;">' +
@@ -1225,51 +1333,52 @@ function pintarPauta() {
     }
     const hecho = it.estadoBorrador === 'Hecho';
     const cant = it.cantidadBorrador !== null && it.cantidadBorrador !== undefined ? it.cantidadBorrador : it.cantidadProgramada;
-    // NUEVO 22/07/2026 (con Osmar): la X hace dos cosas distintas según el origen del ítem.
-    // Sin ConteoId lo agregaron ellas -> elimina de verdad (queda 'Eliminado' en el Sheet,
-    // auditable). Con ConteoId vino del pedido de Cima -> sigue solo ocultando de la lista.
-    // Se distinguen por color: terracota elimina, gris esconde. El servidor valida igual
-    // (ver eliminarItemPauta en Produccion.gs) — el color es ayuda, no la barrera.
+    // NUEVO 23/07/2026 (con Osmar): igual que en desktop — la X gris de "quitar" un ítem
+    // de Cima se dio de baja (no persistía). Solo lo agregado a mano puede eliminarse.
     const esPropio = !it.conteoId;
-    const accionX = esPropio ? 'eliminarItemPropioPauta(\'' + it.id + '\')' : 'ocultarItemPauta(\'' + it.id + '\')';
+    const botonQuitar = esPropio
+      ? '<button class="pauta-quitar pauta-quitar-elimina" title="Eliminar" onclick="eliminarItemPropioPauta(\'' + it.id + '\')"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"></path><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"></path></svg></button>'
+      : '';
     return '<div class="pauta-row' + (hecho ? ' hecho' : '') + '" id="pauta-row-' + it.id + '">' +
-      '<button class="pauta-quitar' + (esPropio ? ' pauta-quitar-elimina' : '') + '" title="' + (esPropio ? 'Eliminar' : 'Quitar de la lista') + '" onclick="' + accionX + '"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"></path><path d="M6 6l12 12"></path></svg></button>' +
       '<div class="pauta-row-top">' +
         '<button class="pauta-check' + (hecho ? ' marcado' : '') + '" onclick="toggleHechoPauta(\'' + it.id + '\')" aria-label="Marcar hecho">' +
           (hecho ? '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"></path></svg>' : '') +
         '</button>' +
         '<span class="pauta-nombre">' + it.producto + '</span>' +
         '<input type="text" inputmode="numeric" value="' + cant + '" id="pauta-cant-' + it.id + '" onchange="cambiarCantidadBorradorPauta(\'' + it.id + '\',this.value)">' +
+        botonQuitar +
       '</div>' +
       (it.comentario ? '<p class="pauta-obs">' + it.comentario + '</p>' : '') +
     '</div>';
   };
 
-  // Planificados agrupados por pedido (mismo ConteoId+Responsable) — "Pedido por" una
-  // sola vez por grupo, no repetido en cada producto.
-  const grupos = {}; const ordenGrupos = [];
-  planificados.forEach(it => {
-    const clave = claveGrupoPauta_(it);
-    if (!grupos[clave]) { grupos[clave] = { responsable: it.responsable, conteoId: it.conteoId, items: [] }; ordenGrupos.push(clave); }
-    grupos[clave].items.push(it);
-  });
+  if (pautaSoloLectura) {
+    const g = agruparPauta_(pendientes, mapaObs);
+    let htmlLect = '';
+    g.envios.forEach(envio => { htmlLect += '<p class="pauta-grupo-titulo">Pedido de Cima</p>' + envio.items.map(filaHtml).join(''); });
+    if (g.agregados.length) htmlLect += '<p class="pauta-grupo-titulo">Agregado acá</p>' + g.agregados.map(filaHtml).join('');
+    cont.innerHTML = htmlLect;
+    return;
+  }
 
+  const g = agruparPauta_(pendientes, mapaObs);
   let html = '';
-  ordenGrupos.forEach(clave => {
-    const g = grupos[clave];
-    // "Pedido por" solo si de verdad vino de un pedido. Un ítem que Katherine agregó ayer
-    // aparecía como "Pedido por: Katherine Bustamante", que es falso: nadie lo pidió.
-    const titulo = g.conteoId
-      ? 'Pedido por: ' + g.responsable
-      : 'Agregado por ' + String(g.responsable || '').split(' ')[0];
-    // NUEVO 23/07/2026: observación general del pedido, una vez por grupo (no por ítem).
-    // Solo aplica a grupos con conteoId — "Agregado por" no viene de un pedido enviado.
-    const obs = g.conteoId ? g.items[0].observacionPedido : '';
-    const bloqueObs = obs ? '<div class="hist-observacion"><p>Observación del pedido</p><p>' + obs + '</p></div>' : '';
-    html += '<p class="pauta-grupo-titulo">' + titulo + '</p>' + bloqueObs + g.items.map(filaHtml).join('');
-  });
-  if (agregados.length) {
-    html += '<p class="pauta-grupo-titulo">Agregado en esta sesión</p>' + agregados.map(filaHtml).join('');
+  if (!pendientes.length) {
+    html += '<p style="font-size:13.5px;color:var(--ink-soft);padding:16px 0;text-align:center;">Todo marcado — revisa Hechos o confirma la producción.</p>';
+  }
+  if (g.envios.length) {
+    html += '<p class="pauta-grupo-titulo">Pedido de Cima</p>';
+    g.envios.forEach(envio => { html += bloqueObservacionEnvio_(envio) + envio.items.map(filaHtml).join(''); });
+  }
+  if (g.agregados.length) {
+    html += '<p class="pauta-grupo-titulo">Agregado acá</p>' + g.agregados.map(filaHtml).join('');
+  }
+
+  if (hechos.length) {
+    html += '<button class="pauta-hechos-toggle" onclick="togglePautaHechos()">' +
+      '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="transform:rotate(' + (pautaHechosAbierto ? '90' : '0') + 'deg);transition:transform .15s;"><path d="M9 18l6-6-6-6"></path></svg>' +
+      '<span>Hechos</span><span class="pauta-hechos-badge">' + hechos.length + '</span></button>';
+    if (pautaHechosAbierto) html += hechos.map(filaHtml).join('');
   }
   cont.innerHTML = html;
 }
@@ -1340,11 +1449,6 @@ async function cambiarCantidadBorradorPauta(id, val) {
   await llamarAPISilencioso('actualizarBorradorPauta', { data: { id: id, estadoBorrador: it.estadoBorrador, cantidadBorrador: it.cantidadBorrador } });
 }
 
-function ocultarItemPauta(id) {
-  pautaOcultos.add(id);
-  pintarPauta();
-}
-
 async function mostrarBuscadorPauta() {
   document.getElementById('pauta-error').textContent = '';
   if (!cacheCatalogoPauta) {
@@ -1386,13 +1490,12 @@ async function agregarProductoPauta(valor, opciones) {
 // venía en el pedido) / Quedan pendientes — mismo criterio que ya usa pintarPauta.
 function escribirObservacionPautaBorrador(val) { pautaObservacionBorrador = val; }
 function volverAEditarPauta() {
-  document.getElementById('pauta-observacion').value = pautaObservacionBorrador;
   irA('screen-pauta');
 }
 
 async function revisarPauta() {
   document.getElementById('pauta-error').textContent = '';
-  const visibles = cachePauta.pauta.filter(it => !pautaOcultos.has(it.id));
+  const visibles = cachePauta.pauta;
   const completados = visibles.filter(it => it.estadoBorrador === 'Hecho');
   const faltantes = visibles.filter(it => it.estadoBorrador !== 'Hecho');
   if (!completados.length && !faltantes.length) {
@@ -1532,7 +1635,7 @@ async function confirmarProduccion() {
   });
   desgloseEmpanadas = {}; stockVCBorrador = {}; cacheStockVC = null;
 
-  cachePauta = null; pautaOcultos = new Set(); pautaAgregadosSesion = []; pautaObservacionBorrador = '';
+  cachePauta = null; pautaAgregadosSesion = []; pautaObservacionBorrador = '';
   document.getElementById('confirm-title').textContent = 'Producción confirmada';
   document.getElementById('confirm-msg').textContent = r.completados.length + ' producto' + (r.completados.length === 1 ? '' : 's') + ' completado' + (r.completados.length === 1 ? '' : 's') +
     (r.faltantes.length ? ', ' + r.faltantes.length + ' quedaron pendientes para la próxima.' : '.');
