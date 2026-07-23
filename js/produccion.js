@@ -290,35 +290,95 @@ function pintarConteo() {
 // conteoCantidades ni el flujo de Revisión — es solo consulta. Usa el modal genérico
 // (abrirModal/cerrarModal) ya existente en index.html, mismo patrón que el resto del
 // sistema (Cierre de caja, Cliente nuevo, etc.).
-async function abrirUltimoConteo() {
-  abrirModal('<p style="text-align:center;color:var(--ink-soft);padding:20px 0;">Cargando…</p>');
-  const r = await llamarAPI('obtenerUltimoConteoCompleto', {});
-  if (!r.ok) {
-    abrirModal('<p class="error-msg">' + (r.error || 'Error al cargar el último conteo') + '</p>' +
-      '<div style="margin-top:14px;"><button class="btn-secondary" style="width:100%;" onclick="cerrarModal()">Cerrar</button></div>');
+// ============ HISTORIAL DE CONTEOS (NUEVO 22/07/2026 — con Osmar) ============
+// Reemplaza "Ver último conteo" (mostraba uno solo, sin poder ver los anteriores ni
+// corregir uno mal hecho). Mismo botón, mismo lugar — ahora abre la lista completa,
+// paginada de 5 en 5, más reciente primero. Cada conteo se expande para ver sus productos
+// y, si ya fue procesado, tiene un botón para anularlo (ver anularConteo en Produccion.gs:
+// no lo reescribe, lo descarta como referencia — el número que se contó mal no se toca).
+let cacheHistorialConteos = [];
+let historialConteosOffset = 0;
+let historialConteosHayMas = false;
+let historialConteosExpandido = null; // id del conteo abierto, o null
+
+async function abrirHistorialConteos() {
+  cacheHistorialConteos = []; historialConteosOffset = 0; historialConteosExpandido = null;
+  abrirModal('<h3 style="margin:0 0 10px;">Historial de conteos</h3><div id="hist-conteos-lista"><p style="text-align:center;color:var(--ink-soft);padding:20px 0;">Cargando…</p></div><button class="btn-secondary" id="hist-conteos-vermas" style="width:100%;margin-top:10px;display:none;" onclick="cargarHistorialConteos(false)">Ver más</button><div class="error-msg" id="hist-conteos-error"></div><div style="margin-top:14px;"><button class="btn-secondary" style="width:100%;" onclick="cerrarModal()">Cerrar</button></div>');
+  await cargarHistorialConteos(true);
+}
+
+async function cargarHistorialConteos(reset) {
+  if (reset) { cacheHistorialConteos = []; historialConteosOffset = 0; }
+  const r = await llamarAPI('obtenerHistorialConteos', { offset: historialConteosOffset });
+  const cont = document.getElementById('hist-conteos-lista');
+  if (!cont) return; // el modal se cerró mientras cargaba
+  if (!r.ok) { cont.innerHTML = '<p class="error-msg">' + (r.error || 'Error al cargar el historial') + '</p>'; return; }
+  cacheHistorialConteos = cacheHistorialConteos.concat(r.historial);
+  historialConteosOffset += r.historial.length;
+  historialConteosHayMas = r.hayMas;
+  pintarHistorialConteos_();
+  document.getElementById('hist-conteos-vermas').style.display = historialConteosHayMas ? '' : 'none';
+}
+
+function pintarHistorialConteos_() {
+  const cont = document.getElementById('hist-conteos-lista');
+  if (!cont) return;
+  if (!cacheHistorialConteos.length) {
+    cont.innerHTML = '<p style="font-size:13.5px;color:var(--ink-soft);padding:20px 0;text-align:center;">Todavía no hay ningún conteo registrado.</p>';
     return;
   }
-  if (!r.conteo) {
-    abrirModal('<h3 style="margin:0 0 8px;">Último conteo</h3>' +
-      '<p style="font-size:13.5px;color:var(--ink-soft);">Todavía no hay ningún conteo registrado.</p>' +
-      '<div style="margin-top:14px;"><button class="btn-secondary" style="width:100%;" onclick="cerrarModal()">Cerrar</button></div>');
-    return;
-  }
-  const c = r.conteo;
-  const categorias = [...new Set((c.productos || []).map(p => p.categoria))];
-  const filas = categorias.map(cat => {
-    const items = (c.productos || []).filter(p => p.categoria === cat);
-    return '<p class="resumen-seccion-titulo">' + cat + '</p>' +
-      items.map(p => '<div class="resumen-fila"><span>' + p.nombre + '</span><strong>' + p.cantidadContada + '</strong></div>').join('');
+  cont.innerHTML = cacheHistorialConteos.map(c => {
+    const abierto = historialConteosExpandido === c.id;
+    const estadoClase = c.estado === 'Anulado' ? 'anulado' : c.estado === 'Pendiente' ? 'pendiente' : '';
+    let detalle = '';
+    if (abierto) {
+      const categorias = [...new Set((c.items || []).map(p => p.categoria))];
+      const filas = categorias.map(cat => {
+        const items = (c.items || []).filter(p => p.categoria === cat);
+        return '<p class="resumen-seccion-titulo">' + cat + '</p>' +
+          items.map(p => '<div class="resumen-fila"><span>' + p.nombre + '</span><strong>' + p.cantidadContada + '</strong></div>').join('');
+      }).join('');
+      const puedeAnular = (c.estado === 'Procesado' || c.estado === 'Revisado') && tienePermisoLocal('RegistrarConteo');
+      detalle = '<div class="hist-conteo-detalle">' + (filas || '<p style="font-size:13px;color:var(--ink-soft);">Sin productos.</p>') +
+        (puedeAnular ? '<button type="button" class="btn-anular-conteo" onclick="confirmarAnularConteo(\'' + c.id + '\')">Anular este conteo</button>' : '') +
+        '</div>';
+    }
+    return '<div class="hist-conteo-fila ' + estadoClase + '">' +
+      '<button type="button" class="hist-conteo-cab" onclick="toggleHistorialConteo_(\'' + c.id + '\')">' +
+        '<div><span class="hist-conteo-fecha">' + c.fecha + '</span><span class="hist-conteo-resp">' + c.responsable + '</span></div>' +
+        '<div class="hist-conteo-der"><span class="hist-conteo-n">' + c.cantidadProductos + ' productos</span>' +
+        (c.estado !== 'Procesado' ? '<span class="hist-conteo-badge">' + c.estado + '</span>' : '') + '</div>' +
+      '</button>' + detalle +
+    '</div>';
   }).join('');
+}
+
+function toggleHistorialConteo_(id) {
+  historialConteosExpandido = historialConteosExpandido === id ? null : id;
+  pintarHistorialConteos_();
+}
+
+function confirmarAnularConteo(id) {
   abrirModal(
-    '<h3 style="margin:0 0 4px;">Último conteo</h3>' +
-    '<p style="font-size:12px;color:var(--ink-soft);margin:0 0 2px;">' + c.fecha + ' · ' + (c.responsable || '') + '</p>' +
-    '<p style="font-size:12px;color:var(--ink-soft);margin:0 0 10px;">Categorías: ' + (c.categorias || '') + '</p>' +
-    '<div style="max-height:320px;overflow-y:auto;">' + (filas || '<p style="font-size:13.5px;color:var(--ink-soft);">Sin productos.</p>') + '</div>' +
-    '<div style="margin-top:14px;"><button class="btn-secondary" style="width:100%;" onclick="cerrarModal()">Cerrar</button></div>'
+    '<h3 style="font-size:15px;margin:0 0 8px;">Anular este conteo</h3>' +
+    '<p style="font-size:12.5px;color:var(--ink-soft);margin:0 0 12px;line-height:1.5;">Deja de servir como referencia para calcular el movimiento. No se borra ni se reescribe.</p>' +
+    '<label style="font-size:11.5px;color:var(--ink-soft);display:block;margin-bottom:5px;">Motivo (opcional)</label>' +
+    '<input type="text" id="anular-conteo-motivo" placeholder="Ej: se contó por error">' +
+    '<div class="error-msg" id="anular-conteo-error"></div>' +
+    '<div style="display:flex;gap:8px;margin-top:14px;">' +
+      '<button class="btn-secondary" style="flex:1;" onclick="abrirHistorialConteos()">Cancelar</button>' +
+      '<button class="btn-primary" style="flex:1;background:var(--terracotta);" onclick="ejecutarAnularConteo_(\'' + id + '\')">Anular</button>' +
+    '</div>'
   );
 }
+
+async function ejecutarAnularConteo_(id) {
+  const motivo = document.getElementById('anular-conteo-motivo').value;
+  const r = await llamarAPI('anularConteo', { data: { conteoId: id, responsable: sesion.nombre, motivo: motivo } });
+  if (!r.ok) { document.getElementById('anular-conteo-error').textContent = r.error || 'Error al anular'; return; }
+  await abrirHistorialConteos();
+}
+
 
 function toggleCategoriaConteo(cat) {
   if (conteoCategoriasActivas.has(cat)) conteoCategoriasActivas.delete(cat); else conteoCategoriasActivas.add(cat);
