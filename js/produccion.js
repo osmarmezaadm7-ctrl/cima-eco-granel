@@ -1189,7 +1189,17 @@ function agruparPauta_(items, mapaObs) {
 function bloqueObservacionEnvio_(envio) {
   if (!envio.observacion) return '';
   const etiqueta = envio.hora ? 'Observación · ' + envio.hora : 'Observación';
-  return '<div class="hist-observacion"><p>' + etiqueta + '</p><p>' + envio.observacion + '</p></div>';
+  return bloqueHistObservacion_(etiqueta, envio.observacion);
+}
+
+// NUEVO 23/07/2026 (con Osmar): chip de ícono + borde caramel más grueso para que la
+// observación se note de un vistazo — antes era puro texto chico, fácil de saltarse.
+// Compartido entre la observación del pedido (Pauta) y la del Historial de pautas.
+function bloqueHistObservacion_(etiqueta, texto) {
+  return '<div class="hist-observacion"><div class="hist-observacion-fila">' +
+    '<div class="hist-observacion-icono"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg></div>' +
+    '<div><p>' + etiqueta + '</p><p>' + texto + '</p></div>' +
+  '</div></div>';
 }
 
 function pintarBarraProgreso_(hechos, total) {
@@ -1684,7 +1694,7 @@ function pintarHistorialPauta() {
     return '<div class="card-dia verde" onclick="var e=document.getElementById(\'' + idDet + '\');e.style.display=(e.style.display===\'block\'?\'none\':\'block\');">' +
       '<div class="c-top"><strong>' + h.fecha + (h.hora ? ', ' + h.hora : '') + '</strong><span class="badge-completado">' + h.completados.length + ' de ' + total + '</span></div>' +
       '<p class="hist-confirmado" style="color:var(--ink-soft);margin:2px 0 0;">Confirmado por ' + h.responsable + '</p>' +
-      (h.observacion ? '<div class="hist-observacion"><p>Observación</p><p>' + h.observacion + '</p></div>' : '') +
+      (h.observacion ? bloqueHistObservacion_('Observación', h.observacion) : '') +
       '<div class="hist-metricas">' +
         '<span class="m-ok">' + h.completados.length + ' completado' + (h.completados.length === 1 ? '' : 's') + '</span>' +
         (h.faltantes.length ? '<span class="m-pend">' + h.faltantes.length + ' pendiente' + (h.faltantes.length === 1 ? '' : 's') + '</span>' : '') +
