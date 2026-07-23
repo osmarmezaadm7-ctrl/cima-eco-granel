@@ -593,29 +593,53 @@ async function guardarProveedorItemAbast(id) {
   if (it) it.proveedor = proveedor;
   pintarAbastecimientoAdmin();
 }
-
 // ============ SOLICITAR ============
+//
+// REDISEÑO 22/07/2026 (con Osmar). Antes eran dos filas de chips apiladas —categoría y
+// subcategoría— sobre una lista plana. En Cima eso son 9 categorías y hasta 14
+// subcategorías visibles a la vez sobre 287 productos: funcionaba, pero visualmente era
+// demasiado. Cambios:
+//
+// 1. Buscador arriba. Filtra por nombre sobre TODO el catálogo del negocio, ignorando
+//    categoría y subcategoría. Con 287 productos, saber que "Chía" está en Granel dejó de
+//    ser requisito para encontrarla. Es lo que más tiempo ahorra.
+// 2. Categoría como <select> de una línea, en vez de 9 chips (opción A elegida por
+//    Osmar). Las subcategorías aparecen SOLO las de la categoría elegida, con "Todo" al
+//    inicio, así nunca hay más de un nivel de chips en pantalla.
+// 3. Cada producto muestra subcategoría y unidad bajo el nombre. Con tres variantes de
+//    "Aceite de Coco 500ml" en el catálogo, esa línea evita pedir la equivocada.
+// 4. Contador TOCABLE en Enviar pedido. Un contador que solo avisa no resuelve el pedido
+//    inflado: se ve que van 12 pero hay que salir a buscar cuál sacar entre 287. Tocando
+//    el número se revisa lo marcado y se saca ahí mismo.
+// 5. Escala de letra del sistema: producto 15.5px (igual que la lista de conteo),
+//    subcategorías 13.5px. Antes el nombre iba en 14px, por debajo del resto del sistema.
+
+let abastBusqueda = '';
 
 async function abrirSolicitar() {
   document.getElementById('abast-solicitar-error').textContent = '';
   abastSeleccionados = new Set();
+  abastBusqueda = '';
+  const inputBuscar = document.getElementById('abast-buscar');
+  if (inputBuscar) inputBuscar.value = '';
 
   // Osmar (sesion.negocio === 'Ambos') no tiene un negocio único — hay que preguntarle
   // para cuál de los dos está solicitando antes de poder cargar catálogo o guardar nada.
   if (sesion.negocio === 'Ambos' && !abastNegocioElegido) {
-    document.getElementById('abast-chips-cat').innerHTML = '';
+    document.getElementById('abast-sel-cat').style.display = 'none';
     document.getElementById('abast-chips-subcat').innerHTML = '';
     document.getElementById('abast-lista-solicitar').innerHTML =
-      '<p style="font-size:13.5px;color:var(--ink-soft);padding:12px 0 8px;text-align:center;">¿Para cuál negocio es?</p>' +
+      '<p style="font-size:14px;color:var(--ink-soft);padding:12px 0 8px;text-align:center;">¿Para cuál negocio es?</p>' +
       '<div style="display:flex;gap:10px;padding:8px 0 24px;">' +
         '<button class="btn-secondary" style="flex:1;" onclick="elegirNegocioAbast_(\'Cima\')">Cima</button>' +
         '<button class="btn-secondary" style="flex:1;" onclick="elegirNegocioAbast_(\'Vegan Corner\')">Vegan Corner</button>' +
       '</div>';
+    actualizarContadorAbast_();
     return;
   }
 
   const negocio = negocioActualAbast_();
-  document.getElementById('abast-chips-cat').innerHTML = skeletonCards(1);
+  document.getElementById('abast-sel-cat').style.display = '';
   document.getElementById('abast-lista-solicitar').innerHTML = skeletonCards(3);
 
   const [rCat, rPend] = await Promise.all([
@@ -638,72 +662,160 @@ function elegirNegocioAbast_(negocio) {
   abrirSolicitar();
 }
 
+// Normaliza para buscar: minúsculas y sin tildes. Escribir "chia" en el teléfono tiene
+// que encontrar "Chía" — nadie pone tildes al buscar, y el catálogo está lleno de ellas
+// (Chía, Castaña, Maní, Plátano). Sin esto la búsqueda falla justo en esos productos.
+function normalizarBusquedaAbast_(t) {
+  return String(t || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+}
+
+function buscarProductoAbast(texto) {
+  abastBusqueda = normalizarBusquedaAbast_(texto).trim();
+  document.getElementById('abast-buscar-x').style.display = abastBusqueda ? '' : 'none';
+  pintarSolicitar();
+}
+
+function limpiarBusquedaAbast() {
+  document.getElementById('abast-buscar').value = '';
+  buscarProductoAbast('');
+}
+
+function elegirCategoriaAbast(cat) {
+  abastCategoriaActiva = cat || null;
+  abastSubcategoriaActiva = null;
+  pintarSolicitar();
+}
+
 function pintarSolicitar() {
-  const categorias = [...new Set(cacheAbastCatalogo.catalogo.map(p => p.categoria))];
-  document.getElementById('abast-chips-cat').innerHTML = categorias.map(c => {
-    const activo = c === abastCategoriaActiva;
-    return '<span class="chip-cat' + (activo ? ' activo' : '') + '" onclick="toggleCategoriaAbast(\'' + c.replace(/'/g, "\\'") + '\')">' + c + '</span>';
-  }).join('');
+  const catalogo = cacheAbastCatalogo.catalogo;
+  const sel = document.getElementById('abast-sel-cat');
+  const subchips = document.getElementById('abast-chips-subcat');
+  const lista = document.getElementById('abast-lista-solicitar');
+
+  // Buscando: el nombre manda sobre categoría y subcategoría. Los filtros se ocultan para
+  // no sugerir que están acotando el resultado — el buscador barre todo el catálogo.
+  if (abastBusqueda) {
+    sel.style.display = 'none';
+    subchips.innerHTML = '';
+    const encontrados = catalogo.filter(p => normalizarBusquedaAbast_(p.nombre).indexOf(abastBusqueda) !== -1);
+    lista.innerHTML = encontrados.length
+      ? filasProductosAbast_(encontrados)
+      : '<p style="font-size:14px;color:var(--ink-soft);padding:24px 0;text-align:center;">No hay productos con ese nombre.</p>';
+    actualizarContadorAbast_();
+    return;
+  }
+
+  sel.style.display = '';
+  const categorias = [...new Set(catalogo.map(p => p.categoria))];
+  sel.innerHTML = ['<option value="">Elige una categoría</option>']
+    .concat(categorias.map(c => '<option value="' + c + '"' + (c === abastCategoriaActiva ? ' selected' : '') + '>' + c + '</option>'))
+    .join('');
 
   if (!abastCategoriaActiva) {
-    document.getElementById('abast-chips-subcat').innerHTML = '';
-    document.getElementById('abast-lista-solicitar').innerHTML = '<p style="font-size:13.5px;color:var(--ink-soft);padding:24px 0;text-align:center;">Elige una categoría.</p>';
+    subchips.innerHTML = '';
+    lista.innerHTML = '<p style="font-size:14px;color:var(--ink-soft);padding:24px 0;text-align:center;">Elige una categoría o busca por nombre.</p>';
+    actualizarContadorAbast_();
     return;
   }
 
-  const productosCategoria = cacheAbastCatalogo.catalogo.filter(p => p.categoria === abastCategoriaActiva);
+  const productosCategoria = catalogo.filter(p => p.categoria === abastCategoriaActiva);
   const subcategorias = [...new Set(productosCategoria.map(p => p.subcategoria).filter(s => s))];
 
+  // "Todo" al inicio: sin él, entrar a una categoría con subcategorías obligaba a elegir
+  // una para ver algo, y no hay forma de mirar la categoría completa.
   if (subcategorias.length) {
-    document.getElementById('abast-chips-subcat').innerHTML = subcategorias.map(s => {
-      const activo = s === abastSubcategoriaActiva;
-      return '<span class="chip-cat' + (activo ? ' activo' : '') + '" style="font-size:11px;padding:3px 10px;" onclick="toggleSubcategoriaAbast(\'' + s.replace(/'/g, "\\'") + '\')">' + s + '</span>';
-    }).join('');
+    subchips.innerHTML = ['<span class="chip-sub' + (abastSubcategoriaActiva ? '' : ' activo') + '" onclick="toggleSubcategoriaAbast(\'\')">Todo</span>']
+      .concat(subcategorias.map(s => {
+        const activo = s === abastSubcategoriaActiva;
+        return '<span class="chip-sub' + (activo ? ' activo' : '') + '" onclick="toggleSubcategoriaAbast(\'' + s.replace(/'/g, "\\'") + '\')">' + s + '</span>';
+      })).join('');
   } else {
-    document.getElementById('abast-chips-subcat').innerHTML = '';
+    subchips.innerHTML = '';
   }
 
-  let productos = productosCategoria;
-  if (subcategorias.length) {
-    productos = abastSubcategoriaActiva ? productosCategoria.filter(p => p.subcategoria === abastSubcategoriaActiva) : [];
-  }
+  const productos = abastSubcategoriaActiva
+    ? productosCategoria.filter(p => p.subcategoria === abastSubcategoriaActiva)
+    : productosCategoria;
 
-  if (!productos.length) {
-    document.getElementById('abast-lista-solicitar').innerHTML = subcategorias.length
-      ? '<p style="font-size:13.5px;color:var(--ink-soft);padding:24px 0;text-align:center;">Elige una subcategoría.</p>'
-      : '<p style="font-size:13.5px;color:var(--ink-soft);padding:24px 0;text-align:center;">No hay productos en esta categoría.</p>';
-    return;
-  }
+  lista.innerHTML = productos.length
+    ? filasProductosAbast_(productos)
+    : '<p style="font-size:14px;color:var(--ink-soft);padding:24px 0;text-align:center;">No hay productos en esta categoría.</p>';
+  actualizarContadorAbast_();
+}
 
+function filasProductosAbast_(productos) {
   let html = '';
   productos.forEach(p => {
     const yaPendiente = cachePendientesNegocio.has(p.nombre);
     const seleccionado = abastSeleccionados.has(p.nombre);
     const nombreEsc = p.nombre.replace(/'/g, "\\'");
+    const meta = [p.subcategoria || '', p.unidad || ''].filter(x => x).join(' · ');
+
     if (yaPendiente) {
-      html += '<div class="conteo-row"><div><span style="color:var(--ink-soft);">' + p.nombre + '</span>' +
-        '<p style="font-size:11px;color:var(--ink-soft);margin:2px 0 0;">Ya en la lista</p></div>' +
-        '<span style="color:var(--ink-soft);">✓</span></div>';
+      html += '<div class="abast-prod ya"><div class="abast-prod-txt">' +
+        '<span class="abast-prod-nombre">' + p.nombre + '</span>' +
+        '<p class="abast-prod-meta">' + (meta ? meta + ' · ' : '') + 'ya en la lista</p>' +
+        '</div><span class="abast-prod-ya">✓</span></div>';
     } else {
-      html += '<div class="conteo-row"><span>' + p.nombre + '</span>' +
-        '<button type="button" class="icon-btn" style="border-radius:50%;' + (seleccionado ? 'background:var(--forest);color:#fff;' : '') + '" onclick="toggleProductoAbast(\'' + nombreEsc + '\')">' + (seleccionado ? '✓' : '+') + '</button></div>';
+      html += '<div class="abast-prod"><div class="abast-prod-txt">' +
+        '<span class="abast-prod-nombre">' + p.nombre + '</span>' +
+        (meta ? '<p class="abast-prod-meta">' + meta + '</p>' : '') +
+        '</div><button type="button" class="abast-prod-btn' + (seleccionado ? ' activo' : '') + '" onclick="toggleProductoAbast(\'' + nombreEsc + '\')" aria-label="' + (seleccionado ? 'Quitar' : 'Agregar') + '">' + (seleccionado ? '✓' : '+') + '</button></div>';
     }
   });
-  document.getElementById('abast-lista-solicitar').innerHTML = html;
+  return html;
 }
 
-function toggleCategoriaAbast(cat) {
-  abastCategoriaActiva = abastCategoriaActiva === cat ? null : cat;
-  abastSubcategoriaActiva = null;
-  pintarSolicitar();
-}
 function toggleSubcategoriaAbast(sub) {
-  abastSubcategoriaActiva = abastSubcategoriaActiva === sub ? null : sub;
+  abastSubcategoriaActiva = sub || null;
   pintarSolicitar();
 }
+
 function toggleProductoAbast(nombre) {
   if (abastSeleccionados.has(nombre)) abastSeleccionados.delete(nombre); else abastSeleccionados.add(nombre);
   pintarSolicitar();
+}
+
+// El contador va dentro del botón Enviar y es tocable: abre la revisión de lo marcado.
+// Con 0 seleccionados se oculta el número (no hay nada que revisar).
+function actualizarContadorAbast_() {
+  const c = document.getElementById('abast-contador');
+  if (!c) return;
+  const n = abastSeleccionados.size;
+  c.textContent = n;
+  c.style.display = n ? '' : 'none';
+}
+
+// Revisar antes de enviar. Es la corrección al pedido inflado: se ve la lista completa de
+// lo marcado y se saca de ahí mismo, sin tener que buscar cada producto entre los 287.
+function abrirRevisarPedidoAbast() {
+  const nombres = [...abastSeleccionados];
+  if (!nombres.length) return;
+  let filas = '';
+  nombres.forEach(n => {
+    const p = cacheAbastCatalogo.catalogo.find(x => x.nombre === n);
+    const meta = p ? [p.subcategoria || '', p.unidad || ''].filter(x => x).join(' · ') : '';
+    filas += '<div class="abast-rev-fila"><div class="abast-prod-txt">' +
+      '<span class="abast-prod-nombre">' + n + '</span>' +
+      (meta ? '<p class="abast-prod-meta">' + meta + '</p>' : '') +
+      '</div><button type="button" class="abast-rev-x" onclick="quitarDeRevisionAbast(\'' + n.replace(/'/g, "\\'") + '\')" aria-label="Sacar del pedido">×</button></div>';
+  });
+  abrirModal(
+    '<h3 style="font-size:16px;margin:0 0 4px;">Tu pedido</h3>' +
+    '<p style="font-size:13px;color:var(--ink-soft);margin:0 0 12px;">' + nombres.length + ' producto' + (nombres.length === 1 ? '' : 's') + ' por solicitar.</p>' +
+    '<div id="abast-rev-lista" class="abast-rev-lista">' + filas + '</div>' +
+    '<div style="display:flex;gap:8px;margin-top:14px;">' +
+      '<button class="btn-secondary" style="flex:1;" onclick="cerrarModal()">Seguir agregando</button>' +
+      '<button class="btn-primary" style="flex:1;" onclick="cerrarModal();enviarPedidoAbastecimiento();">Enviar</button>' +
+    '</div>'
+  );
+}
+
+function quitarDeRevisionAbast(nombre) {
+  abastSeleccionados.delete(nombre);
+  pintarSolicitar();
+  if (!abastSeleccionados.size) { cerrarModal(); return; }
+  abrirRevisarPedidoAbast(); // repinta el modal con lo que queda
 }
 
 async function enviarPedidoAbastecimiento() {
@@ -720,6 +832,7 @@ async function enviarPedidoAbastecimiento() {
   const r = await llamarAPI('guardarPedidoAbastecimiento', { data: { negocio: negocio, responsable: sesion.nombre, items: items } });
   if (!r.ok) { document.getElementById('abast-solicitar-error').textContent = r.error || 'Error al enviar el pedido'; return; }
   abastSeleccionados = new Set();
+  actualizarContadorAbast_();
   document.getElementById('confirm-title').textContent = 'Pedido enviado';
   document.getElementById('confirm-msg').textContent = 'Se agregó a la Lista de compra de ' + negocio + '.';
   document.getElementById('confirm-detalle').innerHTML = '';
@@ -772,6 +885,12 @@ async function confirmarCrearInsumo() {
   abastSeleccionados.add(nombre);
   abastCategoriaActiva = categoria;
   abastSubcategoriaActiva = null;
+  // Si había una búsqueda activa, el insumo recién creado no calzaría con ella y el
+  // usuario no vería el producto que acaba de crear.
+  abastBusqueda = '';
+  const inputBuscar = document.getElementById('abast-buscar');
+  if (inputBuscar) inputBuscar.value = '';
+  document.getElementById('abast-buscar-x').style.display = 'none';
   cerrarModal();
   pintarSolicitar();
 }
