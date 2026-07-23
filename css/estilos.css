@@ -209,9 +209,11 @@ td{padding:8px 6px;border-bottom:1px solid var(--border);}
 .pauta-obs-label{font-size:11.5px;font-weight:700;color:var(--caramel);text-transform:uppercase;display:block;margin:0 0 6px;}
 .pauta-obs-label-nota{font-weight:400;text-transform:none;color:var(--ink-soft);}
 .pauta-obs-textarea{width:100%;min-height:52px;font-size:13px;font-family:inherit;border:1px solid var(--border);border-radius:9px;padding:10px 12px;margin-bottom:16px;resize:vertical;}
-.hist-observacion{background:var(--caramel-soft,#F3E9DB);border-radius:8px;padding:8px 10px;margin:8px 0;}
-.hist-observacion p:first-child{font-size:10px;font-weight:700;color:var(--caramel);text-transform:uppercase;margin:0 0 2px;}
-.hist-observacion p:last-child{font-size:11.5px;color:var(--ink);margin:0;}
+.hist-observacion{background:var(--caramel-soft,#F3E9DB);border-left:4px solid var(--caramel);border-radius:0 10px 10px 0;padding:11px 13px;margin:8px 0;box-shadow:0 1px 3px rgba(169,130,91,.16);}
+.hist-observacion-fila{display:flex;align-items:flex-start;gap:9px;}
+.hist-observacion-icono{width:22px;height:22px;border-radius:6px;background:var(--caramel);display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px;color:#fff;}
+.hist-observacion p:first-child{font-size:11.5px;font-weight:700;color:var(--caramel);text-transform:uppercase;margin:0 0 3px;}
+.hist-observacion p:last-child{font-size:14px;color:var(--ink);margin:0;line-height:1.45;font-weight:500;}
 @media(min-width:900px){
   #historial-lista .card-dia{padding:11px 14px;}
   #historial-lista .card-dia .c-top strong{font-size:13px;}
@@ -220,8 +222,8 @@ td{padding:8px 6px;border-bottom:1px solid var(--border);}
   #historial-lista .hist-grupo-titulo{font-size:10px;margin:10px 0 5px;}
   #historial-lista .rowline{font-size:12px;padding:5px 0;}
   #historial-lista .hist-confirmado{font-size:11px;}
-  #historial-lista .hist-observacion p:first-child{font-size:9px;}
-  #historial-lista .hist-observacion p:last-child{font-size:11px;}
+  #historial-lista .hist-observacion p:first-child{font-size:10.5px;}
+  #historial-lista .hist-observacion p:last-child{font-size:13px;}
   #historial-lista p{font-size:11px;}
 }
 
