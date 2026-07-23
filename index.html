@@ -117,19 +117,33 @@
 .btn-eliminar-pauta{border:1px solid var(--terracotta);color:var(--terracotta);background:var(--terracotta-soft);font-size:11.5px;font-weight:600;padding:6px 10px;border-radius:8px;flex-shrink:0;cursor:pointer;}
 
 .pauta-grupo-titulo{font-size:11px;color:var(--ink-soft);font-weight:800;text-transform:uppercase;letter-spacing:.4px;margin:16px 0 8px;}
-.pauta-row{border:1px solid var(--border);border-radius:11px;padding:11px 13px;margin-bottom:9px;position:relative;}
+.pauta-row{border:1px solid var(--border);border-radius:11px;padding:11px 13px;margin-bottom:9px;}
 .pauta-row.hecho{background:var(--forest-soft);}
 .pauta-row.hecho .pauta-nombre{text-decoration:line-through;color:var(--ink-soft);}
-.pauta-row-top{display:flex;align-items:center;gap:10px;padding-right:22px;}
+.pauta-row-top{display:flex;align-items:center;gap:10px;}
 .pauta-nombre{font-size:14.5px;font-weight:600;flex:1;}
 .pauta-row-top input{width:52px;height:32px;text-align:center;border:1.5px solid var(--border);border-radius:8px;font-family:'JetBrains Mono',monospace;font-size:14px;padding:0;flex-shrink:0;}
 .pauta-check{width:24px;height:24px;border-radius:7px;border:1.5px solid var(--border);background:#fff;padding:0;flex-shrink:0;display:flex;align-items:center;justify-content:center;color:#fff;cursor:pointer;}
 .pauta-check.marcado{background:var(--forest);border-color:var(--forest);}
-.pauta-quitar{position:absolute;top:8px;right:8px;width:22px;height:22px;padding:0;border:none;background:none;color:var(--ink-soft);cursor:pointer;display:flex;align-items:center;justify-content:center;}
-.pauta-quitar:hover{color:var(--danger);}
+/* NUEVO 23/07/2026 (con Osmar): ya no flota sobre la fila (position:absolute, 22px) — pasa
+   a ser un ítem más del flex, con área táctil real. Ahora solo existe para ítems agregados
+   a mano ("Agregado acá"); los de Cima ya no tienen botón de quitar. */
+.pauta-quitar{width:36px;height:36px;padding:0;border:none;background:none;color:var(--ink-soft);cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;border-radius:9px;}
+.pauta-quitar:hover{color:var(--danger);background:var(--terracotta-soft);}
 .pauta-quitar-elimina{color:var(--terracotta);}
 .pauta-quitar-elimina:hover{color:var(--danger);}
 .pauta-obs{font-size:13px;color:var(--ink-soft);font-style:italic;margin:6px 0 0 34px;}
+
+/* NUEVO 23/07/2026 (con Osmar — rediseño de Pauta): progreso + "Hechos" colapsado */
+.pauta-progreso{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px 14px;margin:0 0 14px;}
+.pauta-progreso-top{display:flex;align-items:baseline;justify-content:space-between;margin:0 0 8px;}
+.pauta-progreso-num{font-size:19px;font-weight:600;color:var(--forest);font-family:'Fraunces',serif;}
+.pauta-progreso-faltan{font-size:12px;color:var(--ink-soft);}
+.pauta-progreso-barra{height:7px;background:var(--border);border-radius:4px;overflow:hidden;}
+.pauta-progreso-relleno{height:100%;background:var(--forest);border-radius:4px;transition:width .2s;}
+.pauta-hechos-toggle{width:100%;display:flex;align-items:center;gap:9px;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:13px 12px;margin:14px 0;cursor:pointer;font-family:inherit;color:var(--ink-soft);font-size:13.5px;}
+.pauta-hechos-toggle span:first-of-type{flex:1;text-align:left;}
+.pauta-hechos-badge{font-size:12.5px;font-weight:700;color:var(--forest);background:var(--forest-soft);padding:3px 9px;border-radius:20px;}
 
 .notif-card .n-fecha{font-size:11px;color:var(--ink-soft);margin:0 0 10px;}
 .notif-card .n-acciones{display:flex;gap:8px;flex-wrap:wrap;}
@@ -826,10 +840,7 @@
     <button class="pauta-tab-btn" id="pauta-tab-btn-historial" onclick="cambiarTabPauta('historial')">Historial</button>
   </div>
   <div id="pauta-tab-activa">
-    <div id="pauta-observacion-wrap">
-      <label class="pauta-obs-label">Observación de esta pauta <span class="pauta-obs-label-nota">— opcional, se guarda sola</span></label>
-      <textarea id="pauta-observacion" class="pauta-obs-textarea" placeholder="Ej: faltó azúcar flor, se ajustó receta del bombón" oninput="escribirObservacionPautaBorrador(this.value)"></textarea>
-    </div>
+    <div id="pauta-progreso-wrap"></div>
     <div id="pauta-lista"></div>
     <div id="pauta-agregar-wrap">
       <button class="btn-secondary" style="width:100%;margin:12px 0;" onclick="mostrarBuscadorPauta()">+ Agregar producto</button>
@@ -841,6 +852,7 @@
         </div>
       </div>
     </div>
+    <div id="pauta-aviso-pendientes" class="hist-observacion" style="display:none;border-left:3px solid var(--terracotta);border-radius:0 8px 8px 0;"></div>
     <div class="error-msg" id="pauta-error"></div>
     <div class="submit-bar" id="pauta-confirmar-wrap"><button class="btn-primary" onclick="revisarPauta()">Confirmar producción</button></div>
   </div>
