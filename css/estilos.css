@@ -423,3 +423,20 @@ td{padding:8px 6px;border-bottom:1px solid var(--border);}
 /* Aviso en la pantalla de Conteo. Informativo, no bloqueante. */
 .conteo-aviso{background:var(--amber-soft);color:#7A5A22;font-size:13px;line-height:1.45;border-radius:9px;padding:10px 12px;margin:-6px 0 14px;}
 .aviso-accion{background:transparent;border:none;padding:0;margin-left:4px;font-family:inherit;font-size:13px;font-weight:700;color:#7A5A22;text-decoration:underline;cursor:pointer;}
+
+/* ============ HISTORIAL DE CONTEOS (22/07/2026, con Osmar) ============ */
+/* Reemplaza el modal de "Ver último conteo". Lista plegable, más reciente primero. */
+
+.hist-conteo-fila{border-top:1px solid var(--border);}
+.hist-conteo-fila:first-child{border-top:none;}
+.hist-conteo-cab{width:100%;display:flex;align-items:center;justify-content:space-between;gap:10px;padding:11px 2px;background:transparent;border:none;font-family:inherit;text-align:left;cursor:pointer;color:var(--ink);}
+.hist-conteo-fecha{display:block;font-size:14px;font-weight:600;}
+.hist-conteo-resp{display:block;font-size:12px;color:var(--ink-soft);margin-top:2px;}
+.hist-conteo-der{display:flex;align-items:center;gap:8px;flex-shrink:0;}
+.hist-conteo-n{font-size:12px;color:var(--ink-soft);}
+.hist-conteo-badge{font-size:11px;font-weight:700;padding:2px 8px;border-radius:20px;background:var(--paper);color:var(--ink-soft);}
+.hist-conteo-fila.pendiente .hist-conteo-badge{background:var(--amber-soft);color:#7A5A22;}
+.hist-conteo-fila.anulado .hist-conteo-badge{background:var(--terracotta-soft);color:var(--terracotta);}
+.hist-conteo-fila.anulado .hist-conteo-fecha{color:var(--ink-soft);text-decoration:line-through;}
+.hist-conteo-detalle{max-height:280px;overflow-y:auto;padding:0 2px 12px;}
+.btn-anular-conteo{width:100%;min-height:40px;margin-top:10px;padding:9px;font-size:13px;font-family:inherit;font-weight:700;color:var(--terracotta);background:transparent;border:1.5px solid var(--terracotta);border-radius:8px;cursor:pointer;}
