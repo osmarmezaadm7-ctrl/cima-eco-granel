@@ -1215,15 +1215,6 @@ function pintarBarraProgreso_(hechos, total) {
     '</div>';
 }
 
-function pintarAvisoPendientes_(hechos, total) {
-  const el = document.getElementById('pauta-aviso-pendientes');
-  if (!el) return;
-  const faltan = total - hechos;
-  if (pautaSoloLectura || !faltan) { el.style.display = 'none'; return; }
-  el.style.display = '';
-  el.innerHTML = '<p>Quedan ' + faltan + ' sin marcar</p><p>Al confirmar se cierran como pendientes.</p>';
-}
-
 function filaPautaDesktop_(it) {
   if (pautaSoloLectura) {
     const cant = it.cantidadBorrador !== null && it.cantidadBorrador !== undefined ? it.cantidadBorrador : it.cantidadProgramada;
@@ -1308,7 +1299,6 @@ function pintarPauta() {
     const hechosD = visiblesD.filter(it => it.estadoBorrador === 'Hecho');
     const pendientesD = visiblesD.filter(it => it.estadoBorrador !== 'Hecho');
     pintarBarraProgreso_(hechosD.length, visiblesD.length);
-    pintarAvisoPendientes_(hechosD.length, visiblesD.length);
     pintarPautaDesktop_(hechosD, pendientesD, mapaObservacionesPorEnvio_(visiblesD));
     return;
   }
@@ -1318,7 +1308,6 @@ function pintarPauta() {
   const pendientes = visibles.filter(it => it.estadoBorrador !== 'Hecho');
   const mapaObs = mapaObservacionesPorEnvio_(visibles);
   pintarBarraProgreso_(hechos.length, visibles.length);
-  pintarAvisoPendientes_(hechos.length, visibles.length);
 
   if (!visibles.length) {
     cont.innerHTML = '<p style="font-size:13.5px;color:var(--ink-soft);padding:24px 0;text-align:center;">' +
@@ -1517,7 +1506,13 @@ async function revisarPauta() {
   // pauta de puros pasteles no se toca la red al pedo.
   if (completados.some(it => it.dual)) await cargarStockVC_();
   pintarDesgloseEmpanadas_(completados);
-  document.getElementById('resumen-pauta-observacion').value = pautaObservacionBorrador;
+  const obsTextarea = document.getElementById('resumen-pauta-observacion');
+  obsTextarea.value = pautaObservacionBorrador;
+  // NUEVO 23/07/2026 (con Osmar): con pauta completa el campo es solo "Observaciones",
+  // opcional. Si quedan faltantes, el placeholder pide la razón y confirmarProduccion()
+  // exige el comentario antes de dejar pasar — es la única forma de que quede dicho por
+  // qué no se entregó completa, sin agregar una etiqueta ni un banner aparte.
+  obsTextarea.placeholder = faltantes.length ? '¿Por qué quedó incompleta? (comentario obligatorio)' : 'Observaciones';
   irA('screen-resumen-pauta');
 }
 
@@ -1635,6 +1630,15 @@ async function cargarStockVC_() {
 
 async function confirmarProduccion() {
   document.getElementById('resumen-pauta-error').textContent = '';
+  // NUEVO 23/07/2026 (con Osmar): si quedan faltantes, el comentario es obligatorio —
+  // recalculado sobre cachePauta porque revisarPauta() ya lo tenía, pero no se guarda
+  // aparte para no duplicar estado. cachePauta sigue completo acá: recién se limpia
+  // más abajo, después de que el servidor confirme.
+  const hayFaltantes = cachePauta.pauta.some(it => it.estadoBorrador !== 'Hecho');
+  if (hayFaltantes && !pautaObservacionBorrador.trim()) {
+    document.getElementById('resumen-pauta-error').textContent = 'La pauta quedó incompleta — cuéntanos por qué antes de confirmar.';
+    return;
+  }
   const r = await llamarAPI('confirmarPauta', { data: { responsable: sesion.nombre, agregadosIds: pautaAgregadosSesion, observacion: pautaObservacionBorrador, desglose: desgloseEmpanadas } });
   if (!r.ok) { document.getElementById('resumen-pauta-error').textContent = r.error || 'Error al confirmar producción'; return; }
 
