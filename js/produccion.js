@@ -634,8 +634,11 @@ function bloqueStockRevision_(contadoTotal, dual) {
 //   normal          -> texto plano. Si todos llevaran fondo, el ojo no distinguiría lo que
 //                      necesita atención de lo que está bien.
 //   dudoso          -> ámbar. El número es válido pero hay entregas sin confirmar.
-//   revisar         -> terracota, SIN mostrar el número. Un negativo no le dice nada útil a
-//                      Rocío; lo accionable es "falta confirmar una entrega".
+//   revisar         -> terracota, SIN mostrar el número negativo. CORREGIDO 23/07/2026:
+//                      antes decía "falta confirmar entrega" siempre, pero un negativo
+//                      también puede salir con la entrega YA confirmada — por ejemplo un
+//                      conteo anterior mal hecho. El mensaje ya no diagnostica la causa,
+//                      deja que la persona revise el historial de conteos.
 //   faltaCongeladas -> texto gris. NO se inventa un número: sin contar la reserva no hay
 //                      total, y sin total no hay venta calculable. Esto es exactamente lo
 //                      que antes producía el "salieron 31" falso.
@@ -643,7 +646,7 @@ function bloqueStockRevision_(contadoTotal, dual) {
 function lineaMovimientoHtml_(mov) {
   if (!mov || mov.estado === 'sinReferencia') return '';
   if (mov.estado === 'faltaCongeladas') return '<p class="revision-mov falta">Falta contar las congeladas para calcular la venta</p>';
-  if (mov.estado === 'revisar') return '<p class="revision-mov revisar">Movimiento \u2014 \u00b7 falta confirmar entrega</p>';
+  if (mov.estado === 'revisar') return '<p class="revision-mov revisar">El número no cierra \u2014 revisa el conteo anterior en el historial</p>';
 
   const sale = '<span class="sale">\u2193 ' + mov.vendidas + '</span> vendidas';
   if (mov.estado === 'dudoso') return '<p class="revision-mov dudoso">' + sale + ' \u00b7 hay ' + mov.transito + ' en tránsito</p>';
