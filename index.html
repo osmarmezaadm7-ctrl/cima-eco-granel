@@ -894,6 +894,7 @@
     <button class="back-link" style="margin-bottom:0;" onclick="irA('screen-home')"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"></path></svg> Volver</button>
     <div style="display:flex;gap:4px;">
       <button class="icon-btn" id="btn-ultimo-conteo" title="Historial de conteos" onclick="abrirHistorialConteos()"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 8v4l3 3"></path><circle cx="12" cy="12" r="9"></circle></svg></button>
+      <button class="icon-btn" id="btn-retiro-vc" title="Retiro hacia Vegan Corner" style="display:none;" onclick="abrirRetiroVC()"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="9" width="16" height="12" rx="1.5"></rect><path d="M8 9V6a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v3"></path><path d="M9 14l-3 -3 3 -3"></path><path d="M6 11h6"></path></svg></button>
       <button class="icon-btn" title="Actualizar" onclick="abrirConteo(true)"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 4v6h-6"></path><path d="M1 20v-6h6"></path><path d="M3.5 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.65 4.36A9 9 0 0 0 20.5 15"></path></svg></button>
     </div>
   </div>
@@ -905,6 +906,24 @@
   <div id="conteo-lista"></div>
   <div class="error-msg" id="conteo-error"></div>
   <div class="submit-bar"><button class="btn-primary" onclick="revisarConteo()">Guardar conteo</button></div>
+</div>
+
+<!-- NUEVO 23/07/2026 (con Osmar): Retiro hacia Vegan Corner — mismo patrón visual que Pedidos
+     "Desde cero" (chips de categoría + productos marcados arriba + Ver más), sin buscador
+     escondido, porque acá no hay lista previa que proteger: siempre se arma desde cero. -->
+<div class="screen desktop-wide" id="screen-retiro-vc">
+  <div class="header-row" style="margin-bottom:10px;">
+    <button class="back-link" style="margin-bottom:0;" onclick="irA('screen-conteo')"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"></path></svg> Volver</button>
+  </div>
+  <h2 style="font-size:17px;">Retiro hacia Vegan Corner</h2>
+  <p style="font-size:12.5px;color:var(--ink-soft);margin:0 0 14px;">Marca lo que sale del stock de Cima para completar una venta al por mayor.</p>
+  <p style="font-size:12px;color:var(--ink-soft);margin:0 0 10px;">Categorías</p>
+  <div id="retiro-vc-chips" class="conteo-chips"></div>
+  <div id="retiro-vc-lista"></div>
+  <label style="font-size:12px;color:var(--ink-soft);display:block;margin:4px 0 6px;">Cliente o motivo <span style="font-weight:400;">— opcional</span></label>
+  <input type="text" id="retiro-vc-cliente" placeholder="Ej: Dulce Luna" style="width:100%;margin-bottom:14px;" oninput="cambiarClienteRetiroVC(this.value)">
+  <div class="error-msg" id="retiro-vc-error"></div>
+  <div class="submit-bar"><button class="btn-primary" id="retiro-vc-btn-confirmar" onclick="confirmarRetiroVC()">Registrar retiro</button></div>
 </div>
 
 <div class="screen desktop-wide" id="screen-resumen-conteo">
