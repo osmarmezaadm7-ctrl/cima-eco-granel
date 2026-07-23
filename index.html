@@ -851,6 +851,16 @@
   </div>
   <h2 style="font-size:17px;">Revisar antes de confirmar</h2>
   <div id="resumen-pauta-lista"></div>
+  <div id="desglose-empanadas-wrap" style="display:none;">
+    <p class="resumen-seccion-titulo">Cómo va cada empanada</p>
+    <p class="desglose-ayuda">Sin este dato no se puede calcular cuánto se vendió.</p>
+    <div id="desglose-empanadas-lista"></div>
+  </div>
+  <div id="stock-vc-wrap" style="display:none;">
+    <p class="resumen-seccion-titulo">Congeladas que quedan acá</p>
+    <p class="desglose-ayuda">Ajusta si cambió. Es la reserva de Vegan Corner.</p>
+    <div id="stock-vc-lista"></div>
+  </div>
   <p class="resumen-total" id="resumen-pauta-total"></p>
   <div id="resumen-pauta-observacion-wrap">
     <label class="pauta-obs-label">Observación de esta pauta</label>
@@ -875,6 +885,7 @@
   <div id="conteo-recepcion"></div>
   <p style="font-size:12px;color:var(--ink-soft);margin:0 0 10px;">Categorías</p>
   <div id="conteo-chips" class="conteo-chips"></div>
+  <div id="conteo-aviso-congeladas" class="conteo-aviso" style="display:none;"></div>
   <div id="conteo-lista"></div>
   <div class="error-msg" id="conteo-error"></div>
   <div class="submit-bar"><button class="btn-primary" onclick="revisarConteo()">Guardar conteo</button></div>
