@@ -196,6 +196,24 @@ function pintarConteoDesktop_(productos, incluirUltimo) {
     (esVeganCorner_() ? 'No hay empanadas configuradas para contar.' : 'Elige qué categoría(s) vas a contar.') + '</p>';
   document.getElementById('conteo-lista').innerHTML = html;
 }
+
+// NUEVO 22/07/2026 (con Osmar): aviso suave cuando se van a contar Empanadas horneadas sin
+// las congeladas. No bloquea ni obliga — la reserva no se descongela a diario y contar el
+// congelador todos los días tiene un costo real para Cecilia. Pero sin ese número no se
+// puede calcular la venta (ver mapaMovimiento_), y antes eso se traducía en un número
+// inventado en Revisión. Mejor avisar acá, que es donde se puede hacer algo.
+function pintarAvisoCongeladas_() {
+  const wrap = document.getElementById('conteo-aviso-congeladas');
+  if (!wrap) return;
+  const hayHorneadas = conteoCategoriasActivas.has('Empanadas');
+  const hayCongeladas = conteoCategoriasActivas.has('Empanadas Congeladas');
+  const existeCategoria = cacheConteoCatalogo.catalogo.some(p => p.categoria === 'Empanadas Congeladas');
+  if (!hayHorneadas || hayCongeladas || !existeCategoria) { wrap.style.display = 'none'; return; }
+  wrap.style.display = '';
+  wrap.innerHTML = 'Contando solo las horneadas no se puede calcular cuánto se vendió. ' +
+    '<button type="button" class="aviso-accion" onclick="toggleCategoriaConteo(\'Empanadas Congeladas\')">Agregar congeladas</button>';
+}
+
 function pintarConteo() {
   const titulo = document.querySelector('#screen-conteo h2');
   const boton = document.querySelector('#screen-conteo .submit-bar button');
@@ -238,6 +256,8 @@ function pintarConteo() {
     const activo = conteoCategoriasActivas.has(c);
     return '<span class="chip-cat' + (activo ? ' activo' : '') + '" onclick="toggleCategoriaConteo(\'' + c.replace(/'/g, "\\'") + '\')">' + c + '</span>';
   }).join('');
+
+  pintarAvisoCongeladas_();
 
   const productosActivos = cacheConteoCatalogo.catalogo.filter(p => conteoCategoriasActivas.has(p.categoria));
   if (esAncho) { pintarConteoDesktop_(productosActivos, true); return; }
@@ -533,36 +553,66 @@ function cambiarModoPedido(modo) {
 // parte, estaba repartido entre los badges de categoría (Horneada 8 / Congelada 6) y había
 // que sumarlo de cabeza para saber cuánto hay. Los badges se mantienen debajo — siguen
 // siendo el desglose, solo dejan de ser lo primero que se lee.
-function bloqueStockRevision_(contadoTotal) {
-  return '<div class="revision-stock"><b>' + contadoTotal + '</b><i>en stock</i></div>';
+// ===== BLOQUE DE STOCK Y MOVIMIENTO EN REVISIÓN =====
+// REESCRITO 22/07/2026 (con Osmar). Dos correcciones:
+//
+// 1. El badge "Stock N" se repetía. bloqueStockRevision_ ya escribe "18 en stock" y
+//    badgesDetalleRevision_ agregaba un badge con el MISMO número para cualquier categoría
+//    que no fuera empanada. Ahora los badges solo salen cuando aportan algo: las dos
+//    cubetas de un producto dual, o la reserva de Vegan Corner.
+//
+// 2. En empanadas el número grande es SOLO horneadas — es lo único vendible y lo que
+//    dispara el pedido de horneado. Las congeladas bajan a badge de nivel, sin movimiento:
+//    son reserva, y calcular "salidas" de una reserva que no se cuenta a diario no dice
+//    nada útil. Ver mapaMovimiento_ en Produccion.gs para la aritmética.
+
+function bloqueStockRevision_(contadoTotal, dual) {
+  return '<div class="revision-stock"><b>' + contadoTotal + '</b><i>' + (dual ? 'horneadas en stock' : 'en stock') + '</i></div>';
 }
 
-// Tres estados (ver mapaMovimiento_ en Produccion.gs para cómo se calculan):
-//   normal  -> texto plano. Si los tres estados llevaran fondo, el ojo no distinguiría lo
-//              que necesita atención de lo que está bien.
-//   dudoso  -> fondo ámbar. El número de salidas es válido pero hay entregas sin confirmar.
-//   revisar -> fondo terracota, SIN mostrar el número. Un negativo en pantalla no le dice
-//              nada útil a Rocío; lo accionable es "falta confirmar una entrega".
-// 'sinReferencia' no dibuja nada: sin conteo previo no hay intervalo que medir, y una línea
-// vacía o un "—" suelto solo agrega ruido a la fila.
+// Estados (ver mapaMovimiento_):
+//   normal          -> texto plano. Si todos llevaran fondo, el ojo no distinguiría lo que
+//                      necesita atención de lo que está bien.
+//   dudoso          -> ámbar. El número es válido pero hay entregas sin confirmar.
+//   revisar         -> terracota, SIN mostrar el número. Un negativo no le dice nada útil a
+//                      Rocío; lo accionable es "falta confirmar una entrega".
+//   faltaCongeladas -> texto gris. NO se inventa un número: sin contar la reserva no hay
+//                      total, y sin total no hay venta calculable. Esto es exactamente lo
+//                      que antes producía el "salieron 31" falso.
+//   sinReferencia   -> no dibuja nada: sin conteo previo no hay intervalo que medir.
 function lineaMovimientoHtml_(mov) {
   if (!mov || mov.estado === 'sinReferencia') return '';
+  if (mov.estado === 'faltaCongeladas') return '<p class="revision-mov falta">Falta contar las congeladas para calcular la venta</p>';
   if (mov.estado === 'revisar') return '<p class="revision-mov revisar">Movimiento \u2014 \u00b7 falta confirmar entrega</p>';
-  const sale = '<span class="sale">\u2193 ' + mov.salidas + '</span> salió';
+
+  const sale = '<span class="sale">\u2193 ' + mov.vendidas + '</span> vendidas';
   if (mov.estado === 'dudoso') return '<p class="revision-mov dudoso">' + sale + ' \u00b7 hay ' + mov.transito + ' en tránsito</p>';
   let txt = sale;
-  if (mov.entradas > 0) txt += ' \u00b7 <span class="entra">\u2191 ' + mov.entradas + '</span> entró';
+  if (mov.entradas !== null && mov.entradas !== undefined && mov.entradas > 0) {
+    txt += ' \u00b7 <span class="entra">\u2191 ' + mov.entradas + '</span> entró';
+  }
+  // El horneado interno solo se muestra cuando hubo: es un movimiento de congeladas a
+  // horneadas dentro de Cima, no una entrada ni una venta.
+  if (mov.horneadoCima) txt += ' \u00b7 ' + mov.horneadoCima + ' horneadas acá';
   // Los días solo si el intervalo es mayor a 1: "· 1 día" en un conteo diario es ruido.
   if (mov.dias > 1) txt += ' \u00b7 ' + mov.dias + ' días';
   return '<p class="revision-mov">' + txt + '</p>';
 }
 
-function badgesDetalleRevision_(detalle, stockVC) {
-  const etiqueta = (cat) => cat === 'Empanadas Congeladas' ? 'Congelada' : cat === 'Empanadas' ? 'Horneada' : 'Stock';
-  let html = Object.keys(detalle || {}).map(cat =>
-    '<span class="revision-badge">' + etiqueta(cat) + ' ' + detalle[cat] + '</span>'
-  ).join('');
-  if (stockVC) html += '<span class="revision-badge">VC ' + stockVC + '</span>';
+// Badges de NIVEL, no de movimiento. Solo se dibujan cuando agregan información que el
+// número grande no tiene ya.
+function badgesDetalleRevision_(it) {
+  let html = '';
+  if (it.dual) {
+    if (it.stockCongeladas !== null && it.stockCongeladas !== undefined) {
+      // La reserva puede venir de un conteo de días atrás; se rotula en vez de esconderla.
+      const viejo = it.congeladasDesde > 0 ? ' \u00b7 hace ' + it.congeladasDesde + 'd' : '';
+      html += '<span class="revision-badge">Congeladas Cima ' + it.stockCongeladas + viejo + '</span>';
+    } else {
+      html += '<span class="revision-badge sin">Congeladas Cima \u2014</span>';
+    }
+  }
+  if (it.stockCongeladoVC) html += '<span class="revision-badge">VC ' + it.stockCongeladoVC + '</span>';
   return html;
 }
 
@@ -597,7 +647,7 @@ function pintarRevisionPedidoDesktop_() {
     const val = revisionPedidos[it.productoProduccion] !== undefined ? revisionPedidos[it.productoProduccion] : '';
     const clave = it.productoProduccion.replace(/'/g, "\\'");
     filas += filaRevisionDesktop_(it.productoProduccion, it.productoProduccion, val, clave,
-      bloqueStockRevision_(it.contadoTotal) + lineaMovimientoHtml_(it.movimiento) + badgesDetalleRevision_(it.detalle, it.stockCongeladoVC),
+      bloqueStockRevision_(it.contadoTotal, it.dual) + lineaMovimientoHtml_(it.movimiento) + badgesDetalleRevision_(it),
       etiquetaFactorHtml_(it.productoProduccion),
       comentarioInputDesktop_(it.productoProduccion, clave), 'quitarProductoRevision(\'' + clave + '\')', it.bajoMinimo);
   });
@@ -634,9 +684,9 @@ function pintarRevisionPedido() {
           '<button type="button" onclick="cambiarPedidoRevisionPaso(\'' + clave + '\',1)">+</button>' +
         '</div>' +
       '</div>' +
-      bloqueStockRevision_(it.contadoTotal) +
+      bloqueStockRevision_(it.contadoTotal, it.dual) +
       lineaMovimientoHtml_(it.movimiento) +
-      '<p class="revision-detalle">' + badgesDetalleRevision_(it.detalle, it.stockCongeladoVC) + '</p>' +
+      '<p class="revision-detalle">' + badgesDetalleRevision_(it) + '</p>' +
       etiquetaFactorHtml_(it.productoProduccion) +
       filaComentarioRevision_(it.productoProduccion) +
     '</div>';
@@ -1266,7 +1316,7 @@ function volverAEditarPauta() {
   irA('screen-pauta');
 }
 
-function revisarPauta() {
+async function revisarPauta() {
   document.getElementById('pauta-error').textContent = '';
   const visibles = cachePauta.pauta.filter(it => !pautaOcultos.has(it.id));
   const completados = visibles.filter(it => it.estadoBorrador === 'Hecho');
@@ -1276,6 +1326,10 @@ function revisarPauta() {
     return;
   }
   pintarResumenPauta(completados, faltantes);
+  // El stock congelado de Vegan Corner se pide solo si hay empanadas que confirmar; en una
+  // pauta de puros pasteles no se toca la red al pedo.
+  if (completados.some(it => it.dual)) await cargarStockVC_();
+  pintarDesgloseEmpanadas_(completados);
   document.getElementById('resumen-pauta-observacion').value = pautaObservacionBorrador;
   irA('screen-resumen-pauta');
 }
@@ -1317,10 +1371,92 @@ function pintarResumenPauta(completados, faltantes) {
   document.getElementById('resumen-pauta-total').textContent = texto;
 }
 
+// ===== DESGLOSE HORNEADAS/CONGELADAS + STOCK VC (NUEVO 22/07/2026 — con Osmar) =====
+// Por qué existe: EntregaDetalle guardaba solo "Empanada Pino Soya, 42" y no había forma
+// de saber a cuál cubeta entró. Con eso, el movimiento de empanadas era incalculable y el
+// sistema mostraba números falsos (ver mapaMovimiento_ en Produccion.gs).
+// Solo aparece para los productos que el catálogo tiene con las dos categorías; el resto
+// de la pauta no cambia en nada.
+let desgloseEmpanadas = {};   // { programaId: {horneadas, congeladas} }
+let stockVCBorrador = {};     // { producto: cantidad } — reserva que queda en Vegan Corner
+
+function pintarDesgloseEmpanadas_(completados) {
+  const duales = completados.filter(it => it.dual);
+  const wrap = document.getElementById('desglose-empanadas-wrap');
+  const wrapVC = document.getElementById('stock-vc-wrap');
+  if (!duales.length) {
+    wrap.style.display = 'none'; wrapVC.style.display = 'none';
+    desgloseEmpanadas = {}; stockVCBorrador = {};
+    return;
+  }
+  wrap.style.display = '';
+  desgloseEmpanadas = {};
+  document.getElementById('desglose-empanadas-lista').innerHTML = duales.map(it => {
+    const total = it.cantidadBorrador !== null && it.cantidadBorrador !== undefined ? it.cantidadBorrador : it.cantidadProgramada;
+    desgloseEmpanadas[it.id] = { horneadas: 0, congeladas: 0 };
+    return '<div class="desglose-fila">' +
+      '<p class="desglose-nombre">' + it.producto + '</p>' +
+      '<div class="desglose-campos">' +
+        '<div class="desglose-campo"><label>Horneadas</label>' +
+          '<input type="number" min="0" id="dg-h-' + it.id + '" value="0" oninput="cambiarDesglose_(\'' + it.id + '\',\'horneadas\',this.value,' + total + ')"></div>' +
+        '<div class="desglose-campo"><label>Congeladas</label>' +
+          '<input type="number" min="0" id="dg-c-' + it.id + '" value="0" oninput="cambiarDesglose_(\'' + it.id + '\',\'congeladas\',this.value,' + total + ')"></div>' +
+      '</div>' +
+      '<p class="desglose-suma" id="dg-s-' + it.id + '">Total 0 · faltan ' + total + ' de las ' + total + ' producidas</p>' +
+    '</div>';
+  }).join('');
+
+  // Stock congelado que QUEDA en Vegan Corner. Es un dato distinto del desglose: el
+  // desglose es lo que sale hacia Cima, esto es la reserva de acá. No se puede deducir de
+  // las entregas (Vegan Corner también produce y vende directo), por eso se declara.
+  // Aparece en este momento porque es cuando Katherine tiene el congelador a la vista.
+  wrapVC.style.display = '';
+  const productos = [...new Set(duales.map(it => it.producto))];
+  stockVCBorrador = {};
+  document.getElementById('stock-vc-lista').innerHTML = productos.map(prod => {
+    const actual = (cacheStockVC && cacheStockVC[prod] !== undefined) ? cacheStockVC[prod] : 0;
+    stockVCBorrador[prod] = actual;
+    return '<div class="stockvc-fila">' +
+      '<span class="stockvc-nombre">' + prod + '</span>' +
+      '<input type="number" min="0" value="' + actual + '" oninput="cambiarStockVC_(\'' + prod.replace(/'/g, "\\'") + '\',this.value)">' +
+    '</div>';
+  }).join('');
+}
+
+function cambiarDesglose_(id, campo, valor, total) {
+  if (!desgloseEmpanadas[id]) desgloseEmpanadas[id] = { horneadas: 0, congeladas: 0 };
+  desgloseEmpanadas[id][campo] = Number(valor) || 0;
+  const suma = desgloseEmpanadas[id].horneadas + desgloseEmpanadas[id].congeladas;
+  const el = document.getElementById('dg-s-' + id);
+  // No bloquea: puede haber merma legítima (se quemó una tanda). Solo avisa.
+  if (suma === total) el.className = 'desglose-suma ok', el.textContent = 'Total ' + suma + ' · coincide con lo producido';
+  else if (suma < total) el.className = 'desglose-suma alerta', el.textContent = 'Total ' + suma + ' · faltan ' + (total - suma) + ' de las ' + total + ' producidas';
+  else el.className = 'desglose-suma alerta', el.textContent = 'Total ' + suma + ' · ' + (suma - total) + ' más que las ' + total + ' producidas';
+}
+
+function cambiarStockVC_(producto, valor) {
+  stockVCBorrador[producto] = Number(valor) || 0;
+}
+
+let cacheStockVC = null; // { producto: stockActual } — para precargar los campos
+
+async function cargarStockVC_() {
+  const r = await llamarAPISilencioso('obtenerStockCongeladoVC', {});
+  cacheStockVC = {};
+  if (r && r.ok) (r.stock || []).forEach(s => { cacheStockVC[s.producto] = s.stockActual; });
+}
+
 async function confirmarProduccion() {
   document.getElementById('resumen-pauta-error').textContent = '';
-  const r = await llamarAPI('confirmarPauta', { data: { responsable: sesion.nombre, agregadosIds: pautaAgregadosSesion, observacion: pautaObservacionBorrador } });
+  const r = await llamarAPI('confirmarPauta', { data: { responsable: sesion.nombre, agregadosIds: pautaAgregadosSesion, observacion: pautaObservacionBorrador, desglose: desgloseEmpanadas } });
   if (!r.ok) { document.getElementById('resumen-pauta-error').textContent = r.error || 'Error al confirmar producción'; return; }
+
+  // El stock de Vegan Corner se guarda después de confirmar y en silencio: si falla, la
+  // producción ya quedó registrada, que es lo que no se puede perder.
+  Object.keys(stockVCBorrador).forEach(prod => {
+    llamarAPISilencioso('actualizarStockCongeladoVC', { data: { producto: prod, stockActual: stockVCBorrador[prod], responsable: sesion.nombre } });
+  });
+  desgloseEmpanadas = {}; stockVCBorrador = {}; cacheStockVC = null;
 
   cachePauta = null; pautaOcultos = new Set(); pautaAgregadosSesion = []; pautaObservacionBorrador = '';
   document.getElementById('confirm-title').textContent = 'Producción confirmada';
