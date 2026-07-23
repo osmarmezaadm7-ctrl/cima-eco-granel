@@ -41,7 +41,12 @@
 .chip-cat.activo{background:var(--forest);border-color:var(--forest);color:#fff;}
 .conteo-seccion-titulo{font-size:11px;color:var(--ink-soft);font-weight:800;text-transform:uppercase;letter-spacing:.4px;margin:14px 0 6px;}
 .conteo-row{display:flex;justify-content:space-between;align-items:center;padding:11px 0;border-bottom:1px solid var(--border);gap:10px;}
-.conteo-row span{font-size:15.5px;line-height:1.3;}
+/* CORREGIDO 23/07/2026 (con Osmar): con nombres largos, el bloque del contador entero
+   caía a la línea de abajo (flex-wrap:wrap en la fila + el span sin límite de ancho).
+   flex:1 + min-width:0 hace que el TEXTO envuelva dentro de su propia columna, y el
+   contador se queda pegado a la derecha en la misma línea, sea cual sea el largo del
+   nombre. Mismo arreglo que ya se usó en .abast-nombre para el mismo problema. */
+.conteo-row span{flex:1;min-width:0;font-size:15.5px;line-height:1.3;overflow-wrap:anywhere;}
 .conteo-stepper{display:flex;align-items:center;gap:8px;flex-shrink:0;}
 .conteo-stepper button{width:36px;height:36px;border-radius:9px;border:1.5px solid var(--border);background:#fff;font-size:17px;line-height:1;cursor:pointer;padding:0;color:var(--ink);}
 .conteo-stepper button:hover{background:var(--forest-soft);}
