@@ -392,3 +392,34 @@ td{padding:8px 6px;border-bottom:1px solid var(--border);}
 .abast-rev-lista{max-height:46vh;overflow-y:auto;border-top:1px solid var(--border);}
 .abast-rev-fila{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border);}
 .abast-rev-x{width:38px;height:38px;flex-shrink:0;padding:0;border:none;background:transparent;color:var(--terracotta);font-size:23px;line-height:1;cursor:pointer;}
+
+/* ============ PRODUCCIÓN — desglose empanadas y movimiento (22/07/2026, con Osmar) ============ */
+
+/* Desglose horneadas/congeladas al confirmar la pauta. Solo aparece en los productos que
+   el catálogo tiene con las dos categorías. */
+.desglose-ayuda{font-size:12.5px;color:var(--ink-soft);margin:2px 0 10px;line-height:1.45;}
+.desglose-fila{padding:11px 0;border-top:1px solid var(--border);}
+.desglose-nombre{margin:0 0 9px;font-size:15.5px;}
+.desglose-campos{display:flex;gap:10px;}
+.desglose-campo{flex:1;}
+.desglose-campo label{display:block;font-size:12.5px;color:var(--ink-soft);margin-bottom:5px;}
+.desglose-campo input{height:44px;text-align:right;font-family:'JetBrains Mono',monospace;font-size:16px;}
+.desglose-suma{margin:7px 0 0;font-size:12px;color:var(--ink-soft);}
+.desglose-suma.ok{color:var(--success);}
+.desglose-suma.alerta{color:var(--terracotta);}
+
+/* Reserva que queda en Vegan Corner. Dato distinto del desglose: el desglose es lo que sale
+   hacia Cima, esto es lo que se queda acá. */
+.stockvc-fila{display:flex;align-items:center;gap:10px;padding:9px 0;border-top:1px solid var(--border);}
+.stockvc-nombre{flex:1;min-width:0;font-size:15px;}
+.stockvc-fila input{width:74px;height:44px;flex-shrink:0;text-align:right;font-family:'JetBrains Mono',monospace;font-size:16px;}
+
+/* Estado 'faltaCongeladas': gris y sin número. A propósito NO lleva fondo de alerta — no es
+   un error de nadie, es que falta un dato opcional. Terracota acá haría que Rocío viera
+   media pantalla en rojo cada día que no se cuenta el congelador. */
+.revision-mov.falta{color:var(--ink-soft);font-style:italic;}
+.revision-badge.sin{color:var(--ink-soft);opacity:.65;}
+
+/* Aviso en la pantalla de Conteo. Informativo, no bloqueante. */
+.conteo-aviso{background:var(--amber-soft);color:#7A5A22;font-size:13px;line-height:1.45;border-radius:9px;padding:10px 12px;margin:-6px 0 14px;}
+.aviso-accion{background:transparent;border:none;padding:0;margin-left:4px;font-family:inherit;font-size:13px;font-weight:700;color:#7A5A22;text-decoration:underline;cursor:pointer;}
