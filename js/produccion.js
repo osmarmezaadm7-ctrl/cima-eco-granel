@@ -1417,7 +1417,16 @@ function filaPautaDesktop_(it) {
     '</button></td>' +
     '<td style="padding:9px 6px;font-weight:700;">' + it.producto + (it.comentario ? '<div style="font-size:10.5px;color:var(--ink-soft);font-weight:400;margin-top:2px;">' + it.comentario + '</div>' : '') + '</td>' +
     '<td style="padding:6px;width:90px;"><input type="text" inputmode="numeric" value="' + cant + '" id="pauta-cant-' + it.id + '" onchange="cambiarCantidadBorradorPauta(\'' + it.id + '\',this.value)" style="width:70px;text-align:center;font-family:\'JetBrains Mono\',monospace;font-weight:700;border:1px solid var(--border);border-radius:7px;padding:6px 8px;"></td>' +
-    '<td style="padding:9px 6px;width:34px;text-align:right;">' + botonQuitar + '</td></tr>';
+    '<td style="padding:9px 6px;width:34px;text-align:right;">' + botonQuitar + '</td></tr>' +
+    filaDesgloseDesktop_(it);
+}
+
+// En escritorio la pauta es una tabla, así que el desglose no puede ir "dentro" de la fila:
+// va como una segunda fila con colspan, alineada bajo el nombre del producto.
+function filaDesgloseDesktop_(it) {
+  const bloque = bloqueDesglosePauta_(it);
+  if (!bloque) return '';
+  return '<tr class="dg-fila-desktop"><td></td><td colspan="3" style="padding:0 6px 10px;">' + bloque + '</td></tr>';
 }
 
 function pintarPautaDesktop_(hechos, pendientes, mapaObs) {
@@ -1445,9 +1454,11 @@ function pintarPautaDesktop_(hechos, pendientes, mapaObs) {
     return;
   }
 
-  const g = agruparPauta_(pendientes, mapaObs);
+  const enAcordeon = hechos.filter(it => !it.dual);
+  const enLista = cachePauta.pauta.filter(it => it.estadoBorrador !== 'Hecho' || it.dual);
+  const g = agruparPauta_(enLista, mapaObs);
   let html = '';
-  if (!pendientes.length) {
+  if (!enLista.length) {
     html += '<p style="font-size:13.5px;color:var(--ink-soft);padding:16px 0;text-align:center;">Todo marcado — revisa Hechos o confirma la producción.</p>';
   }
   if (g.envios.length) {
@@ -1460,12 +1471,12 @@ function pintarPautaDesktop_(hechos, pendientes, mapaObs) {
     html += '<p class="pauta-grupo-titulo">Agregado acá</p><table><tbody>' + g.agregados.map(filaPautaDesktop_).join('') + '</tbody></table>';
   }
 
-  if (hechos.length) {
+  if (enAcordeon.length) {
     html += '<button class="pauta-hechos-toggle" onclick="togglePautaHechos()">' +
       '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="transform:rotate(' + (pautaHechosAbierto ? '90' : '0') + 'deg);transition:transform .15s;"><path d="M9 18l6-6-6-6"></path></svg>' +
-      '<span>Hechos</span><span class="pauta-hechos-badge">' + hechos.length + '</span></button>';
+      '<span>Hechos</span><span class="pauta-hechos-badge">' + enAcordeon.length + '</span></button>';
     if (pautaHechosAbierto) {
-      html += '<table><tbody>' + hechos.map(filaPautaDesktop_).join('') + '</tbody></table>';
+      html += '<table><tbody>' + enAcordeon.map(filaPautaDesktop_).join('') + '</tbody></table>';
     }
   }
   cont.innerHTML = html;
@@ -1484,6 +1495,12 @@ function pintarPauta() {
   const visibles = cachePauta.pauta;
   const hechos = visibles.filter(it => it.estadoBorrador === 'Hecho');
   const pendientes = visibles.filter(it => it.estadoBorrador !== 'Hecho');
+  // NUEVO 24/07/2026 (con Osmar): una empanada marcada Hecho NO baja al acordeón — se queda
+  // en su grupo mostrando cómo quedó repartida. Si se escondiera, el desglose quedaría
+  // decidido por defecto sin que nadie lo viera nunca. El resto de los productos sigue
+  // bajando a "Hechos" igual que antes: ahí no queda nada pendiente de declarar.
+  const enAcordeon = hechos.filter(it => !it.dual);
+  const enLista = visibles.filter(it => it.estadoBorrador !== 'Hecho' || it.dual);
   const mapaObs = mapaObservacionesPorEnvio_(visibles);
   pintarBarraProgreso_(hechos.length, visibles.length);
 
@@ -1526,6 +1543,7 @@ function pintarPauta() {
         botonQuitar +
       '</div>' +
       (it.comentario ? '<p class="pauta-obs">' + it.comentario + '</p>' : '') +
+      bloqueDesglosePauta_(it) +
     '</div>';
   };
 
@@ -1538,9 +1556,9 @@ function pintarPauta() {
     return;
   }
 
-  const g = agruparPauta_(pendientes, mapaObs);
+  const g = agruparPauta_(enLista, mapaObs);
   let html = '';
-  if (!pendientes.length) {
+  if (!enLista.length) {
     html += '<p style="font-size:13.5px;color:var(--ink-soft);padding:16px 0;text-align:center;">Todo marcado — revisa Hechos o confirma la producción.</p>';
   }
   if (g.envios.length) {
@@ -1551,11 +1569,11 @@ function pintarPauta() {
     html += '<p class="pauta-grupo-titulo">Agregado acá</p>' + g.agregados.map(filaHtml).join('');
   }
 
-  if (hechos.length) {
+  if (enAcordeon.length) {
     html += '<button class="pauta-hechos-toggle" onclick="togglePautaHechos()">' +
       '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="transform:rotate(' + (pautaHechosAbierto ? '90' : '0') + 'deg);transition:transform .15s;"><path d="M9 18l6-6-6-6"></path></svg>' +
-      '<span>Hechos</span><span class="pauta-hechos-badge">' + hechos.length + '</span></button>';
-    if (pautaHechosAbierto) html += hechos.map(filaHtml).join('');
+      '<span>Hechos</span><span class="pauta-hechos-badge">' + enAcordeon.length + '</span></button>';
+    if (pautaHechosAbierto) html += enAcordeon.map(filaHtml).join('');
   }
   cont.innerHTML = html;
 }
@@ -1615,6 +1633,14 @@ async function toggleHechoPauta(id) {
   const it = cachePauta.pauta.find(x => x.id === id);
   if (!it) return;
   it.estadoBorrador = it.estadoBorrador === 'Hecho' ? '' : 'Hecho';
+  // NUEVO 24/07/2026 (con Osmar): marcar una empanada Hecho siembra su desglose con el
+  // valor por defecto (todas horneadas) — sin modal, sin toque extra, sin interrumpir el
+  // checklist. Desmarcarla lo borra: si el producto vuelve a pendiente, lo declarado sobre
+  // cómo se repartió deja de tener sentido.
+  if (it.dual) {
+    if (it.estadoBorrador === 'Hecho') asegurarDesglose_(it);
+    else { delete desgloseEmpanadas[id]; if (desgloseAbierto === id) desgloseAbierto = null; }
+  }
   pintarPauta();
   await llamarAPISilencioso('actualizarBorradorPauta', { data: { id: id, estadoBorrador: it.estadoBorrador, cantidadBorrador: it.cantidadBorrador } });
 }
@@ -1623,6 +1649,14 @@ async function cambiarCantidadBorradorPauta(id, val) {
   const it = cachePauta.pauta.find(x => x.id === id);
   if (!it) return;
   it.cantidadBorrador = Math.max(0, Number(val) || 0);
+  // Si cambia el total de una empanada ya marcada, se conserva lo declarado como congeladas
+  // y se recalcula el resto — cambiar la cantidad no es motivo para perder el dato.
+  if (it.dual && desgloseEmpanadas[id]) {
+    const d = desgloseEmpanadas[id];
+    d.congeladas = Math.min(d.congeladas, it.cantidadBorrador);
+    d.horneadas = Math.max(0, it.cantidadBorrador - d.congeladas);
+    pintarPauta();
+  }
   await llamarAPISilencioso('actualizarBorradorPauta', { data: { id: id, estadoBorrador: it.estadoBorrador, cantidadBorrador: it.cantidadBorrador } });
 }
 
@@ -1683,11 +1717,11 @@ async function revisarPauta() {
     document.getElementById('pauta-error').textContent = 'No hay nada que confirmar.';
     return;
   }
+  // Red de seguridad: toda empanada completada tiene que llegar acá con desglose sembrado.
+  // toggleHechoPauta ya lo hace al marcarla; esto cubre cualquier ítem que haya quedado en
+  // 'Hecho' por otra vía (borrador recuperado del servidor, por ejemplo).
+  completados.filter(it => it.dual).forEach(asegurarDesglose_);
   pintarResumenPauta(completados, faltantes);
-  // El stock congelado de Vegan Corner se pide solo si hay empanadas que confirmar; en una
-  // pauta de puros pasteles no se toca la red al pedo.
-  if (completados.some(it => it.dual)) await cargarStockVC_();
-  pintarDesgloseEmpanadas_(completados);
   const obsTextarea = document.getElementById('resumen-pauta-observacion');
   obsTextarea.value = pautaObservacionBorrador;
   // NUEVO 23/07/2026 (con Osmar): con pauta completa el campo es solo "Observaciones",
@@ -1698,14 +1732,28 @@ async function revisarPauta() {
   irA('screen-resumen-pauta');
 }
 
+// NUEVO 24/07/2026 (con Osmar): la Revisión ya no pregunta el desglose, lo muestra. Es una
+// línea de lectura con salida a corregir — el dato ya viene declarado desde la Pauta.
+function lineaDesgloseResumen_(it, esAncho) {
+  if (!it.dual || !desgloseEmpanadas[it.id]) return '';
+  const cuerpo = '<span class="dg-resumen-txt">' + fraseDesglose_(desgloseEmpanadas[it.id]) + '</span>' +
+    '<span class="dg-linea-cta">Cambiar</span>';
+  if (esAncho) {
+    return '<tr><td colspan="2" style="padding:0 6px 8px;"><button class="dg-resumen" onclick="corregirDesglose_(\'' + it.id + '\')">' + cuerpo + '</button></td></tr>';
+  }
+  return '<button class="dg-resumen" onclick="corregirDesglose_(\'' + it.id + '\')">' + cuerpo + '</button>';
+}
+
 function filaResumenPauta_(it, atenuado) {
   const cant = it.cantidadBorrador !== null && it.cantidadBorrador !== undefined ? it.cantidadBorrador : it.cantidadProgramada;
   if (window.matchMedia('(min-width: 900px)').matches) {
     return '<tr' + (atenuado ? ' style="opacity:.6;"' : '') + '><td style="padding:9px 6px;"><div style="font-weight:700;">' + it.producto + '</div>' + (it.comentario ? '<div style="font-size:10.5px;color:var(--ink-soft);margin-top:2px;">' + it.comentario + '</div>' : '') + '</td>' +
-      '<td style="padding:9px 6px;text-align:right;font-family:\'JetBrains Mono\',monospace;font-weight:700;">' + cant + '</td></tr>';
+      '<td style="padding:9px 6px;text-align:right;font-family:\'JetBrains Mono\',monospace;font-weight:700;">' + cant + '</td></tr>' +
+      (atenuado ? '' : lineaDesgloseResumen_(it, true));
   }
   return '<div class="resumen-fila' + (atenuado ? ' atenuado' : '') + '"><span>' + it.producto + '</span><strong>' + cant + '</strong></div>' +
-    (it.comentario ? '<p class="resumen-fila-nota">' + it.comentario + '</p>' : '');
+    (it.comentario ? '<p class="resumen-fila-nota">' + it.comentario + '</p>' : '') +
+    (atenuado ? '' : lineaDesgloseResumen_(it, false));
 }
 
 function pintarResumenPauta(completados, faltantes) {
@@ -1735,79 +1783,130 @@ function pintarResumenPauta(completados, faltantes) {
   document.getElementById('resumen-pauta-total').textContent = texto;
 }
 
-// ===== DESGLOSE HORNEADAS/CONGELADAS + STOCK VC (NUEVO 22/07/2026 — con Osmar) =====
+// ===== DESGLOSE HORNEADAS/CONGELADAS (REDISEÑO 24/07/2026 — con Osmar) =====
 // Por qué existe: EntregaDetalle guardaba solo "Empanada Pino Soya, 42" y no había forma
 // de saber a cuál cubeta entró. Con eso, el movimiento de empanadas era incalculable y el
 // sistema mostraba números falsos (ver mapaMovimiento_ en Produccion.gs).
-// Solo aparece para los productos que el catálogo tiene con las dos categorías; el resto
-// de la pauta no cambia en nada.
+//
+// POR QUÉ SE MOVIÓ ACÁ (antes vivía en la pantalla de Revisión):
+// 1) No persistía. pintarDesgloseEmpanadas_ hacía `desgloseEmpanadas = {}` en CADA entrada
+//    al resumen: llenar las 5 empanadas, tocar "Volver a editar" y regresar borraba todo,
+//    sin aviso. Era el único dato del flujo que no sobrevivía, mientras estadoBorrador y
+//    cantidadBorrador sí se guardaban en el servidor en cada toque.
+// 2) Arrancaba en 0/0, o sea que la pantalla abría con "faltan N de las N" en alerta para
+//    cada empanada, siempre. En EntregaDetalle las congeladas fueron 0 en el 100% de las
+//    entregas con desglose: el valor por defecto era justo el único que nunca es correcto.
+// 3) Preguntaba al final del día por 5 productos a la vez, obligando a reconstruir 5 hechos
+//    de memoria. Ahora se declara al marcar Hecho, que es cuando la respuesta está a mano.
+// 4) Una pantalla de confirmación que pide datos nuevos no es una confirmación. La Revisión
+//    vuelve a ser solo lectura: muestra cómo quedó cada empanada, no la pregunta.
+//
+// El bloque de "Stock congelado que queda acá" salió de la Revisión y no se reemplaza: ya
+// tiene su pantalla dedicada (Conteo en modo stock congelado, ver linea ~466). Eran dos
+// conteos físicos distintos metidos en la misma pantalla.
 let desgloseEmpanadas = {};   // { programaId: {horneadas, congeladas} }
-let stockVCBorrador = {};     // { producto: cantidad } — reserva que queda en Vegan Corner
+let desgloseAbierto = null;   // programaId con el editor abierto — uno a la vez
 
-function pintarDesgloseEmpanadas_(completados) {
-  const duales = completados.filter(it => it.dual);
-  const wrap = document.getElementById('desglose-empanadas-wrap');
-  const wrapVC = document.getElementById('stock-vc-wrap');
-  if (!duales.length) {
-    wrap.style.display = 'none'; wrapVC.style.display = 'none';
-    desgloseEmpanadas = {}; stockVCBorrador = {};
-    return;
+function totalItemPauta_(it) {
+  return it.cantidadBorrador !== null && it.cantidadBorrador !== undefined ? it.cantidadBorrador : it.cantidadProgramada;
+}
+
+// Siembra el desglose con el valor por defecto: todas horneadas. Idempotente a propósito —
+// si la usuaria ya declaró algo (o viene de corregir desde la Revisión) no se pisa.
+function asegurarDesglose_(it) {
+  if (!desgloseEmpanadas[it.id]) {
+    const total = Number(totalItemPauta_(it)) || 0;
+    desgloseEmpanadas[it.id] = { horneadas: total, congeladas: 0 };
   }
-  wrap.style.display = '';
-  desgloseEmpanadas = {};
-  document.getElementById('desglose-empanadas-lista').innerHTML = duales.map(it => {
-    const total = it.cantidadBorrador !== null && it.cantidadBorrador !== undefined ? it.cantidadBorrador : it.cantidadProgramada;
-    desgloseEmpanadas[it.id] = { horneadas: 0, congeladas: 0 };
-    return '<div class="desglose-fila">' +
-      '<p class="desglose-nombre">' + it.producto + '</p>' +
-      '<div class="desglose-campos">' +
-        '<div class="desglose-campo"><label>Horneadas</label>' +
-          '<input type="number" min="0" id="dg-h-' + it.id + '" value="0" oninput="cambiarDesglose_(\'' + it.id + '\',\'horneadas\',this.value,' + total + ')"></div>' +
-        '<div class="desglose-campo"><label>Congeladas</label>' +
-          '<input type="number" min="0" id="dg-c-' + it.id + '" value="0" oninput="cambiarDesglose_(\'' + it.id + '\',\'congeladas\',this.value,' + total + ')"></div>' +
-      '</div>' +
-      '<p class="desglose-suma" id="dg-s-' + it.id + '">Total 0 · faltan ' + total + ' de las ' + total + ' producidas</p>' +
-    '</div>';
-  }).join('');
-
-  // Stock congelado que QUEDA en Vegan Corner. Es un dato distinto del desglose: el
-  // desglose es lo que sale hacia Cima, esto es la reserva de acá. No se puede deducir de
-  // las entregas (Vegan Corner también produce y vende directo), por eso se declara.
-  // Aparece en este momento porque es cuando Katherine tiene el congelador a la vista.
-  wrapVC.style.display = '';
-  const productos = [...new Set(duales.map(it => it.producto))];
-  stockVCBorrador = {};
-  document.getElementById('stock-vc-lista').innerHTML = productos.map(prod => {
-    const actual = (cacheStockVC && cacheStockVC[prod] !== undefined) ? cacheStockVC[prod] : 0;
-    stockVCBorrador[prod] = actual;
-    return '<div class="stockvc-fila">' +
-      '<span class="stockvc-nombre">' + prod + '</span>' +
-      '<input type="number" min="0" value="' + actual + '" oninput="cambiarStockVC_(\'' + prod.replace(/'/g, "\\'") + '\',this.value)">' +
-    '</div>';
-  }).join('');
+  return desgloseEmpanadas[it.id];
 }
 
-function cambiarDesglose_(id, campo, valor, total) {
-  if (!desgloseEmpanadas[id]) desgloseEmpanadas[id] = { horneadas: 0, congeladas: 0 };
-  desgloseEmpanadas[id][campo] = Number(valor) || 0;
-  const suma = desgloseEmpanadas[id].horneadas + desgloseEmpanadas[id].congeladas;
-  const el = document.getElementById('dg-s-' + id);
-  // No bloquea: puede haber merma legítima (se quemó una tanda). Solo avisa.
-  if (suma === total) el.className = 'desglose-suma ok', el.textContent = 'Total ' + suma + ' · coincide con lo producido';
-  else if (suma < total) el.className = 'desglose-suma alerta', el.textContent = 'Total ' + suma + ' · faltan ' + (total - suma) + ' de las ' + total + ' producidas';
-  else el.className = 'desglose-suma alerta', el.textContent = 'Total ' + suma + ' · ' + (suma - total) + ' más que las ' + total + ' producidas';
+function fraseDesglose_(d) {
+  if (!d.congeladas) return '<b>' + d.horneadas + '</b> horneadas · ninguna congelada';
+  if (!d.horneadas) return 'ninguna horneada · <b>' + d.congeladas + '</b> congeladas';
+  return '<b>' + d.horneadas + '</b> horneadas · <b>' + d.congeladas + '</b> congeladas';
 }
 
-function cambiarStockVC_(producto, valor) {
-  stockVCBorrador[producto] = Number(valor) || 0;
+function textoAvisoDesglose_(d, total) {
+  const suma = d.horneadas + d.congeladas;
+  if (suma === total) return '';
+  return 'Total ' + suma + ' · ' + (suma < total ? 'faltan ' + (total - suma) : (suma - total) + ' de más') + ' respecto de las ' + total + ' que envías';
 }
 
-let cacheStockVC = null; // { producto: stockActual } — para precargar los campos
+// Devuelve el bloque que va DENTRO de la fila del producto, debajo del nombre. Vacío para
+// todo lo que no sea una empanada marcada Hecho: el resto de la pauta no cambia en nada.
+function bloqueDesglosePauta_(it) {
+  if (!it.dual || it.estadoBorrador !== 'Hecho' || pautaSoloLectura) return '';
+  const d = asegurarDesglose_(it);
+  const total = Number(totalItemPauta_(it)) || 0;
 
-async function cargarStockVC_() {
-  const r = await llamarAPISilencioso('obtenerStockCongeladoVC', {});
-  cacheStockVC = {};
-  if (r && r.ok) (r.stock || []).forEach(s => { cacheStockVC[s.producto] = s.stockActual; });
+  if (desgloseAbierto !== it.id) {
+    return '<button class="dg-linea" onclick="abrirDesglose_(\'' + it.id + '\')">' +
+      '<span class="dg-linea-txt">' + fraseDesglose_(d) + '</span>' +
+      '<span class="dg-linea-cta">Cambiar <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"></path></svg></span>' +
+    '</button>';
+  }
+
+  const aviso = textoAvisoDesglose_(d, total);
+  return '<div class="dg-abierto">' +
+    '<p class="dg-pregunta">De las ' + total + ' que envías, ¿cuántas van congeladas?</p>' +
+    '<div class="dg-campos">' +
+      '<div class="dg-campo"><label for="dg-h-' + it.id + '">Horneadas</label>' +
+        '<input type="number" min="0" id="dg-h-' + it.id + '" value="' + d.horneadas + '" oninput="cambiarDesglose_(\'' + it.id + '\',\'horneadas\',this.value)"></div>' +
+      '<div class="dg-campo"><label for="dg-c-' + it.id + '">Congeladas</label>' +
+        '<input type="number" min="0" id="dg-c-' + it.id + '" value="' + d.congeladas + '" oninput="cambiarDesglose_(\'' + it.id + '\',\'congeladas\',this.value)"></div>' +
+    '</div>' +
+    '<p class="dg-aviso" id="dg-aviso-' + it.id + '"' + (aviso ? '' : ' style="display:none;"') + '>' + aviso + '</p>' +
+    '<button class="dg-listo" onclick="cerrarDesglose_()">Listo</button>' +
+  '</div>';
+}
+
+function abrirDesglose_(id) {
+  desgloseAbierto = id;
+  pintarPauta();
+  const inp = document.getElementById('dg-c-' + id);
+  if (inp) { inp.focus(); inp.select(); }
+}
+
+function cerrarDesglose_() {
+  desgloseAbierto = null;
+  pintarPauta();
+}
+
+// No repinta la pauta en cada tecla a propósito: un pintarPauta() por keystroke le saca el
+// foco al input y pierde el cursor. Se parchea sólo el campo hermano y el aviso.
+function cambiarDesglose_(id, campo, valor) {
+  const it = cachePauta.pauta.find(x => x.id === id);
+  if (!it) return;
+  const d = asegurarDesglose_(it);
+  const total = Number(totalItemPauta_(it)) || 0;
+  d[campo] = Math.max(0, Number(valor) || 0);
+  // Escribir congeladas ajusta horneadas sola — lo normal es declarar cuántas van al
+  // congelador y que el resto se entienda horneado. Editar horneadas a mano NO toca
+  // congeladas: esa es la puerta para declarar merma (se quemó una tanda), y recién ahí
+  // aparece el aviso de descuadre. Antes el aviso salía siempre, de entrada.
+  if (campo === 'congeladas') {
+    d.horneadas = Math.max(0, total - d.congeladas);
+    const inpH = document.getElementById('dg-h-' + id);
+    if (inpH) inpH.value = d.horneadas;
+  }
+  const el = document.getElementById('dg-aviso-' + id);
+  if (!el) return;
+  const aviso = textoAvisoDesglose_(d, total);
+  el.textContent = aviso;
+  el.style.display = aviso ? '' : 'none';
+}
+
+// Desde la Revisión: vuelve a la Pauta con el editor de ese producto abierto y la fila a
+// la vista. Un solo lugar donde se edita el desglose.
+function corregirDesglose_(id) {
+  desgloseAbierto = id;
+  irA('screen-pauta');
+  pintarPauta();
+  const fila = document.getElementById('pauta-row-' + id);
+  if (fila && fila.scrollIntoView) fila.scrollIntoView({ block: 'center' });
+  const inp = document.getElementById('dg-c-' + id);
+  if (inp) { inp.focus(); inp.select(); }
 }
 
 async function confirmarProduccion() {
@@ -1824,13 +1923,7 @@ async function confirmarProduccion() {
   const r = await llamarAPI('confirmarPauta', { data: { responsable: sesion.nombre, agregadosIds: pautaAgregadosSesion, observacion: pautaObservacionBorrador, desglose: desgloseEmpanadas } });
   if (!r.ok) { document.getElementById('resumen-pauta-error').textContent = r.error || 'Error al confirmar producción'; return; }
 
-  // El stock de Vegan Corner se guarda después de confirmar y en silencio: si falla, la
-  // producción ya quedó registrada, que es lo que no se puede perder.
-  Object.keys(stockVCBorrador).forEach(prod => {
-    llamarAPISilencioso('actualizarStockCongeladoVC', { data: { producto: prod, stockActual: stockVCBorrador[prod], responsable: sesion.nombre } });
-  });
-  desgloseEmpanadas = {}; stockVCBorrador = {}; cacheStockVC = null;
-
+  desgloseEmpanadas = {}; desgloseAbierto = null;
   cachePauta = null; pautaAgregadosSesion = []; pautaObservacionBorrador = '';
   document.getElementById('confirm-title').textContent = 'Producción confirmada';
   document.getElementById('confirm-msg').textContent = r.completados.length + ' producto' + (r.completados.length === 1 ? '' : 's') + ' completado' + (r.completados.length === 1 ? '' : 's') +
