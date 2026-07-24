@@ -144,6 +144,27 @@
 .pauta-hechos-toggle{width:100%;display:flex;align-items:center;gap:9px;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:13px 12px;margin:14px 0;cursor:pointer;font-family:inherit;color:var(--ink-soft);font-size:13.5px;}
 .pauta-hechos-toggle span:first-of-type{flex:1;text-align:left;}
 .pauta-hechos-badge{font-size:12.5px;font-weight:700;color:var(--forest);background:var(--forest-soft);padding:3px 9px;border-radius:20px;}
+/* Desglose horneadas/congeladas dentro de la fila de la Pauta (REDISEÑO 24/07/2026).
+   La línea ENTERA es el botón: 44px de alto, borde forest y la palabra "Cambiar" a la
+   derecha. Antes era un input suelto que nadie identificaba como accionable. El margen
+   izquierdo de 34px la alinea bajo el nombre del producto, igual que .pauta-obs. */
+.dg-linea{display:flex;align-items:center;gap:8px;width:calc(100% - 34px);margin:9px 0 0 34px;min-height:44px;padding:9px 11px;border:1.5px solid var(--forest);border-radius:9px;background:#fff;font-family:inherit;text-align:left;cursor:pointer;}
+.dg-linea-txt{flex:1;font-size:12.5px;color:var(--ink-soft);}
+.dg-linea-txt b,.dg-resumen-txt b{font-family:'JetBrains Mono',monospace;font-weight:700;color:var(--forest);font-size:13.5px;}
+.dg-linea-cta{display:flex;align-items:center;gap:4px;font-size:12.5px;font-weight:700;color:var(--forest);flex-shrink:0;}
+.dg-abierto{width:calc(100% - 34px);margin:9px 0 0 34px;padding:11px 12px;border:1.5px solid var(--forest);border-radius:9px;background:#fff;}
+.dg-pregunta{margin:0 0 9px;font-size:12.5px;color:var(--ink-soft);}
+.dg-campos{display:flex;gap:10px;}
+.dg-campo{flex:1;}
+.dg-campo label{display:block;font-size:12.5px;color:var(--ink-soft);margin-bottom:5px;}
+.dg-campo input{height:44px;text-align:right;font-family:'JetBrains Mono',monospace;font-size:16px;}
+/* Solo aparece cuando la suma NO cuadra — antes el aviso salía siempre, de entrada. */
+.dg-aviso{margin:8px 0 0;font-size:12px;color:var(--terracotta);}
+.dg-listo{width:100%;margin-top:10px;padding:11px;border:none;border-radius:9px;background:var(--forest);color:#fff;font-size:14px;font-weight:600;font-family:inherit;cursor:pointer;}
+.dg-fila-desktop .dg-linea,.dg-fila-desktop .dg-abierto{width:100%;margin-left:0;}
+/* Línea de solo lectura en la pantalla de Revisión. */
+.dg-resumen{display:flex;align-items:center;gap:8px;width:100%;min-height:38px;margin:0 0 8px;padding:6px 2px;border:none;border-bottom:1px solid var(--border);background:none;font-family:inherit;text-align:left;cursor:pointer;}
+.dg-resumen-txt{flex:1;font-size:12px;color:var(--ink-soft);}
 
 .notif-card .n-fecha{font-size:11px;color:var(--ink-soft);margin:0 0 10px;}
 .notif-card .n-acciones{display:flex;gap:8px;flex-wrap:wrap;}
@@ -867,16 +888,6 @@
   </div>
   <h2 style="font-size:17px;">Revisar antes de confirmar</h2>
   <div id="resumen-pauta-lista"></div>
-  <div id="desglose-empanadas-wrap" style="display:none;">
-    <p class="resumen-seccion-titulo">Cómo va cada empanada</p>
-    <p class="desglose-ayuda">Sin este dato no se puede calcular cuánto se vendió.</p>
-    <div id="desglose-empanadas-lista"></div>
-  </div>
-  <div id="stock-vc-wrap" style="display:none;">
-    <p class="resumen-seccion-titulo">Congeladas que quedan acá</p>
-    <p class="desglose-ayuda">Ajusta si cambió. Es la reserva de Vegan Corner.</p>
-    <div id="stock-vc-lista"></div>
-  </div>
   <p class="resumen-total" id="resumen-pauta-total"></p>
   <div id="resumen-pauta-observacion-wrap">
     <label class="pauta-obs-label">Observación de esta pauta</label>
