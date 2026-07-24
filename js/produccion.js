@@ -72,33 +72,64 @@ function conteoAjustado_(key) {
 }
 
 async function abrirConteo(forzar) {
+  // REDISEÑO 24/07/2026 (con Osmar): el flujo de apertura cambia de "todo mezclado en la
+  // pantalla de conteo" a una SECUENCIA con prioridad:
+  //   1. ¿Hay una entrega de Vegan Corner pendiente de recepción? → pantalla propia primero.
+  //   2. Recién después (o si se pospone) → el conteo, o el modal de borrador si hay uno.
+  // Y la velocidad, bien puesta: mientras la persona lee/decide la recepción, el catálogo del
+  // conteo se carga EN PARALELO de fondo (precargaConteoPromesa_), así al salir de recepción
+  // el conteo ya está listo, sin la espera secuencial que había antes.
+  //
+  // Vegan Corner no recepciona (no reciben entregas de sí mismos): para ellos, directo al
+  // conteo, igual que antes.
+  if (forzar && Object.keys(conteoCantidades).length) await guardarBorradorConteo_();
+  const necesitaCatalogo = !cacheConteoCatalogo || forzar;
+
+  // Dispara la carga del catálogo YA, sin await — corre de fondo mientras se decide la
+  // recepción. Si no hace falta recargarlo, la promesa resuelve al toque.
+  precargaConteoPromesa_ = necesitaCatalogo ? cargarCatalogoConteo_() : Promise.resolve(true);
+
+  // La recepción solo aplica a Cima. Se consulta antes de decidir a qué pantalla ir.
+  if (!esVeganCorner_()) {
+    let rec = null;
+    try { rec = await llamarAPISilencioso('obtenerEntregasPendientesRecepcion'); } catch (e) { rec = null; }
+    if (rec && rec.ok && rec.items && rec.items.length) {
+      mostrarPantallaRecepcion_(rec);
+      return; // el conteo se abre desde las salidas de la pantalla de recepción
+    }
+  }
+  await entrarAlConteo_();
+}
+
+// Carga el catálogo del conteo y siembra la precarga. Separada de abrirConteo para poder
+// dispararla en paralelo. Devuelve true si quedó lista, false si falló.
+async function cargarCatalogoConteo_() {
+  const r = await llamarAPISilencioso('obtenerCatalogoProduccion', { soloConteo: true });
+  if (!r || !r.ok) return false;
+  cacheConteoCatalogo = r;
+  conteoCategoriasActivas = esVeganCorner_() ? new Set(['Empanadas Congeladas']) : new Set();
+  precargarConteo_();
+  return true;
+}
+
+// Abre la pantalla de conteo propiamente tal: espera a que el catálogo (que venía cargando
+// de fondo) esté listo, pinta, y ofrece el borrador si hay uno. Es el destino común de las
+// dos salidas de la recepción y del caso sin recepción.
+async function entrarAlConteo_() {
   irA('screen-conteo');
   document.getElementById('btn-retiro-vc').style.display = tienePermisoLocal('RegistrarConteo') ? '' : 'none';
-  // El botón de refrescar (forzar) borra conteoCantidades — guardamos antes para que un
-  // toque accidental a mitad de conteo no pierda lo contado.
-  if (forzar && Object.keys(conteoCantidades).length) await guardarBorradorConteo_();
-  if (!cacheConteoCatalogo || forzar) {
-    document.getElementById('conteo-chips').innerHTML = skeletonCards(1);
-    document.getElementById('conteo-lista').innerHTML = skeletonCards(4);
-    const r = await llamarAPI('obtenerCatalogoProduccion', { soloConteo: true });
-    if (!r.ok) {
-      document.getElementById('conteo-lista').innerHTML = '<p class="error-msg">' + (r.error || 'Error al cargar el catálogo') + '</p>';
-      return;
-    }
-    cacheConteoCatalogo = r;
-    // Por defecto NINGUNA categoría activa — que Rocío/el staff elija qué va a contar
-    // en vez de arrancar con todo desplegado (confuso, mucho para escanear de una).
-    // Para Vegan Corner no aplica: solo existe una categoría posible para ellos.
-    conteoCategoriasActivas = esVeganCorner_() ? new Set(['Empanadas Congeladas']) : new Set();
-    precargarConteo_();
+  document.getElementById('conteo-chips').innerHTML = skeletonCards(1);
+  document.getElementById('conteo-lista').innerHTML = skeletonCards(4);
+  const ok = await (precargaConteoPromesa_ || Promise.resolve(false));
+  if (!ok && !cacheConteoCatalogo) {
+    document.getElementById('conteo-lista').innerHTML = '<p class="error-msg">Error al cargar el catálogo. Toca el botón de recargar.</p>';
+    return;
   }
   if (document.getElementById('screen-conteo').classList.contains('active')) pintarConteo();
-  // CORRECCIÓN 22/07/2026: antes esta llamada iba DESPUÉS de ofrecerBorradorConteo_, así
-  // que cualquier excepción allá dejaba el bloque de recepción sin dibujar y sin rastro.
-  // Ahora va primero y con su propio try/catch: los dos caminos son independientes.
-  try { await cargarRecepcionPendiente_(); } catch (e) { console.error('[recepcion] falló la carga:', e); }
   await ofrecerBorradorConteo_();
 }
+
+let precargaConteoPromesa_ = null;   // promesa de carga del catálogo, corriendo de fondo
 
 // ============ BORRADOR AUTOMÁTICO DE CONTEO (NUEVO 21/07/2026 — con Osmar) ============
 // Antes, todo lo contado vivía SOLO en conteoCantidades (memoria del navegador): si el
@@ -1780,23 +1811,69 @@ async function mostrarBuscadorPauta() {
   document.querySelector('#ss-pauta-producto input[type=text]').focus();
 }
 
+// Un producto es "dual" (empanada con desglose horneada/congelada) cuando aparece en el
+// catálogo con MÁS de una categoría — el mismo criterio que mapaProductosDuales_ en el
+// servidor, pero calculado en el cliente sobre cacheCatalogoPauta que ya está cargado. Sirve
+// para que el modo optimista (agregar sin esperar al servidor) sepa desde el primer momento
+// si el ítem lleva desglose, sin depender del r.dual que devolvía la llamada.
+function esProductoDualLocal_(productoProduccion) {
+  if (!cacheCatalogoPauta) return false;
+  const cats = new Set();
+  cacheCatalogoPauta.catalogo.forEach(p => {
+    if (p.productoProduccion === productoProduccion) cats.add(p.categoria);
+  });
+  return cats.size > 1;
+}
+
+// REDISEÑO 24/07/2026 (con Osmar — velocidad): modo optimista, el mismo patrón que ya usa
+// marcar Hecho (toggleHechoPauta, 15/07). Antes cada "+ Agregar producto" llamaba a llamarAPI,
+// que bloquea la pantalla con el overlay de carga: agregar tres productos = tres congelamientos
+// seguidos. Ahora el producto aparece EN EL ACTO y el guardado va de fondo (llamarAPISilencioso),
+// así se pueden agregar varios sin espera.
+//
+// El id se genera en el cliente con el mismo formato que nuevoId('PROG') del servidor
+// (prefijo-timestamp-random), y se le pasa al servidor para que use ESE id — así el borrador
+// (actualizarBorradorPauta, que referencia el id) queda consistente sin esperar respuesta.
+//
+// Si el servidor falla, se revierte: el producto se saca de la lista y se avisa. Es el precio
+// del modo optimista, asumido a conciencia (mismo trade-off que marcar Hecho).
+function nuevoIdPautaLocal_() {
+  return 'PROG-' + Date.now() + '-' + Math.floor(Math.random() * 1000);
+}
+
 async function agregarProductoPauta(valor, opciones) {
   const opt = opciones.find(o => o.value === valor);
-  const r = await llamarAPI('agregarItemPautaDirecto', { data: { producto: valor, cantidad: 1, responsable: sesion.nombre } });
-  if (!r.ok) { document.getElementById('pauta-error').textContent = r.error || 'No se pudo agregar el producto'; return; }
-  cachePauta.pauta.push({
-    id: r.id, fecha: fechaLocalISO(), producto: opt ? opt.label : valor, cantidadProgramada: 1,
+  const id = nuevoIdPautaLocal_();
+  const item = {
+    id: id, fecha: fechaLocalISO(), producto: opt ? opt.label : valor, cantidadProgramada: 1,
     estado: 'Programado', responsable: sesion.nombre, conteoId: '', cantidadContada: null,
     comentario: '', estadoBorrador: '', cantidadBorrador: null,
-    // NUEVO 23/07/2026 (con Osmar): sin este campo, un producto agregado directo (no desde
-    // pedido de Cima) nunca mostraba el desglose horneada/congelada al confirmar, aunque
-    // fuera empanada — el servidor ahora lo calcula y lo manda en la misma respuesta.
-    dual: !!r.dual, observacionPedido: ''
-  });
-  pautaAgregadosSesion.push(r.id);
+    dual: esProductoDualLocal_(valor), observacionPedido: ''
+  };
+  // Optimista: aparece ya y el buscador queda listo para el siguiente.
+  cachePauta.pauta.push(item);
+  pautaAgregadosSesion.push(id);
   document.getElementById('ss-pauta-producto-wrap').style.display = 'none';
-  document.querySelector('#ss-pauta-producto input[type=text]').value = '';
+  const inp = document.querySelector('#ss-pauta-producto input[type=text]');
+  if (inp) inp.value = '';
   pintarPauta();
+
+  // Guardado de fondo con el id ya fijado. Si falla, se revierte lo agregado.
+  const r = await llamarAPISilencioso('agregarItemPautaDirecto', { data: { id: id, producto: valor, cantidad: 1, responsable: sesion.nombre } });
+  if (!r || !r.ok) {
+    cachePauta.pauta = cachePauta.pauta.filter(x => x.id !== id);
+    const i = pautaAgregadosSesion.indexOf(id);
+    if (i !== -1) pautaAgregadosSesion.splice(i, 1);
+    pintarPauta();
+    document.getElementById('pauta-error').textContent = (r && r.error) || 'No se pudo agregar "' + (opt ? opt.label : valor) + '". Intenta de nuevo.';
+    return;
+  }
+  // El servidor puede corregir el dato de dual (fuente de verdad). Si difiere, se ajusta —
+  // sin quitar ni volver a pintar de más si coincide, que es el caso normal.
+  if (typeof r.dual === 'boolean' && r.dual !== item.dual) {
+    item.dual = r.dual;
+    pintarPauta();
+  }
 }
 
 // NUEVO 16/07/2026 (con Osmar): resumen antes de confirmar — se calcula 100% en el cliente,
@@ -2114,58 +2191,30 @@ window.addEventListener('resize', () => {
 let recepcionPendiente = null;    // { items:[{fila, programaId, producto, cantidadEntregada}], responsable, fecha }
 let recepcionCantidades = {};     // fila de EntregaDetalle -> cantidad que se va a confirmar
 
-// CORRECCIÓN 22/07/2026 (con Osmar): esta función fallaba en silencio. Cualquier problema
-// — API caída, acción no desplegada, contenedor ausente, error al dibujar — terminaba en
-// un `return` mudo que dejaba el contenedor vacío. Un fallo real y "no hay entregas
-// pendientes" se veían exactamente igual, y eso costó una tarde de diagnóstico a ciegas.
-// Ahora el único caso que borra el contenedor sin decir nada es el legítimo: no hay nada
-// pendiente. Todo lo demás se muestra en pantalla y se registra en consola.
-function avisoRecepcionHtml_(mensaje) {
-  return '<div class="recep-bloque"><p class="error-msg" style="margin:0;">Recepción: ' + mensaje + '</p></div>';
-}
-
-async function cargarRecepcionPendiente_() {
-  const cont = document.getElementById('conteo-recepcion');
-  if (!cont) { console.error('[recepcion] no existe #conteo-recepcion en el DOM — index.html desactualizado'); return; }
-  recepcionPendiente = null;
-  recepcionCantidades = {};
-  if (esVeganCorner_()) { cont.innerHTML = ''; return; }
-
-  let r;
-  try {
-    r = await llamarAPISilencioso('obtenerEntregasPendientesRecepcion');
-  } catch (e) {
-    console.error('[recepcion] excepción al llamar la API:', e);
-    cont.innerHTML = avisoRecepcionHtml_('no se pudo consultar al servidor (' + e.message + ')');
-    return;
-  }
-  console.log('[recepcion] respuesta de la API:', r);
-
-  if (!r) { cont.innerHTML = avisoRecepcionHtml_('el servidor no respondió.'); return; }
-  if (!r.ok) { cont.innerHTML = avisoRecepcionHtml_(r.error || 'el servidor respondió con error.'); return; }
-  if (!r.items || !r.items.length) { cont.innerHTML = ''; return; }   // único vaciado legítimo
-
+// NUEVO 24/07/2026 (con Osmar): la recepción pasó de bloque-en-el-conteo a PANTALLA PROPIA
+// previa. La consulta al servidor la hace ahora abrirConteo (para poder decidir a qué
+// pantalla ir antes de dibujar nada); estas funciones solo pintan y manejan las salidas.
+//
+// recibe el objeto de respuesta ya validado (ok + items con contenido) desde abrirConteo.
+function mostrarPantallaRecepcion_(r) {
   recepcionPendiente = r;
+  recepcionCantidades = {};
   // Prellenado con lo declarado por Vegan Corner. La persona en Cima ajusta solo si llegó
   // distinto — el caso normal es tocar nada y confirmar.
   r.items.forEach(it => { recepcionCantidades[it.fila] = it.cantidadEntregada; });
-  try {
-    pintarBloqueRecepcion_();
-    console.log('[recepcion] bloque dibujado con ' + r.items.length + ' productos');
-  } catch (e) {
-    console.error('[recepcion] error al dibujar:', e);
-    cont.innerHTML = avisoRecepcionHtml_('error al dibujar el bloque (' + e.message + ')');
-  }
+  irA('screen-recepcion');
+  const err = document.getElementById('recep-error'); if (err) err.textContent = '';
+  const obs = document.getElementById('recep-obs'); if (obs) obs.value = '';
+  const sub = document.getElementById('recep-sub');
+  if (sub) sub.textContent = [r.responsable, r.fecha].filter(x => x).join(' · ') + ' · ajusta solo si llegó distinto';
+  pintarListaRecepcion_();
 }
 
-function pintarBloqueRecepcion_() {
-  const cont = document.getElementById('conteo-recepcion');
+function pintarListaRecepcion_() {
+  const cont = document.getElementById('recep-lista');
   if (!cont || !recepcionPendiente) return;
-  const r = recepcionPendiente;
-  const sub = [r.responsable, r.fecha].filter(x => x).join(' · ');
-
   let filas = '';
-  r.items.forEach(it => {
+  recepcionPendiente.items.forEach(it => {
     const val = recepcionCantidades[it.fila] !== undefined ? recepcionCantidades[it.fila] : it.cantidadEntregada;
     filas += '<div class="recep-row">' +
       '<span>' + it.producto + '</span>' +
@@ -2176,17 +2225,15 @@ function pintarBloqueRecepcion_() {
       '</div>' +
     '</div>';
   });
+  cont.innerHTML = filas;
+}
 
-  cont.innerHTML = '<div class="recep-bloque">' +
-    '<div class="recep-cab">' +
-      '<div class="recep-titulo serif">Confirmar recepción</div>' +
-      (sub ? '<div class="recep-sub">' + sub + '</div>' : '') +
-    '</div>' +
-    filas +
-    '<textarea id="recep-obs" class="recep-obs" rows="2" placeholder="Observación sobre este pedido (opcional) — se avisa a Vegan Corner"></textarea>' +
-    '<p class="error-msg" id="recep-error" style="margin:0 0 8px;"></p>' +
-    '<button class="btn-primary" onclick="confirmarRecepcion()">Confirmar recepción</button>' +
-  '</div>';
+// "Recepcionar luego": salta al conteo sin registrar nada. La entrega queda pendiente y
+// vuelve a aparecer la próxima vez que se abra Conteo.
+async function recepcionarLuego() {
+  recepcionPendiente = null;
+  recepcionCantidades = {};
+  await entrarAlConteo_();
 }
 
 // Se toca solo el input de esa fila, nunca se repinta el bloque entero: un repintado
@@ -2223,6 +2270,7 @@ async function confirmarRecepcion() {
   const n = r.confirmados || items.length;
   recepcionPendiente = null;
   recepcionCantidades = {};
-  const cont = document.getElementById('conteo-recepcion');
-  if (cont) cont.innerHTML = '<p class="recep-listo">Recepción confirmada \u00b7 ' + n + ' producto' + (n === 1 ? '' : 's') + '</p>';
+  // Confirmada la recepción, se sigue al conteo (que venía cargando de fondo). La constancia
+  // de lo recepcionado queda en el propio registro del servidor; acá basta con seguir.
+  await entrarAlConteo_();
 }
