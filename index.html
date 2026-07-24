@@ -41,6 +41,20 @@
 .chip-cat.activo{background:var(--forest);border-color:var(--forest);color:#fff;}
 .conteo-seccion-titulo{font-size:11px;color:var(--ink-soft);font-weight:800;text-transform:uppercase;letter-spacing:.4px;margin:14px 0 6px;}
 .conteo-row{display:flex;justify-content:space-between;align-items:center;padding:11px 0;border-bottom:1px solid var(--border);gap:10px;}
+/* Indicador de ajuste en el Conteo (NUEVO 24/07/2026 — con Osmar). Azul pizarra: color
+   deliberadamente NEUTRO. No es forest (marca), ni caramel (Vegan Corner), ni terracotta
+   (error) — un ajuste no significa ninguna de esas tres cosas, solo "esto lo cambiaste
+   respecto de la última vez". Las variables se definen acá y no en estilos.css para que
+   este archivo quede autocontenido. */
+.conteo-row{--azul:#2F6C8F;--azul-bg:#EEF4F7;padding-left:0;border-left:3px solid transparent;transition:border-color .15s,background .15s;}
+.conteo-row.ajustado{border-left-color:var(--azul);background:var(--azul-bg);padding-left:11px;}
+.conteo-row.ajustado .conteo-stepper input{border-color:var(--azul);color:var(--azul);font-weight:700;}
+.conteo-ref{font-size:11px;color:var(--ink-soft);}
+.conteo-deshacer{background:none;border:none;color:#2F6C8F;font-size:11px;font-weight:700;font-family:inherit;cursor:pointer;padding:0 2px;text-decoration:underline;}
+.conteo-fila-ajustada{--azul:#2F6C8F;--azul-bg:#EEF4F7;background:var(--azul-bg);}
+.conteo-fila-ajustada .conteo-stepper input{border-color:#2F6C8F;color:#2F6C8F;font-weight:700;}
+.conteo-resumen-barra{display:flex;align-items:center;gap:8px;background:var(--surface,#fff);border:1px solid var(--border);border-radius:11px;padding:10px 13px;margin-top:14px;font-size:13px;color:var(--ink-soft);}
+.conteo-resumen-barra b{color:var(--forest);}
 /* CORREGIDO 23/07/2026 (con Osmar): con nombres largos, el bloque del contador entero
    caía a la línea de abajo (flex-wrap:wrap en la fila + el span sin límite de ancho).
    flex:1 + min-width:0 hace que el TEXTO envuelva dentro de su propia columna, y el
