@@ -75,6 +75,16 @@
 .recep-row>span{font-size:15.5px;line-height:1.3;flex:1;min-width:0;}
 .recep-obs{width:100%;margin:12px 0 8px;min-height:60px;font-family:'Work Sans',sans-serif;font-size:14px;line-height:1.45;}
 .recep-listo{font-size:13.5px;color:var(--success);margin:0 0 14px;}
+/* Pantalla propia de recepción (NUEVO 24/07/2026 — con Osmar). */
+.recep-cinta{display:flex;align-items:center;gap:9px;background:var(--caramel-bg,#F5EEE4);border-left:4px solid var(--caramel);border-radius:0 10px 10px 0;padding:10px 12px;margin:0 0 16px;}
+.recep-cinta-ico{width:30px;height:30px;border-radius:50%;background:var(--caramel);color:#fff;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.recep-cinta-txt{font-size:12px;color:#5A4630;line-height:1.4;}
+.recep-cinta-txt b{font-weight:700;}
+.recep-sub-pantalla{font-size:12.5px;color:var(--ink-soft);margin:0 0 16px;}
+/* "Recepcionar luego": ámbar/caramel a propósito, NO terracotta. Terracotta está reservado
+   para errores/alertas (regla del sistema) y posponer no es un error — es una salida válida.
+   El caramel además es el color de Vegan Corner, de donde viene la entrega. */
+.btn-recepcion-luego{width:100%;margin-top:9px;padding:12px;border:1.5px solid var(--caramel);border-radius:11px;background:var(--caramel-bg,#F5EEE4);color:#6E5334;font-size:14.5px;font-weight:600;font-family:inherit;cursor:pointer;}
 
 .revision-row{border:1px solid var(--border);border-radius:11px;padding:11px 13px;margin-bottom:9px;}
 .revision-row.alerta{background:var(--terracotta-soft);border-color:var(--terracotta);}
@@ -924,13 +934,38 @@
     </div>
   </div>
   <h2 style="font-size:17px;">Contar stock</h2>
-  <div id="conteo-recepcion"></div>
   <p style="font-size:12px;color:var(--ink-soft);margin:0 0 10px;">Categorías</p>
   <div id="conteo-chips" class="conteo-chips"></div>
   <div id="conteo-aviso-congeladas" class="conteo-aviso" style="display:none;"></div>
   <div id="conteo-lista"></div>
   <div class="error-msg" id="conteo-error"></div>
   <div class="submit-bar"><button class="btn-primary" onclick="revisarConteo()">Guardar conteo</button></div>
+</div>
+
+<!-- NUEVO 24/07/2026 (con Osmar): Recepción como PASO PREVIO al conteo, en pantalla propia.
+     Antes vivía como un bloque (#conteo-recepcion) mezclado arriba de la lista de conteo, y
+     competía por atención con el conteo mismo — dos decisiones distintas revueltas. Ahora,
+     si hay una entrega de Vegan Corner pendiente, se atiende primero, sola. Dos salidas, las
+     dos llevan al conteo: "Confirmar recepción" (registra lo que llegó) o "Recepcionar luego"
+     (lo posterga). Mientras la persona decide acá, el catálogo del conteo carga de fondo. -->
+<div class="screen desktop-wide" id="screen-recepcion">
+  <div class="header-row" style="margin-bottom:10px;">
+    <button class="back-link" style="margin-bottom:0;" onclick="irA('screen-home')"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"></path></svg> Volver</button>
+  </div>
+  <div class="recep-cinta">
+    <span class="recep-cinta-ico"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><path d="M3.27 6.96 12 12.01l8.73-5.05"></path><path d="M12 22.08V12"></path></svg></span>
+    <span class="recep-cinta-txt">Antes de contar, hay una <b>entrega de Vegan Corner</b> esperando confirmación.</span>
+  </div>
+  <h2 style="font-size:20px;font-family:'Fraunces',serif;margin:0 0 3px;">Confirmar recepción</h2>
+  <p class="recep-sub-pantalla" id="recep-sub"></p>
+  <div id="recep-lista"></div>
+  <textarea id="recep-obs" class="recep-obs" rows="2" placeholder="Observación sobre este pedido (opcional) — se avisa a Vegan Corner"></textarea>
+  <p class="error-msg" id="recep-error" style="margin:0 0 8px;"></p>
+  <div class="submit-bar">
+    <button class="btn-primary" onclick="confirmarRecepcion()">Confirmar recepción</button>
+    <button class="btn-recepcion-luego" onclick="recepcionarLuego()">Recepcionar luego</button>
+    <p style="font-size:11px;color:var(--ink-soft);text-align:center;margin:9px 4px 0;line-height:1.4;">Si lo dejas para luego, la entrega queda pendiente y pasas directo al conteo.</p>
+  </div>
 </div>
 
 <!-- NUEVO 23/07/2026 (con Osmar): Retiro hacia Vegan Corner — mismo patrón visual que Pedidos
