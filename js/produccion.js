@@ -1653,7 +1653,11 @@ async function agregarProductoPauta(valor, opciones) {
   cachePauta.pauta.push({
     id: r.id, fecha: fechaLocalISO(), producto: opt ? opt.label : valor, cantidadProgramada: 1,
     estado: 'Programado', responsable: sesion.nombre, conteoId: '', cantidadContada: null,
-    comentario: '', estadoBorrador: '', cantidadBorrador: null
+    comentario: '', estadoBorrador: '', cantidadBorrador: null,
+    // NUEVO 23/07/2026 (con Osmar): sin este campo, un producto agregado directo (no desde
+    // pedido de Cima) nunca mostraba el desglose horneada/congelada al confirmar, aunque
+    // fuera empanada — el servidor ahora lo calcula y lo manda en la misma respuesta.
+    dual: !!r.dual, observacionPedido: ''
   });
   pautaAgregadosSesion.push(r.id);
   document.getElementById('ss-pauta-producto-wrap').style.display = 'none';
