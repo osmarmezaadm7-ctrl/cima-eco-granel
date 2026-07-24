@@ -12,6 +12,12 @@ let cacheConteoCatalogo = null;           // { ok, catalogo:[{nombre, productoPr
 let conteoCategoriasActivas = new Set();  // categorías con el chip activo
 let conteoCantidades = {};                // clave "productoProduccion|categoria" -> cantidad contada
 let borradorConteoPendiente = null;       // borrador traído del servidor, mientras el modal está abierto
+// NUEVO 24/07/2026 (con Osmar — precarga del Conteo): valor de ARRANQUE de cada producto,
+// o sea lo que se contó/guardó la última vez. Sirve para dos cosas: sembrar los inputs al
+// abrir (en vez de 0) y saber, en cada fila, si la cantidad actual se ajustó o quedó igual
+// (lo que pinta el indicador azul y el "deshacer"). Es un espejo de solo lectura de la
+// precarga — conteoCantidades sí cambia con cada toque, esto no.
+let conteoValorArranque = {};             // clave "productoProduccion|categoria" -> cantidad de referencia
 
 // Rosa/Katherine (Vegan Corner) solo reportan SU propio stock congelado — no cuentan lo
 // de Cima (Horneada/Pasteles/Congelados no son suyos). Esta pantalla se adapta sola:
@@ -25,6 +31,45 @@ function esVeganCorner_() { return !!(sesion && sesion.negocio === 'Vegan Corner
 // (sesion.negocio === 'Ambos'): la pantalla de Conteo lo manda por el camino de Cima,
 // así que su borrador cae en la fila de Cima Eco-Granel.
 function negocioConteo_() { return esVeganCorner_() ? 'Vegan Corner' : 'Cima Eco-Granel'; }
+
+// NUEVO 24/07/2026 (con Osmar — precarga del Conteo): el conteo deja de arrancar en 0.
+// Cada producto parte con lo que se contó/guardó la última vez, y contar pasa a ser
+// "confirmar lo que sigue igual y ajustar lo que se movió".
+//
+// La fuente del valor de arranque depende del negocio:
+//   · Cima          -> ultimoConteo.cantidad (última fila de ConteoStockCima)
+//   · Vegan Corner  -> stockCongeladoVC (stock actual en la hoja StockCongeladoVC)
+// Ambos vienen ya en el catálogo (ver obtenerCatalogoProduccion en Produccion.gs).
+//
+// Siembra TANTO conteoValorArranque (referencia fija, para el indicador de ajuste) COMO
+// conteoCantidades (lo editable, que arranca igual a la referencia). El borrador NO pasa
+// por acá: si hay uno, ofrecerBorradorConteo_ lo restaura y pisa esto — y así debe ser,
+// porque un conteo a medias es más nuevo que el último cerrado (ver nota del borrador).
+function valorArranqueProducto_(p) {
+  if (esVeganCorner_()) return Number(p.stockCongeladoVC) || 0;
+  return p.ultimoConteo ? (Number(p.ultimoConteo.cantidad) || 0) : 0;
+}
+
+function precargarConteo_() {
+  conteoValorArranque = {};
+  conteoCantidades = {};
+  if (!cacheConteoCatalogo) return;
+  cacheConteoCatalogo.catalogo.forEach(p => {
+    const key = p.productoProduccion + '|' + p.categoria;
+    const arranque = valorArranqueProducto_(p);
+    conteoValorArranque[key] = arranque;
+    conteoCantidades[key] = arranque;
+  });
+}
+
+// Una fila está "ajustada" cuando su cantidad actual difiere del valor de arranque. Si no
+// hay arranque registrado (producto nuevo, sin conteo previo) el arranque es 0 y cualquier
+// número > 0 cuenta como ajuste — que es lo correcto: se está declarando algo por primera vez.
+function conteoAjustado_(key) {
+  const arr = conteoValorArranque[key];
+  if (arr === undefined) return (conteoCantidades[key] || 0) !== 0;
+  return (conteoCantidades[key] || 0) !== arr;
+}
 
 async function abrirConteo(forzar) {
   irA('screen-conteo');
@@ -45,7 +90,7 @@ async function abrirConteo(forzar) {
     // en vez de arrancar con todo desplegado (confuso, mucho para escanear de una).
     // Para Vegan Corner no aplica: solo existe una categoría posible para ellos.
     conteoCategoriasActivas = esVeganCorner_() ? new Set(['Empanadas Congeladas']) : new Set();
-    conteoCantidades = {};
+    precargarConteo_();
   }
   if (document.getElementById('screen-conteo').classList.contains('active')) pintarConteo();
   // CORRECCIÓN 22/07/2026: antes esta llamada iba DESPUÉS de ofrecerBorradorConteo_, así
@@ -123,13 +168,18 @@ async function ofrecerBorradorConteo_() {
       '</div>' +
     '</div>' +
     '<button class="btn-primary" style="margin-bottom:9px;" onclick="retomarBorradorConteo()">Retomar el conteo</button>' +
-    '<button class="btn-secondary" onclick="descartarBorradorConteo()">Empezar de cero</button>'
+    '<button class="btn-secondary" onclick="descartarBorradorConteo()">Comenzar de nuevo</button>'
   );
 }
 
 function retomarBorradorConteo() {
   const b = borradorConteoPendiente;
   if (!b) { cerrarModal(); return; }
+  // El borrador trae lo que se IBA contando: eso va a conteoCantidades (lo editable). Pero
+  // el valor de arranque (la referencia para el indicador de ajuste) sigue siendo el último
+  // conteo cerrado, no el borrador — así, al retomar, el azul marca lo que ya venía movido
+  // respecto de la última vez. precargarConteo_ ya dejó conteoValorArranque sembrado con eso;
+  // acá solo se pisa conteoCantidades con el borrador.
   conteoCantidades = b.productos || {};
   // Vegan Corner tiene una sola categoría fija: no se restaura desde el borrador.
   if (!esVeganCorner_()) conteoCategoriasActivas = new Set(b.categorias || []);
@@ -155,15 +205,40 @@ async function descartarBorradorConteo(confirmado) {
       '</div>' +
       '<p style="font-size:14px;line-height:1.55;margin:0 0 16px;">Se va a perder lo que contó ' + b.responsable + ' (' + b.contados + ' producto' + (b.contados === 1 ? '' : 's') + '). No se puede deshacer.</p>' +
       '<button class="btn-primary" style="margin-bottom:9px;" onclick="retomarBorradorConteo()">Mejor retomarlo</button>' +
-      '<button class="btn-secondary" onclick="descartarBorradorConteo(true)">Sí, empezar de cero</button>'
+      '<button class="btn-secondary" onclick="descartarBorradorConteo(true)">Sí, comenzar de nuevo</button>'
     );
     return;
   }
   await llamarAPISilencioso('limpiarBorradorConteo', { negocio: negocioConteo_() });
   borradorConteoPendiente = null;
-  conteoCantidades = {};
+  // "Comenzar de nuevo" descarta el borrador y vuelve a la precarga del último conteo — NO
+  // deja todo en 0. Con el nuevo modelo, arrancar de nuevo significa partir desde lo último
+  // guardado, igual que una apertura limpia sin borrador.
+  precargarConteo_();
   cerrarModal();
   pintarConteo();
+}
+
+// Bloque de referencia bajo el nombre del producto en la pantalla de Conteo. Muestra el
+// valor de arranque (lo último contado/guardado) y, si la fila se ajustó, un "deshacer"
+// que la devuelve a ese valor. Reemplaza al viejo refUltimoConteoHtml_ solo en el pintado
+// nuevo — el desktop de VerPrograma sigue usando aquel para su columna aparte.
+function refArranqueHtml_(p, key, keyEsc) {
+  const arr = conteoValorArranque[key];
+  let ref;
+  if (esVeganCorner_()) {
+    ref = arr ? 'Guardado: ' + arr : 'Sin stock previo';
+  } else if (p.ultimoConteo) {
+    ref = 'Últ: ' + p.ultimoConteo.cantidad + ' · ' + p.ultimoConteo.fecha;
+  } else {
+    ref = 'Sin conteo previo';
+  }
+  let html = '<span class="conteo-ref">' + ref;
+  if (conteoAjustado_(key)) {
+    html += ' <button type="button" class="conteo-deshacer" onclick="deshacerConteo_(\'' + keyEsc + '\')">deshacer</button>';
+  }
+  html += '</span>';
+  return html;
 }
 
 // NUEVO 20/07/2026 (con Osmar — "revisar el último conteo", Opción B): texto de
@@ -173,9 +248,10 @@ function refUltimoConteoHtml_(p) {
   return '<span style="font-size:11px;color:var(--ink-soft);">Últ: ' + p.ultimoConteo.cantidad + ' · ' + p.ultimoConteo.fecha + '</span>';
 }
 function filaConteoDesktop_(p, key, val, keyEsc, incluirUltimo) {
-  return '<tr><td style="padding:9px 6px;font-weight:600;color:var(--ink);">' + p.nombre + '</td>' +
+  const ajustado = conteoAjustado_(key);
+  return '<tr class="' + (ajustado ? 'conteo-fila-ajustada' : '') + '"><td style="padding:9px 6px;font-weight:600;color:var(--ink);">' + p.nombre + '</td>' +
     '<td style="padding:9px 6px;">' + p.categoria + '</td>' +
-    (incluirUltimo ? '<td style="padding:9px 6px;">' + refUltimoConteoHtml_(p) + '</td>' : '') +
+    (incluirUltimo ? '<td style="padding:9px 6px;">' + refArranqueHtml_(p, key, keyEsc) + '</td>' : '') +
     '<td style="padding:6px;text-align:right;"><div class="conteo-stepper" style="display:inline-flex;">' +
       '<button type="button" onclick="cambiarCantidadConteo(\'' + keyEsc + '\',-1)">\u2212</button>' +
       '<input type="number" min="0" value="' + val + '" oninput="escribirCantidadConteo(\'' + keyEsc + '\',this.value)">' +
@@ -193,6 +269,7 @@ function pintarConteoDesktop_(productos, incluirUltimo) {
     html += filaConteoDesktop_(p, key, val, key.replace(/'/g, "\\'"), incluirUltimo);
   });
   html += '</tbody></table>';
+  html += barraResumenConteo_(productos);
   if (!productos.length) html = '<p style="font-size:13.5px;color:var(--ink-soft);padding:24px 0;text-align:center;">' +
     (esVeganCorner_() ? 'No hay empanadas configuradas para contar.' : 'Elige qué categoría(s) vas a contar.') + '</p>';
   document.getElementById('conteo-lista').innerHTML = html;
@@ -234,8 +311,8 @@ function pintarConteo() {
       const key = p.productoProduccion + '|' + p.categoria;
       const val = conteoCantidades[key] !== undefined ? conteoCantidades[key] : 0;
       const keyEsc = key.replace(/'/g, "\\'");
-      html += '<div class="conteo-row">' +
-        '<span>' + p.nombre + '</span>' +
+      html += '<div class="conteo-row' + (conteoAjustado_(key) ? ' ajustado' : '') + '" style="flex-wrap:wrap;">' +
+        '<span>' + p.nombre + '<br>' + refArranqueHtml_(p, key, keyEsc) + '</span>' +
         '<div class="conteo-stepper">' +
           '<button type="button" onclick="cambiarCantidadConteo(\'' + keyEsc + '\',-1)">\u2212</button>' +
           '<input type="number" min="0" value="' + val + '" oninput="escribirCantidadConteo(\'' + keyEsc + '\',this.value)">' +
@@ -243,7 +320,7 @@ function pintarConteo() {
         '</div>' +
       '</div>';
     });
-    document.getElementById('conteo-lista').innerHTML = html || '<p style="font-size:13.5px;color:var(--ink-soft);padding:24px 0;text-align:center;">No hay empanadas configuradas para contar.</p>';
+    document.getElementById('conteo-lista').innerHTML = (html + barraResumenConteo_(productos)) || '<p style="font-size:13.5px;color:var(--ink-soft);padding:24px 0;text-align:center;">No hay empanadas configuradas para contar.</p>';
     return;
   }
 
@@ -264,16 +341,18 @@ function pintarConteo() {
   if (esAncho) { pintarConteoDesktop_(productosActivos, true); return; }
 
   let html = '';
+  const productosVisibles = [];
   categorias.filter(c => conteoCategoriasActivas.has(c)).forEach(cat => {
     const productos = cacheConteoCatalogo.catalogo.filter(p => p.categoria === cat);
     if (!productos.length) return;
     html += '<p class="conteo-seccion-titulo">' + cat + '</p>';
     productos.forEach(p => {
+      productosVisibles.push(p);
       const key = p.productoProduccion + '|' + p.categoria;
       const val = conteoCantidades[key] !== undefined ? conteoCantidades[key] : 0;
       const keyEsc = key.replace(/'/g, "\\'");
-      html += '<div class="conteo-row" style="flex-wrap:wrap;">' +
-        '<span>' + p.nombre + '<br>' + refUltimoConteoHtml_(p) + '</span>' +
+      html += '<div class="conteo-row' + (conteoAjustado_(key) ? ' ajustado' : '') + '" style="flex-wrap:wrap;">' +
+        '<span>' + p.nombre + '<br>' + refArranqueHtml_(p, key, keyEsc) + '</span>' +
         '<div class="conteo-stepper">' +
           '<button type="button" onclick="cambiarCantidadConteo(\'' + keyEsc + '\',-1)">\u2212</button>' +
           '<input type="number" min="0" value="' + val + '" oninput="escribirCantidadConteo(\'' + keyEsc + '\',this.value)">' +
@@ -282,8 +361,23 @@ function pintarConteo() {
       '</div>';
     });
   });
-  if (!html) html = '<p style="font-size:13.5px;color:var(--ink-soft);padding:24px 0;text-align:center;">Elige qué categoría(s) vas a contar.</p>';
-  document.getElementById('conteo-lista').innerHTML = html;
+  if (!html) { document.getElementById('conteo-lista').innerHTML = '<p style="font-size:13.5px;color:var(--ink-soft);padding:24px 0;text-align:center;">Elige qué categoría(s) vas a contar.</p>'; return; }
+  document.getElementById('conteo-lista').innerHTML = html + barraResumenConteo_(productosVisibles);
+}
+
+// Barra de cierre: cuántos productos se ajustaron y cuántos quedaron confirmados sin
+// cambio. Da la sensación de "revisé todo" y no obliga a recordar qué se tocó. "Confirmado
+// sin cambio" no es lo mismo que "no lo miré" — el modelo asume que dejar el valor de
+// arranque ES confirmarlo, que es justo el punto del rediseño.
+function barraResumenConteo_(productos) {
+  if (!productos.length) return '';
+  let ajustados = 0;
+  productos.forEach(p => { if (conteoAjustado_(p.productoProduccion + '|' + p.categoria)) ajustados++; });
+  const sinCambio = productos.length - ajustados;
+  return '<div class="conteo-resumen-barra">' +
+    '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--forest)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"></path></svg>' +
+    '<span><b>' + ajustados + '</b> ajustado' + (ajustados === 1 ? '' : 's') + ' · ' + sinCambio + ' confirmado' + (sinCambio === 1 ? '' : 's') + ' sin cambio</span>' +
+  '</div>';
 }
 
 // NUEVO 20/07/2026 (con Osmar — "revisar el último conteo", Opción A): snapshot de
@@ -392,6 +486,12 @@ function cambiarCantidadConteo(key, delta) {
 }
 function escribirCantidadConteo(key, val) {
   conteoCantidades[key] = Math.max(0, Number(val) || 0);
+}
+// Devuelve una fila a su valor de arranque (lo último contado/guardado). Aparece solo
+// cuando la fila está ajustada — es la salida rápida si se tocó por error.
+function deshacerConteo_(key) {
+  conteoCantidades[key] = conteoValorArranque[key] !== undefined ? conteoValorArranque[key] : 0;
+  pintarConteo();
 }
 
 let resumenConteoProductos = [];
