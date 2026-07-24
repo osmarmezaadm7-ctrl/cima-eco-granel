@@ -1127,26 +1127,51 @@ function pintarRetiroVC() {
   document.getElementById('retiro-vc-lista').innerHTML = html;
 }
 
-// Registro directo, sin pantalla de resumen — Osmar pidió que sea "lo más fácil para
-// registrar" (23/07/2026); una pantalla de revisión de más sería fricción para algo que se
-// hace parada frente al estante. Valida que haya al menos un producto con cantidad > 0.
-async function confirmarRetiroVC() {
+// Registro en dos pasos, como el resto de Producción (23/07/2026, con Osmar: "agrega
+// resumen"). revisarRetiroVC() arma la lista y la deja ver antes de escribir nada; recién
+// confirmarRetiroVC() —desde la pantalla de resumen— llama al servidor.
+let resumenRetiroVCItems = [];
+
+function revisarRetiroVC() {
   const err = document.getElementById('retiro-vc-error');
   err.textContent = '';
   const items = [];
   cacheCatalogoCompleto.catalogo.forEach(p => {
     const key = p.productoProduccion + '|' + p.categoria;
     const cant = retiroVCCantidades[key];
-    if (cant && cant > 0) items.push({ productoProduccion: p.productoProduccion, cantidad: cant });
+    if (cant && cant > 0) items.push({ productoProduccion: p.productoProduccion, nombre: p.nombre, cantidad: cant });
   });
   if (!items.length) { err.textContent = 'Marca al menos un producto con cantidad mayor a 0.'; return; }
-  const boton = document.getElementById('retiro-vc-btn-confirmar');
+  resumenRetiroVCItems = items;
+  pintarResumenRetiroVC();
+  irA('screen-resumen-retiro-vc');
+}
+
+function pintarResumenRetiroVC() {
+  document.getElementById('resumen-retiro-lista').innerHTML = resumenRetiroVCItems.map(it =>
+    '<div class="resumen-fila"><span>' + it.nombre + '</span><strong>' + it.cantidad + '</strong></div>'
+  ).join('');
+  const total = resumenRetiroVCItems.length;
+  let texto = total + ' producto' + (total === 1 ? '' : 's') + '.';
+  if (retiroVCCliente.trim()) texto += ' Cliente/motivo: ' + retiroVCCliente.trim() + '.';
+  document.getElementById('resumen-retiro-total').textContent = texto;
+  document.getElementById('resumen-retiro-error').textContent = '';
+}
+
+async function confirmarRetiroVC() {
+  const err = document.getElementById('resumen-retiro-error');
+  err.textContent = '';
+  const boton = document.getElementById('resumen-retiro-btn-confirmar');
   boton.disabled = true;
-  const r = await llamarAPI('guardarRetiroStockVC', { data: { responsable: sesion.nombre, clienteMotivo: retiroVCCliente, items: items } });
+  const r = await llamarAPI('guardarRetiroStockVC', {
+    data: { responsable: sesion.nombre, clienteMotivo: retiroVCCliente, items: resumenRetiroVCItems.map(it => ({ productoProduccion: it.productoProduccion, cantidad: it.cantidad })) }
+  });
   boton.disabled = false;
   if (!r.ok) { err.textContent = r.error || 'Error al registrar el retiro'; return; }
+  const n = resumenRetiroVCItems.length;
+  retiroVCCantidades = {}; retiroVCCliente = ''; resumenRetiroVCItems = [];
   document.getElementById('confirm-title').textContent = 'Retiro registrado';
-  document.getElementById('confirm-msg').textContent = items.length + ' producto' + (items.length === 1 ? '' : 's') + ' registrado' + (items.length === 1 ? '' : 's') + ' hacia Vegan Corner.';
+  document.getElementById('confirm-msg').textContent = n + ' producto' + (n === 1 ? '' : 's') + ' registrado' + (n === 1 ? '' : 's') + ' hacia Vegan Corner.';
   document.getElementById('confirm-detalle').innerHTML = '';
   ocultarBotonOtro();
   irA('screen-confirm');
