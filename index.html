@@ -264,18 +264,31 @@
 .btn-quitar-archivo{background:none;border:none;color:var(--ink-soft);font-size:16px;line-height:1;cursor:pointer;padding:4px 8px;min-width:44px;min-height:44px;}
 .btn-quitar-archivo:hover{color:var(--danger);}
 
-/* ===== Ingresos Vegan Corner (sección dentro de Conciliación) ===== */
+/* ===== Ingresos Vegan Corner (pestaña dentro de Conciliación) ===== */
+.conc-tabs{display:flex;border-bottom:1px solid var(--border);margin-bottom:16px;}
+.conc-tab{flex:1;background:none;border:none;cursor:pointer;padding:12px 8px;font-family:inherit;font-size:13px;font-weight:500;color:var(--ink-soft);border-bottom:2.5px solid transparent;line-height:1.25;}
+.conc-tab.activo{color:var(--forest);font-weight:600;border-bottom-color:var(--forest);}
+.ivc-proc{display:flex;align-items:center;justify-content:space-between;background:var(--surface);border:0.5px solid var(--border);border-radius:10px;padding:13px 14px;margin-bottom:9px;cursor:pointer;}
+.ivc-proc:hover{border-color:var(--forest);}
+.ivc-proc-per{font-size:14px;font-weight:500;color:var(--ink);}
+.ivc-proc-est{font-size:12px;color:var(--ink-soft);margin-top:2px;}
+.ivc-file-msg{font-size:12.5px;color:var(--ink-soft);margin:8px 0 0;}
+.ivc-file-msg.ok{color:#27500A;font-weight:500;}
 .ivc-metrics{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;}
 .ivc-metric{border-radius:10px;padding:12px 14px;}
 .ivc-metric span{display:block;font-size:12px;}
 .ivc-metric b{font-size:21px;font-weight:600;}
-.ivc-metric-vc{background:#F3EBDF;}.ivc-metric-vc span{color:#8A6B42;}.ivc-metric-vc b{color:#7A5A32;}
-.ivc-metric-cima{background:#E9F0E4;}.ivc-metric-cima span{color:#3B6D11;}.ivc-metric-cima b{color:#27500A;}
+.ivc-ingreso{background:#E9F0E4;}
+.ivc-metric.ivc-ingreso span{color:#3B6D11;}.ivc-metric.ivc-ingreso b{color:#27500A;}
+.ivc-costo{background:#F6E4DA;}
+.ivc-metric.ivc-costo span{color:#A85A34;}.ivc-metric.ivc-costo b{color:#8A3D18;}
+.ivc-neutro{background:var(--surface);border:0.5px solid var(--border);}
+.ivc-metric.ivc-neutro span{color:var(--ink-soft);}.ivc-metric.ivc-neutro b{color:var(--ink);}
 .ivc-resumen{font-size:13px;color:var(--ink-soft);margin:0 0 16px;}
-.ivc-alerta{background:var(--terracotta-soft);border:1px solid var(--danger);border-radius:10px;padding:12px 14px;margin-bottom:16px;font-size:13px;color:var(--ink);}
-.ivc-alerta ul{margin:8px 0;padding-left:18px;}.ivc-alerta li{margin:2px 0;}
+.ivc-alerta{background:#FBE9E1;border:1.5px solid var(--terracotta);border-radius:10px;padding:12px 14px;margin-bottom:16px;font-size:13px;color:var(--ink);}
+.ivc-alerta-top{display:flex;align-items:center;gap:8px;color:var(--terracotta);margin-bottom:6px;}
+.ivc-alerta ul{margin:6px 0;padding-left:18px;}.ivc-alerta li{margin:2px 0;}
 .ivc-alerta span{display:block;font-size:12px;color:var(--ink-soft);margin-top:6px;}
-.ivc-alerta-warn{background:var(--amber-soft);border-color:#C99A3A;}
 .ivc-detalle{margin-bottom:16px;border:0.5px solid var(--border);border-radius:10px;padding:2px 12px;}
 .ivc-detalle summary{font-size:13px;color:var(--ink-soft);cursor:pointer;padding:8px 0;}
 .ivc-tabla{width:100%;border-collapse:collapse;font-size:13px;margin-bottom:8px;}
@@ -288,11 +301,12 @@
 .ivc-pata{display:flex;align-items:center;justify-content:space-between;padding:12px 14px;}
 .ivc-pata>div b{display:block;font-size:14px;}.ivc-pata>div span{font-size:12px;}
 .ivc-pata>b{font-size:16px;font-weight:600;}
-.ivc-pata-vc{background:#F3EBDF;border-bottom:0.5px solid var(--border);}.ivc-pata-vc b{color:#7A5A32;}.ivc-pata-vc span{color:#8A6B42;}
-.ivc-pata-cima{background:#E9F0E4;}.ivc-pata-cima b{color:#27500A;}.ivc-pata-cima span{color:#3B6D11;}
+.ivc-pata.ivc-ingreso{border-bottom:0.5px solid var(--border);}
+.ivc-pata.ivc-ingreso>b,.ivc-pata.ivc-ingreso>div b{color:#27500A;}.ivc-pata.ivc-ingreso>div span{color:#3B6D11;}
+.ivc-pata.ivc-costo>b,.ivc-pata.ivc-costo>div b{color:#8A3D18;}.ivc-pata.ivc-costo>div span{color:#A85A34;}
 .ivc-nota{font-size:12px;color:var(--ink-soft);margin:0 0 18px;}
-.ivc-ok{text-align:center;padding:24px 12px;}
-.ivc-ok svg{color:#3B6D11;}.ivc-ok h3{font-size:18px;margin:8px 0;color:var(--forest);}.ivc-ok p{font-size:14px;color:var(--ink);margin:4px 0;}
+.ivc-cerrado-banner{display:flex;align-items:center;gap:10px;background:#E9F0E4;border-radius:10px;padding:12px 14px;margin-bottom:14px;}
+.ivc-cerrado-banner b{display:block;font-size:14px;color:#27500A;}.ivc-cerrado-banner span{font-size:12px;color:#3B6D11;}
 .dz-over{border-color:var(--forest) !important;background:#E9F0E4 !important;}
 </style>
 </head>
@@ -703,41 +717,59 @@
       <h2 style="font-size:17px;">Conciliación</h2>
       <button class="icon-btn" title="Actualizar" onclick="abrirConciliacion(true)"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 4v6h-6"></path><path d="M1 20v-6h6"></path><path d="M3.5 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.65 4.36A9 9 0 0 0 20.5 15"></path></svg></button>
     </div>
-    <p style="font-size:12px;color:var(--ink-soft);">Transbank, PedidosYa y Aronium vs. lo registrado en el sistema.</p>
-    <div id="conc-avisos"></div>
-    <div style="display:flex;gap:8px;align-items:flex-end;margin-bottom:14px;">
-      <div style="flex:1;"><label style="margin-top:0;">Mes</label>
-        <select id="conc-filtro-mes" onchange="filtrarConciliaciones()">
-          <option value="">Todos</option>
-          <option value="0">Enero</option><option value="1">Febrero</option><option value="2">Marzo</option>
-          <option value="3">Abril</option><option value="4">Mayo</option><option value="5">Junio</option>
-          <option value="6">Julio</option><option value="7">Agosto</option><option value="8">Septiembre</option>
-          <option value="9">Octubre</option><option value="10">Noviembre</option><option value="11">Diciembre</option>
-        </select>
-      </div>
-      <div style="flex:1;"><label style="margin-top:0;">Año</label>
-        <select id="conc-filtro-anio" onchange="filtrarConciliaciones()">
-          <option value="">Todos</option>
-        </select>
-      </div>
-      <button class="btn-secondary" style="width:auto;padding:11px 14px;" onclick="limpiarFiltroConciliaciones()">Limpiar</button>
+    <!-- TABS: dos conciliaciones hermanas -->
+    <div class="conc-tabs">
+      <button id="tab-conc-cima" class="conc-tab activo" onclick="ivcCambiarTab('cima')">Ingresos Cima Eco-Granel</button>
+      <button id="tab-conc-vc" class="conc-tab" onclick="ivcCambiarTab('vc')">Ingresos Vegan Corner</button>
     </div>
-    <button class="btn-primary" style="margin-bottom:10px;" onclick="irANuevaConciliacion()">+ Nueva conciliación</button>
-    <button class="btn-secondary" style="margin-bottom:14px;" onclick="irAIngresosVC()">Ingresos Vegan Corner</button>
-    <div id="lista-conciliacion"></div>
+
+    <!-- PANE: Ingresos Cima Eco-Granel (flujo existente, sin cambios de lógica) -->
+    <div id="pane-conc-cima">
+      <p style="font-size:12px;color:var(--ink-soft);">Transbank, PedidosYa y Aronium vs. lo registrado en el sistema.</p>
+      <div id="conc-avisos"></div>
+      <div style="display:flex;gap:8px;align-items:flex-end;margin-bottom:14px;">
+        <div style="flex:1;"><label style="margin-top:0;">Mes</label>
+          <select id="conc-filtro-mes" onchange="filtrarConciliaciones()">
+            <option value="">Todos</option>
+            <option value="0">Enero</option><option value="1">Febrero</option><option value="2">Marzo</option>
+            <option value="3">Abril</option><option value="4">Mayo</option><option value="5">Junio</option>
+            <option value="6">Julio</option><option value="7">Agosto</option><option value="8">Septiembre</option>
+            <option value="9">Octubre</option><option value="10">Noviembre</option><option value="11">Diciembre</option>
+          </select>
+        </div>
+        <div style="flex:1;"><label style="margin-top:0;">Año</label>
+          <select id="conc-filtro-anio" onchange="filtrarConciliaciones()">
+            <option value="">Todos</option>
+          </select>
+        </div>
+        <button class="btn-secondary" style="width:auto;padding:11px 14px;" onclick="limpiarFiltroConciliaciones()">Limpiar</button>
+      </div>
+      <button class="btn-primary" style="margin-bottom:14px;" onclick="irANuevaConciliacion()">+ Nueva conciliación</button>
+      <div id="lista-conciliacion"></div>
+    </div>
+
+    <!-- PANE: Ingresos Vegan Corner -->
+    <div id="pane-conc-vc" style="display:none;">
+      <p style="font-size:12px;color:var(--ink-soft);">Ingreso real de VC por la venta al detalle en Cima (reporte Aronium por producto).</p>
+      <button class="btn-primary" style="margin-bottom:14px;" onclick="irANuevaIngresoVC()">+ Nueva conciliación</button>
+      <div id="lista-ingresos-vc"></div>
+    </div>
   </div>
 
-  <!-- INGRESOS VEGAN CORNER — atribución del ingreso de VC por venta al detalle en Cima (reporte Aronium por producto) -->
-  <div class="screen" id="screen-ingresos-vc">
-    <button class="back-link" onclick="irA('screen-conciliacion')"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"></path></svg> Volver</button>
-    <h2 style="font-size:19px;">Ingresos Vegan Corner</h2>
-    <p style="font-size:13.5px;color:var(--ink-soft);margin:0 0 16px;">Reconoce el ingreso real de VC por la venta al detalle en Cima. Sube el reporte "Ventas por producto" de Aronium del período.</p>
-
-    <div style="display:flex;gap:12px;">
-      <div style="flex:1;"><label>Desde</label><input type="date" id="ivc-desde" onchange="ivcCalcular()"></div>
-      <div style="flex:1;"><label>Hasta</label><input type="date" id="ivc-hasta" onchange="ivcCalcular()"></div>
+  <!-- INGRESOS VC — Etapa 1: Fuente -->
+  <div class="screen" id="screen-ivc-fuente">
+    <button class="back-link" onclick="irA('screen-conciliacion');ivcCambiarTab('vc');"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"></path></svg> Volver</button>
+    <div class="stepper">
+      <div class="st now"><div class="n">1</div>Fuente</div><div class="line"></div>
+      <div class="st"><div class="n">2</div>Revisión</div><div class="line"></div>
+      <div class="st"><div class="n">3</div>Cerrar</div>
     </div>
-
+    <h2 style="font-size:19px;">Nueva conciliación · Vegan Corner</h2>
+    <p style="font-size:13.5px;color:var(--ink-soft);margin:0 0 16px;">Sube el reporte "Ventas por producto" de Aronium. Detectamos el período y los productos automáticamente.</p>
+    <div style="display:flex;gap:12px;">
+      <div style="flex:1;"><label>Desde</label><input type="date" id="ivc-desde"></div>
+      <div style="flex:1;"><label>Hasta</label><input type="date" id="ivc-hasta"></div>
+    </div>
     <div class="dropzone dropzone-lg" id="dz-ingresos-vc" style="margin-top:14px;"
          onclick="document.getElementById('ivc-archivo').click()"
          ondragover="event.preventDefault();this.classList.add('dz-over');"
@@ -747,10 +779,29 @@
       <span class="dropzone-sub">Aronium — Ventas por producto (.xls)</span>
     </div>
     <input type="file" id="ivc-archivo" accept=".xlsx,.xls" style="display:none;" onchange="ivcArchivoSeleccionado(this.files[0])">
-    <p id="ivc-archivo-nombre" style="font-size:12.5px;color:var(--ink-soft);margin:8px 0 0;"></p>
-
+    <p id="ivc-archivo-nombre" class="ivc-file-msg"></p>
     <div class="error-msg" id="ivc-error"></div>
-    <div id="ivc-resultado" style="margin-top:16px;"></div>
+    <div class="submit-bar"><button class="btn-primary" id="ivc-btn-revision" disabled onclick="irARevisionIngresoVC()">Ir a Revisión</button></div>
+  </div>
+
+  <!-- INGRESOS VC — Etapa 2: Revisión -->
+  <div class="screen" id="screen-ivc-revision">
+    <button class="back-link" onclick="irA('screen-ivc-fuente')"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"></path></svg> Volver</button>
+    <div class="stepper">
+      <div class="st done"><div class="n">1</div>Fuente</div><div class="line"></div>
+      <div class="st now"><div class="n">2</div>Revisión</div><div class="line"></div>
+      <div class="st"><div class="n">3</div>Cerrar</div>
+    </div>
+    <h2 style="font-size:19px;">Revisión</h2>
+    <div class="error-msg" id="ivc-error-rev"></div>
+    <div id="ivc-revision-cont"></div>
+  </div>
+
+  <!-- INGRESOS VC — Proceso cerrado (solo lectura) -->
+  <div class="screen" id="screen-ivc-cerrado">
+    <button class="back-link" onclick="irA('screen-conciliacion');ivcCambiarTab('vc');"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"></path></svg> Volver</button>
+    <h2 style="font-size:19px;">Conciliación · Vegan Corner</h2>
+    <div id="ivc-cerrado-cont"></div>
   </div>
 
   <!-- CONCILIACIÓN — Fuentes: elegir período y cargar las 4 fuentes en un solo dropzone -->
