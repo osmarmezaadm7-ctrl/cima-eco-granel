@@ -1,26 +1,79 @@
-/* ingresos-vc.js — Sección "Ingresos Vegan Corner" dentro de Conciliación.
- * Reconoce el ingreso real de VC por la venta al detalle en Cima, a partir del reporte de
- * Aronium "Ventas por producto". Genera un asiento espejo de RESULTADO (Ingreso VC / Costo Cima),
- * que NO afecta caja. Backend: IngresosVC.gs (calcularIngresoVC / generarAsientoIngresoVC).
- *
- * Módulo independiente: no toca conciliacion.js. Se accede desde la pantalla de Conciliación.
+/* ingresos-vc.js — Pestaña "Ingresos Vegan Corner" dentro de Conciliación.
+ * Reconoce el ingreso real de VC por la venta al detalle en Cima (reporte Aronium "Ventas por
+ * producto"). Flujo réplica del modo de conciliar de Cima: Lista -> Fuente -> Revisión -> Cerrar.
+ * Genera un asiento espejo de RESULTADO (Ingreso VC / Costo Cima), que NO afecta caja.
+ * Colores: verde = ingresos, terracota = costos/egresos. Backend: IngresosVC.gs.
+ * Módulo independiente: no toca conciliacion.js.
  */
 
 var ivcEstado = { productos: [], desde: '', hasta: '', archivo: '', calc: null };
 
-function irAIngresosVC(){
+/* ---------- Tabs dentro de la pantalla de Conciliación ---------- */
+function ivcCambiarTab(tab){
+  var esVC = (tab === 'vc');
+  var pc = document.getElementById('pane-conc-cima');
+  var pv = document.getElementById('pane-conc-vc');
+  if(pc) pc.style.display = esVC ? 'none' : 'block';
+  if(pv) pv.style.display = esVC ? 'block' : 'none';
+  var tc = document.getElementById('tab-conc-cima');
+  var tv = document.getElementById('tab-conc-vc');
+  if(tc) tc.classList.toggle('activo', !esVC);
+  if(tv) tv.classList.toggle('activo', esVC);
+  if(esVC) ivcCargarLista();
+}
+
+/* ---------- Lista de períodos cerrados ---------- */
+async function ivcCargarLista(){
+  var cont = document.getElementById('lista-ingresos-vc');
+  if(!cont) return;
+  cont.innerHTML = '<p style="font-size:12.5px;color:var(--ink-soft);">Cargando…</p>';
+  var r = await llamarAPI('listarIngresosVC', {});
+  if(!r || !r.ok){ cont.innerHTML = '<p class="error-msg">No se pudo cargar la lista.</p>'; return; }
+  if(!r.procesos.length){
+    cont.innerHTML = '<p style="font-size:12.5px;color:var(--ink-soft);text-align:center;padding:16px 0;">Aún no hay períodos registrados. Toca "+ Nueva conciliación" para crear el primero.</p>';
+    return;
+  }
+  var html = '';
+  r.procesos.forEach(function(p){
+    html += '<div class="ivc-proc" onclick="abrirIngresoVCCerrado(\'' + p.loteId + '\')">' +
+      '<div><div class="ivc-proc-per">' + ivcRango_(p.desde, p.hasta) + '</div>' +
+      '<div class="ivc-proc-est">Cerrada · <b style="color:var(--forest);">' + fmt(p.totalIngresoVC) + '</b></div></div>' +
+      '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#3B6D11" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>' +
+      '</div>';
+  });
+  cont.innerHTML = html;
+}
+
+/* ---------- Utilidades de fecha ---------- */
+var IVC_MESES = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+function ivcRango_(desde, hasta){
+  return ivcFechaCorta_(desde) + ' – ' + ivcFechaCorta_(hasta);
+}
+function ivcFechaCorta_(iso){
+  if(!iso) return '';
+  var s = String(iso).slice(0,10).split('-');
+  if(s.length!==3) return String(iso);
+  return parseInt(s[2],10) + ' ' + (IVC_MESES[parseInt(s[1],10)-1]||'') + ' ' + s[0];
+}
+function ivcFechaISO_(txt){
+  var m = String(txt).trim().match(/(\d{1,2})-(\d{1,2})-(\d{4})/);
+  if(!m) return '';
+  return m[3] + '-' + ('0'+m[2]).slice(-2) + '-' + ('0'+m[1]).slice(-2);
+}
+
+/* ---------- Nueva conciliación: etapa Fuente ---------- */
+function irANuevaIngresoVC(){
   ivcEstado = { productos: [], desde: '', hasta: '', archivo: '', calc: null };
   var e;
   e = document.getElementById('ivc-desde'); if(e) e.value = '';
   e = document.getElementById('ivc-hasta'); if(e) e.value = '';
-  e = document.getElementById('ivc-archivo-nombre'); if(e) e.textContent = '';
-  e = document.getElementById('ivc-resultado'); if(e) e.innerHTML = '';
+  e = document.getElementById('ivc-archivo-nombre'); if(e){ e.textContent = ''; e.className = 'ivc-file-msg'; }
   e = document.getElementById('ivc-error'); if(e) e.textContent = '';
-  irA('screen-ingresos-vc');
+  e = document.getElementById('ivc-btn-revision'); if(e) e.disabled = true;
+  irA('screen-ivc-fuente');
 }
 
-// Lee el reporte Aronium (SpreadsheetML/.xls) con raw:true — con raw:false SheetJS devuelve
-// strings con formato de miles que rompen el parseo de números (aprendizaje del proyecto).
+// Lee el reporte con raw:true (con raw:false SheetJS devuelve strings con formato que rompen números).
 function leerReporteIngresoVC(file){
   return new Promise(function(resolve, reject){
     var reader = new FileReader();
@@ -35,14 +88,7 @@ function leerReporteIngresoVC(file){
   });
 }
 
-// dd-mm-yyyy -> yyyy-mm-dd (para los input type=date y para el backend)
-function ivcFechaISO_(txt){
-  var m = String(txt).trim().match(/(\d{1,2})-(\d{1,2})-(\d{4})/);
-  if(!m) return '';
-  return m[3] + '-' + ('0'+m[2]).slice(-2) + '-' + ('0'+m[1]).slice(-2);
-}
-
-// Extrae productos (código, nombre, cantidad, total) y el período del encabezado del reporte.
+// El reporte usa ss:Index: código f[0], producto f[1], cantidad f[4], total f[9] (SheetJS respeta índices).
 function parseReporteIngresoVC_(filas){
   var productos = [], desde = '', hasta = '';
   for(var i=0; i<filas.length; i++){
@@ -53,16 +99,9 @@ function parseReporteIngresoVC_(filas){
         if(mm){ desde = ivcFechaISO_(mm[1]); hasta = ivcFechaISO_(mm[2]); break; }
       }
     }
-    // El reporte usa ss:Index: código col A (f[0]), producto col B (f[1]),
-    // cantidad col E (f[4]), total col J (f[9]). SheetJS respeta esos índices.
     var cod = f[0];
     if(cod !== '' && cod !== null && cod !== undefined && /^\d+$/.test(String(cod).trim())){
-      productos.push({
-        codigo: String(cod).trim(),
-        nombre: String(f[1] || '').trim(),
-        cantidad: Number(f[4]) || 0,
-        total: Number(f[9]) || 0
-      });
+      productos.push({ codigo: String(cod).trim(), nombre: String(f[1]||'').trim(), cantidad: Number(f[4])||0, total: Number(f[9])||0 });
     }
   }
   return { productos: productos, desde: desde, hasta: hasta };
@@ -70,58 +109,62 @@ function parseReporteIngresoVC_(filas){
 
 async function ivcArchivoSeleccionado(file){
   var err = document.getElementById('ivc-error'); err.textContent = '';
+  var msg = document.getElementById('ivc-archivo-nombre');
   if(!file) return;
   try{
     var filas = await leerReporteIngresoVC(file);
     var parsed = parseReporteIngresoVC_(filas);
     if(parsed.productos.length === 0){
-      err.textContent = 'No se encontraron productos en el archivo. ¿Es el reporte "Ventas por producto" de Aronium?';
+      err.textContent = 'No se encontraron productos. ¿Es el reporte "Ventas por producto" de Aronium?';
       return;
     }
     ivcEstado.productos = parsed.productos;
     ivcEstado.archivo = file.name;
-    document.getElementById('ivc-archivo-nombre').textContent = file.name + ' — ' + parsed.productos.length + ' productos';
+    msg.className = 'ivc-file-msg ok';
+    msg.textContent = file.name + ' — ' + parsed.productos.length + ' productos cargados';
     if(parsed.desde){ document.getElementById('ivc-desde').value = parsed.desde; ivcEstado.desde = parsed.desde; }
     if(parsed.hasta){ document.getElementById('ivc-hasta').value = parsed.hasta; ivcEstado.hasta = parsed.hasta; }
-    ivcCalcular();
+    document.getElementById('ivc-btn-revision').disabled = false;
   }catch(e){
     err.textContent = 'No se pudo leer el archivo: ' + e.message;
   }
 }
 
-async function ivcCalcular(){
+async function irARevisionIngresoVC(){
   var err = document.getElementById('ivc-error'); err.textContent = '';
   ivcEstado.desde = document.getElementById('ivc-desde').value;
   ivcEstado.hasta = document.getElementById('ivc-hasta').value;
-  if(ivcEstado.productos.length === 0) return;
+  if(ivcEstado.productos.length === 0){ err.textContent = 'Sube el reporte primero.'; return; }
   if(!ivcEstado.desde || !ivcEstado.hasta){ err.textContent = 'Indica el período (desde y hasta).'; return; }
   var r = await llamarAPI('calcularIngresoVC', { data: { productos: ivcEstado.productos, desde: ivcEstado.desde, hasta: ivcEstado.hasta } });
   if(!r || !r.ok){ err.textContent = (r && r.error) || 'No se pudo calcular.'; return; }
   ivcEstado.calc = r;
-  ivcRenderResultado(r);
+  irA('screen-ivc-revision');
+  ivcRenderRevision(r);
 }
 
-function ivcRenderResultado(r){
-  var cont = document.getElementById('ivc-resultado');
+/* ---------- Etapa Revisión ---------- */
+function ivcRenderRevision(r){
+  var cont = document.getElementById('ivc-revision-cont');
   var bloqueado = r.noCruzan && r.noCruzan.length > 0;
   var html = '';
 
   html += '<div class="ivc-metrics">' +
-    '<div class="ivc-metric ivc-metric-vc"><span>Ingreso Vegan Corner</span><b>' + fmt(r.totalIngresoVC) + '</b></div>' +
-    '<div class="ivc-metric ivc-metric-cima"><span>Markup Cima</span><b>' + fmt(r.markup) + '</b></div>' +
+    '<div class="ivc-metric ivc-ingreso"><span>Ingreso Vegan Corner</span><b>' + fmt(r.totalIngresoVC) + '</b></div>' +
+    '<div class="ivc-metric ivc-neutro"><span>Markup Cima</span><b>' + fmt(r.markup) + '</b></div>' +
     '</div>';
 
   html += '<p class="ivc-resumen">' + r.productosCruzados + ' productos cruzados · ' +
     (bloqueado ? ('<b style="color:var(--terracotta);">' + r.noCruzan.length + ' sin catalogar</b>') : '0 sin catalogar') + '</p>';
 
   if(bloqueado){
-    html += '<div class="ivc-alerta"><b>Productos sin catalogar — resuélvelos antes de generar:</b><ul>';
+    html += '<div class="ivc-alerta"><div class="ivc-alerta-top"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg><b>Productos sin catalogar — resuélvelos antes de cerrar</b></div><ul>';
     r.noCruzan.forEach(function(p){ html += '<li>' + p.codigo + ' · ' + (p.nombre || '(sin nombre)') + ' — vendió ' + p.cantidad + '</li>'; });
     html += '</ul><span>Corrige el código en el catálogo o agrégalos, y vuelve a cargar el reporte.</span></div>';
   }
 
   if(r.detalle && r.detalle.length){
-    html += '<details class="ivc-detalle"><summary>Ver detalle por producto (' + r.detalle.length + ')</summary>' +
+    html += '<details class="ivc-detalle" open><summary>Detalle por producto (' + r.detalle.length + ')</summary>' +
       '<table class="ivc-tabla"><thead><tr><th>Producto</th><th>Vend.</th><th>May.</th><th>Ingreso VC</th></tr></thead><tbody>';
     r.detalle.forEach(function(p){
       html += '<tr><td>' + p.nombre + '</td><td>' + p.cantidad + '</td><td>' + fmt(p.precioMayorista) + '</td><td>' + fmt(p.ingreso) + '</td></tr>';
@@ -129,51 +172,83 @@ function ivcRenderResultado(r){
     html += '</tbody></table></details>';
   }
 
-  html += '<p class="ivc-label">Asiento que se generará</p>' +
-    '<div class="ivc-asiento">' +
-      '<div class="ivc-pata ivc-pata-vc"><div><b>Vegan Corner</b><span>Ingreso · Venta a Cima</span></div><b>+' + fmt(r.totalIngresoVC) + '</b></div>' +
-      '<div class="ivc-pata ivc-pata-cima"><div><b>Cima Eco-Granel</b><span>Costo · Compra a Vegan Corner</span></div><b>&minus;' + fmt(r.totalIngresoVC) + '</b></div>' +
-    '</div>' +
-    '<p class="ivc-nota">Registro de resultado — no afecta caja ni banco.</p>';
-
-  if(r.duplicado){
-    html += '<div class="ivc-alerta ivc-alerta-warn">Ya existe un registro para un período que se traslapa (lote ' + r.duplicado.loteAnteriorId + '). Si generas, se te pedirá confirmar el reemplazo.</div>';
-  }
+  html += ivcHtmlAsiento_(r.totalIngresoVC);
 
   var disabled = bloqueado ? ' disabled' : '';
-  var etiqueta = bloqueado ? 'Resuelve los productos sin catalogar' : 'Generar asiento del período';
-  html += '<div class="submit-bar"><button class="btn-primary" id="ivc-btn-generar"' + disabled + ' onclick="ivcGenerar()">' + etiqueta + '</button></div>';
+  var etiqueta = bloqueado ? 'Resuelve los productos sin catalogar' : 'Cerrar conciliación';
+  html += '<div class="submit-bar"><button class="btn-primary" id="ivc-btn-cerrar"' + disabled + ' onclick="ivcCerrar()">' + etiqueta + '</button></div>';
 
   cont.innerHTML = html;
 }
 
-async function ivcGenerar(){
-  var err = document.getElementById('ivc-error'); err.textContent = '';
+// Vista previa / registro del asiento espejo (verde = ingreso, terracota = costo).
+function ivcHtmlAsiento_(monto){
+  return '<p class="ivc-label">Asiento que se generará</p>' +
+    '<div class="ivc-asiento">' +
+      '<div class="ivc-pata ivc-ingreso"><div><b>Vegan Corner</b><span>Ingreso · Venta a Cima</span></div><b>+' + fmt(monto) + '</b></div>' +
+      '<div class="ivc-pata ivc-costo"><div><b>Cima Eco-Granel</b><span>Costo · Compra a Vegan Corner</span></div><b>&minus;' + fmt(monto) + '</b></div>' +
+    '</div>' +
+    '<p class="ivc-nota">Registro de resultado — no afecta caja ni banco.</p>';
+}
+
+/* ---------- Cerrar (genera el asiento) ---------- */
+async function ivcCerrar(){
+  var err = document.getElementById('ivc-error-rev'); err.textContent = '';
   if(!ivcEstado.calc) return;
   var payload = { productos: ivcEstado.productos, desde: ivcEstado.desde, hasta: ivcEstado.hasta };
   var r = await llamarAPI('generarAsientoIngresoVC', { data: payload });
 
   if(r && r.duplicado){
-    if(confirm('Ya existe un registro de Ingresos VC para un período que se traslapa (lote ' + r.loteAnteriorId + '). ¿Reemplazarlo por este?')){
+    if(confirm('Ya existe un período de Ingresos VC que se traslapa con este (lote ' + r.loteAnteriorId + '). ¿Reemplazarlo?')){
       payload.reemplazar = true;
       r = await llamarAPI('generarAsientoIngresoVC', { data: payload });
-    } else {
-      return;
-    }
+    } else { return; }
   }
-  if(r && r.bloqueado){
-    err.textContent = r.error || 'Hay productos sin catalogar.';
-    return;
-  }
-  if(!r || !r.ok){ err.textContent = (r && r.error) || 'No se pudo generar el asiento.'; return; }
+  if(r && r.bloqueado){ err.textContent = r.error || 'Hay productos sin catalogar.'; return; }
+  if(!r || !r.ok){ err.textContent = (r && r.error) || 'No se pudo cerrar la conciliación.'; return; }
 
-  var cont = document.getElementById('ivc-resultado');
-  cont.innerHTML = '<div class="ivc-ok">' +
-    '<svg width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"></path></svg>' +
-    '<h3>Asiento generado</h3>' +
-    '<p>Ingreso Vegan Corner: <b>' + fmt(r.totalIngresoVC) + '</b></p>' +
-    '<p>Markup Cima: <b>' + fmt(r.markup) + '</b></p>' +
-    '<p class="ivc-nota">Lote ' + r.loteId + '</p>' +
-    '<button class="btn-secondary" onclick="irAIngresosVC()" style="margin-top:14px;width:auto;padding:11px 16px;">Registrar otro período</button>' +
+  abrirIngresoVCCerrado(r.loteId);
+}
+
+/* ---------- Proceso cerrado (read-only) ---------- */
+async function abrirIngresoVCCerrado(loteId){
+  irA('screen-ivc-cerrado');
+  var cont = document.getElementById('ivc-cerrado-cont');
+  cont.innerHTML = '<p style="font-size:12.5px;color:var(--ink-soft);">Cargando…</p>';
+  var r = await llamarAPI('obtenerIngresoVCProceso', { loteId: loteId });
+  if(!r || !r.ok){ cont.innerHTML = '<p class="error-msg">' + ((r && r.error) || 'No se pudo abrir el proceso.') + '</p>'; return; }
+  ivcRenderCerrado(r);
+}
+
+function ivcRenderCerrado(p){
+  var cont = document.getElementById('ivc-cerrado-cont');
+  var html = '';
+
+  html += '<div class="ivc-cerrado-banner">' +
+    '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#27500A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>' +
+    '<div><b>Período cerrado</b><span>' + ivcRango_(p.desde, p.hasta) + ' · inmutable</span></div></div>';
+
+  html += '<div class="ivc-metrics">' +
+    '<div class="ivc-metric ivc-ingreso"><span>Ingreso Vegan Corner</span><b>' + fmt(p.totalIngresoVC) + '</b></div>' +
+    '<div class="ivc-metric ivc-neutro"><span>Markup Cima</span><b>' + fmt(p.markup) + '</b></div>' +
     '</div>';
+
+  html += '<p class="ivc-label">Asiento generado</p>' +
+    '<div class="ivc-asiento">' +
+      '<div class="ivc-pata ivc-ingreso"><div><b>Vegan Corner</b><span>Ingreso · Venta a Cima</span></div><b>+' + fmt(p.totalIngresoVC) + '</b></div>' +
+      '<div class="ivc-pata ivc-costo"><div><b>Cima Eco-Granel</b><span>Costo · Compra a Vegan Corner</span></div><b>&minus;' + fmt(p.totalIngresoVC) + '</b></div>' +
+    '</div>';
+
+  if(p.detalle && p.detalle.length){
+    html += '<details class="ivc-detalle"><summary>Detalle por producto (' + p.detalle.length + ')</summary>' +
+      '<table class="ivc-tabla"><thead><tr><th>Producto</th><th>Vend.</th><th>Ingreso VC</th></tr></thead><tbody>';
+    p.detalle.forEach(function(d){
+      html += '<tr><td>' + d.nombre + '</td><td>' + d.cantidad + '</td><td>' + fmt(d.ingreso) + '</td></tr>';
+    });
+    html += '</tbody></table></details>';
+  }
+
+  html += '<p class="ivc-nota" style="text-align:center;">Lote ' + p.loteId + ' · generado el ' + ivcFechaCorta_(p.fecha) + ' · solo lectura</p>';
+
+  cont.innerHTML = html;
 }
