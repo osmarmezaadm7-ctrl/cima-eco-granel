@@ -136,43 +136,44 @@ async function irARevisionIngresoVC(){
   ivcEstado.hasta = document.getElementById('ivc-hasta').value;
   if(ivcEstado.productos.length === 0){ err.textContent = 'Sube el reporte primero.'; return; }
   if(!ivcEstado.desde || !ivcEstado.hasta){ err.textContent = 'Indica el período (desde y hasta).'; return; }
-  var r = await llamarAPI('calcularIngresoVC', { data: { productos: ivcEstado.productos, desde: ivcEstado.desde, hasta: ivcEstado.hasta } });
+  var r = await llamarAPI('calcularInformeVC', { data: { productos: ivcEstado.productos, desde: ivcEstado.desde, hasta: ivcEstado.hasta } });
   if(!r || !r.ok){ err.textContent = (r && r.error) || 'No se pudo calcular.'; return; }
   ivcEstado.calc = r;
   irA('screen-ivc-revision');
   ivcRenderRevision(r);
 }
 
-/* ---------- Etapa Revisión ---------- */
+/* ---------- Etapa Revisión: informe completo ---------- */
 function ivcRenderRevision(r){
   var cont = document.getElementById('ivc-revision-cont');
-  var bloqueado = r.noCruzan && r.noCruzan.length > 0;
+  var ing = r.ingreso;
+  var bloqueado = ing.noCruzan && ing.noCruzan.length > 0;
   var html = '';
 
-  html += '<div class="ivc-metrics">' +
-    '<div class="ivc-metric ivc-ingreso"><span>Ingreso Vegan Corner</span><b>' + fmt(r.totalIngresoVC) + '</b></div>' +
-    '<div class="ivc-metric ivc-neutro"><span>Markup Cima</span><b>' + fmt(r.markup) + '</b></div>' +
-    '</div>';
-
-  html += '<p class="ivc-resumen">' + r.productosCruzados + ' productos cruzados · ' +
-    (bloqueado ? ('<b style="color:var(--terracotta);">' + r.noCruzan.length + ' sin catalogar</b>') : '0 sin catalogar') + '</p>';
+  html += '<p class="ivc-resumen" style="margin-bottom:16px;">Período ' + ivcRango_(ivcEstado.desde, ivcEstado.hasta) + ' · ' + ing.productosCruzados + ' productos · ' +
+    (bloqueado ? ('<b style="color:var(--terracotta);">' + ing.noCruzan.length + ' sin catalogar</b>') : '0 sin catalogar') + '</p>';
 
   if(bloqueado){
     html += '<div class="ivc-alerta"><div class="ivc-alerta-top"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg><b>Productos sin catalogar — resuélvelos antes de cerrar</b></div><ul>';
-    r.noCruzan.forEach(function(p){ html += '<li>' + p.codigo + ' · ' + (p.nombre || '(sin nombre)') + ' — vendió ' + p.cantidad + '</li>'; });
+    ing.noCruzan.forEach(function(p){ html += '<li>' + p.codigo + ' · ' + (p.nombre || '(sin nombre)') + ' — vendió ' + p.cantidad + '</li>'; });
     html += '</ul><span>Corrige el código en el catálogo o agrégalos, y vuelve a cargar el reporte.</span></div>';
   }
 
-  if(r.detalle && r.detalle.length){
-    html += '<details class="ivc-detalle" open><summary>Detalle por producto (' + r.detalle.length + ')</summary>' +
-      '<table class="ivc-tabla"><thead><tr><th>Producto</th><th>Vend.</th><th>May.</th><th>Ingreso VC</th></tr></thead><tbody>';
-    r.detalle.forEach(function(p){
-      html += '<tr><td>' + p.nombre + '</td><td>' + p.cantidad + '</td><td>' + fmt(p.precioMayorista) + '</td><td>' + fmt(p.ingreso) + '</td></tr>';
-    });
-    html += '</tbody></table></details>';
-  }
+  // 1. Ingresos
+  html += ivcSeccion_('Ingresos', '#2B4638',
+    '<div class="ivc-metrics">' +
+      '<div class="ivc-metric ivc-ingreso"><span>Ingreso Vegan Corner</span><b>' + fmt(ing.totalIngresoVC) + '</b></div>' +
+      '<div class="ivc-metric ivc-neutro"><span>Markup Cima</span><b>' + fmt(ing.markup) + '</b></div>' +
+    '</div>' +
+    ivcHtmlDetalleIngreso_(ing.detalle));
 
-  html += ivcHtmlAsiento_(r.totalIngresoVC);
+  // 2. Movimiento  3. Merma
+  html += ivcHtmlMovimientoMerma_(r);
+
+  // 4. Asiento
+  html += ivcSeccion_('Asiento que se generará', '#2B4638',
+    ivcHtmlAsientoInterno_(ing.totalIngresoVC) +
+    '<p class="ivc-nota" style="margin-top:8px;"><i>Registro de resultado — no afecta caja. La merma no genera asiento.</i></p>');
 
   var disabled = bloqueado ? ' disabled' : '';
   var etiqueta = bloqueado ? 'Resuelve los productos sin catalogar' : 'Cerrar conciliación';
@@ -181,14 +182,62 @@ function ivcRenderRevision(r){
   cont.innerHTML = html;
 }
 
-// Vista previa / registro del asiento espejo (verde = ingreso, terracota = costo).
-function ivcHtmlAsiento_(monto){
-  return '<p class="ivc-label">Asiento que se generará</p>' +
-    '<div class="ivc-asiento">' +
-      '<div class="ivc-pata ivc-ingreso"><div><b>Vegan Corner</b><span>Ingreso · Venta a Cima</span></div><b>+' + fmt(monto) + '</b></div>' +
-      '<div class="ivc-pata ivc-costo"><div><b>Cima Eco-Granel</b><span>Costo · Compra a Vegan Corner</span></div><b>&minus;' + fmt(monto) + '</b></div>' +
-    '</div>' +
-    '<p class="ivc-nota">Registro de resultado — no afecta caja ni banco.</p>';
+// Encabezado de sección con barra de color a la izquierda.
+function ivcSeccion_(titulo, color, contenido){
+  return '<div class="ivc-sec-tit"><span style="background:' + color + ';"></span>' + titulo + '</div>' +
+    '<div class="ivc-sec-body">' + contenido + '</div>';
+}
+
+function ivcHtmlDetalleIngreso_(detalle){
+  if(!detalle || !detalle.length) return '';
+  var h = '<details class="ivc-detalle"><summary>Detalle por producto (' + detalle.length + ')</summary>' +
+    '<table class="ivc-tabla"><thead><tr><th>Producto</th><th>Vend.</th><th>May.</th><th>Ingreso VC</th></tr></thead><tbody>';
+  detalle.forEach(function(p){ h += '<tr><td>' + p.nombre + '</td><td>' + p.cantidad + '</td><td>' + fmt(p.precioMayorista) + '</td><td>' + fmt(p.ingreso) + '</td></tr>'; });
+  return h + '</tbody></table></details>';
+}
+
+// Secciones Movimiento + Merma (compartidas entre Revisión y proceso cerrado).
+function ivcHtmlMovimientoMerma_(r){
+  var mov = r.movimiento || [];
+  var html = '';
+
+  // Movimiento
+  var filasMov = '';
+  mov.forEach(function(m){
+    filasMov += '<tr><td>' + m.producto + '</td><td class="r">' + m.entro + '</td><td class="r">' + m.vendio + '</td><td class="r">' + (m.queda === null ? '—' : m.queda) + '</td></tr>';
+  });
+  html += ivcSeccion_('Movimiento <span class="ivc-sec-sub">entró · vendió · queda</span>', '#A9825B',
+    '<details class="ivc-detalle" open><summary>' + mov.length + ' productos</summary>' +
+    '<table class="ivc-tabla ivc-tabla-mov"><thead><tr><th>Producto</th><th class="r">Entró</th><th class="r">Vendió</th><th class="r">Queda</th></tr></thead><tbody>' +
+    (filasMov || '<tr><td colspan="4" style="text-align:center;color:var(--ink-soft);">Sin movimiento en el período</td></tr>') +
+    '</tbody></table></details>');
+
+  // Merma
+  var filasMerma = '';
+  mov.forEach(function(m){
+    if(m.estado === 'revisar'){
+      filasMerma += '<tr class="ivc-fila-revisar"><td>' + m.producto + '</td><td class="r">' + (m.salidas === null ? '—' : m.salidas) + '</td><td class="r">' + m.vendio + '</td><td class="r"><b>revisar</b></td></tr>';
+    } else if(m.merma && m.merma !== 0){
+      filasMerma += '<tr><td>' + m.producto + '</td><td class="r">' + m.salidas + '</td><td class="r">' + m.vendio + '</td><td class="r ivc-merma-n">' + m.merma + '</td></tr>';
+    }
+  });
+  var mermaBody =
+    '<div class="ivc-merma-total"><span>Merma valorizada del período</span><b>' + fmt(r.mermaTotal || 0) + '</b></div>' +
+    (filasMerma ?
+      ('<table class="ivc-tabla ivc-tabla-mov"><thead><tr><th>Producto</th><th class="r">Salió</th><th class="r">Vendió</th><th class="r">Merma</th></tr></thead><tbody>' + filasMerma + '</tbody></table>')
+      : '<p style="font-size:12.5px;color:var(--ink-soft);margin:8px 0 0;">Sin merma detectada en el período.</p>') +
+    (r.hayRevisar ? '<p class="ivc-nota" style="margin-top:8px;"><i>"revisar" = el stock no calza; puede ser un conteo o una entrada sin registrar.</i></p>' : '');
+  html += ivcSeccion_('Merma <span class="ivc-badge-ref">referencial · no bloquea</span>', '#BE5A2B', mermaBody);
+
+  return html;
+}
+
+// Asiento sin el título de sección (para envolverlo en ivcSeccion_).
+function ivcHtmlAsientoInterno_(monto){
+  return '<div class="ivc-asiento">' +
+    '<div class="ivc-pata ivc-ingreso"><div><b>Vegan Corner</b><span>Ingreso · Venta a Cima</span></div><b>+' + fmt(monto) + '</b></div>' +
+    '<div class="ivc-pata ivc-costo"><div><b>Cima Eco-Granel</b><span>Costo · Compra a Vegan Corner</span></div><b>&minus;' + fmt(monto) + '</b></div>' +
+  '</div>';
 }
 
 /* ---------- Cerrar (genera el asiento) ---------- */
@@ -228,27 +277,34 @@ function ivcRenderCerrado(p){
     '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#27500A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>' +
     '<div><b>Período cerrado</b><span>' + ivcRango_(p.desde, p.hasta) + ' · inmutable</span></div></div>';
 
-  html += '<div class="ivc-metrics">' +
-    '<div class="ivc-metric ivc-ingreso"><span>Ingreso Vegan Corner</span><b>' + fmt(p.totalIngresoVC) + '</b></div>' +
-    '<div class="ivc-metric ivc-neutro"><span>Markup Cima</span><b>' + fmt(p.markup) + '</b></div>' +
-    '</div>';
+  // 1. Ingresos
+  html += ivcSeccion_('Ingresos', '#2B4638',
+    '<div class="ivc-metrics">' +
+      '<div class="ivc-metric ivc-ingreso"><span>Ingreso Vegan Corner</span><b>' + fmt(p.totalIngresoVC) + '</b></div>' +
+      '<div class="ivc-metric ivc-neutro"><span>Markup Cima</span><b>' + fmt(p.markup) + '</b></div>' +
+    '</div>' +
+    ivcHtmlDetalleIngresoCerrado_(p.detalle));
 
-  html += '<p class="ivc-label">Asiento generado</p>' +
-    '<div class="ivc-asiento">' +
-      '<div class="ivc-pata ivc-ingreso"><div><b>Vegan Corner</b><span>Ingreso · Venta a Cima</span></div><b>+' + fmt(p.totalIngresoVC) + '</b></div>' +
-      '<div class="ivc-pata ivc-costo"><div><b>Cima Eco-Granel</b><span>Costo · Compra a Vegan Corner</span></div><b>&minus;' + fmt(p.totalIngresoVC) + '</b></div>' +
-    '</div>';
-
-  if(p.detalle && p.detalle.length){
-    html += '<details class="ivc-detalle"><summary>Detalle por producto (' + p.detalle.length + ')</summary>' +
-      '<table class="ivc-tabla"><thead><tr><th>Producto</th><th>Vend.</th><th>Ingreso VC</th></tr></thead><tbody>';
-    p.detalle.forEach(function(d){
-      html += '<tr><td>' + d.nombre + '</td><td>' + d.cantidad + '</td><td>' + fmt(d.ingreso) + '</td></tr>';
-    });
-    html += '</tbody></table></details>';
+  // 2. Movimiento  3. Merma (si el proceso guardó informe)
+  if(p.informe && p.informe.movimiento){
+    html += ivcHtmlMovimientoMerma_(p.informe);
   }
+
+  // 4. Asiento
+  html += ivcSeccion_('Asiento generado', '#2B4638',
+    ivcHtmlAsientoInterno_(p.totalIngresoVC) +
+    '<p class="ivc-nota" style="margin-top:8px;"><i>Registro de resultado — no afecta caja. La merma no genera asiento.</i></p>');
 
   html += '<p class="ivc-nota" style="text-align:center;">Lote ' + p.loteId + ' · generado el ' + ivcFechaCorta_(p.fecha) + ' · solo lectura</p>';
 
   cont.innerHTML = html;
+}
+
+// Detalle de ingreso en el cerrado (sin columna mayorista, más limpio).
+function ivcHtmlDetalleIngresoCerrado_(detalle){
+  if(!detalle || !detalle.length) return '';
+  var h = '<details class="ivc-detalle"><summary>Detalle por producto (' + detalle.length + ')</summary>' +
+    '<table class="ivc-tabla"><thead><tr><th>Producto</th><th>Vend.</th><th>Ingreso VC</th></tr></thead><tbody>';
+  detalle.forEach(function(d){ h += '<tr><td>' + d.nombre + '</td><td>' + d.cantidad + '</td><td>' + fmt(d.ingreso) + '</td></tr>'; });
+  return h + '</tbody></table></details>';
 }
