@@ -544,6 +544,33 @@
       <div><label>Fecha</label><input type="date" id="co-fecha" autocomplete="off"></div>
       <div><label>Negocio</label><div class="toggle-group" id="co-negocio-group" style="flex-wrap:wrap;"></div></div>
     </div>
+    <div id="co-reparto-wrap" style="display:none;background:var(--forest-soft);border-radius:9px;padding:12px 12px 14px;margin-top:6px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+        <span style="font-size:12.5px;font-weight:700;color:var(--forest);">Reparto entre negocios</span>
+        <div style="display:flex;background:#fff;border:1.5px solid var(--border);border-radius:8px;overflow:hidden;">
+          <button type="button" id="co-reparto-btn-pct" onclick="cambiarModoReparto_('pct')" style="padding:4px 11px;font-size:12px;font-weight:700;border:none;background:var(--forest);color:#fff;">%</button>
+          <button type="button" id="co-reparto-btn-monto" onclick="cambiarModoReparto_('monto')" style="padding:4px 11px;font-size:12px;font-weight:600;border:none;background:#fff;color:var(--ink-soft);">$</button>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
+        <span style="width:90px;font-size:13px;flex-shrink:0;">Cima</span>
+        <div style="position:relative;flex:1;">
+          <input type="number" id="co-reparto-cima" oninput="repartoDesde_('cima')" style="width:100%;box-sizing:border-box;padding:9px 26px 9px 10px;border:1.5px solid var(--border);border-radius:8px;font-family:'JetBrains Mono',monospace;font-size:14px;font-weight:700;color:var(--forest);">
+          <span id="co-reparto-unidad-cima" style="position:absolute;right:10px;top:9px;font-size:12.5px;color:var(--ink-soft);">%</span>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;">
+        <span style="width:90px;font-size:13px;flex-shrink:0;">Vegan Corner</span>
+        <div style="position:relative;flex:1;">
+          <input type="number" id="co-reparto-vc" oninput="repartoDesde_('vc')" style="width:100%;box-sizing:border-box;padding:9px 26px 9px 10px;border:1.5px solid var(--border);border-radius:8px;font-family:'JetBrains Mono',monospace;font-size:14px;font-weight:700;color:var(--caramel);">
+          <span id="co-reparto-unidad-vc" style="position:absolute;right:10px;top:9px;font-size:12.5px;color:var(--ink-soft);">%</span>
+        </div>
+      </div>
+      <div style="border-top:1px solid var(--border);margin-top:10px;padding-top:8px;display:flex;justify-content:space-between;font-family:'JetBrains Mono',monospace;font-size:12px;">
+        <span id="co-reparto-ref-cima" style="color:var(--forest);"></span>
+        <span id="co-reparto-ref-vc" style="color:var(--caramel);"></span>
+      </div>
+    </div>
     <div class="desktop-grid2">
       <div>
         <label>Categoría</label>
@@ -2273,8 +2300,10 @@ function prepararCompra(){
   document.getElementById('co-fecha').value = fechaLocalISO();
   const grupo = document.getElementById('co-negocio-group');
   const opciones = sesion.rol==='Staff' ? [sesion.negocio] : CONFIG.NEGOCIOS;
-  grupo.innerHTML = opciones.map((n,i)=>'<button type="button" class="'+(i===0?'selected':'')+'" onclick="seleccionarToggle(\'co-negocio-group\',this,\''+n+'\')">'+n+'</button>').join('');
+  grupo.innerHTML = opciones.map((n,i)=>'<button type="button" class="'+(i===0?'selected':'')+'" onclick="seleccionarToggle(\'co-negocio-group\',this,\''+n+'\');actualizarBloqueReparto_();">'+n+'</button>').join('');
   grupo.dataset.valor = opciones[0];
+  cambiarModoReparto_('pct');
+  actualizarBloqueReparto_();
   document.querySelector('#ss-co-naturaleza input[type=text]').value=''; document.getElementById('ss-co-naturaleza-valor').value='';
   document.querySelector('#ss-co-proveedor input[type=text]').value=''; document.getElementById('ss-co-proveedor-valor').value='';
   document.getElementById('co-tipo-doc').selectedIndex = 0;
@@ -2282,7 +2311,7 @@ function prepararCompra(){
   document.getElementById('co-monto').value = '';
   document.getElementById('co-desc').value = '';
   document.getElementById('co-error').textContent = '';
-  document.getElementById('co-monto').oninput = ()=>actualizarResumenPagos('co');
+  document.getElementById('co-monto').oninput = ()=>{ actualizarResumenPagos('co'); if(document.getElementById('co-reparto-wrap').style.display!=='none') cambiarModoReparto_(repartoModo_); };
   cargarCategoriasCompra(); cargarProveedores().then(()=>inicializarPagos('co', 0));
 }
 async function cargarCategoriasCompra(){
@@ -2340,6 +2369,67 @@ async function crearProveedorNuevo(){
     elegirSearchSelect('ss-co-proveedor', d.alias);
   } else document.getElementById('np-error').textContent=r.error||'Error al crear';
 }
+
+// ===== Reparto "Ambos" en Compra/gasto (NUEVO 28/07/2026 — con Osmar) =====
+// Antes de esto, un gasto "Ambos" siempre se leía 50/50 al calcular por negocio (nunca se
+// guardaba nada). Ahora, opcionalmente, se puede ajustar el % real y se manda al backend —
+// SIEMPRE en % (si se digitó en $, se convierte acá antes de enviar; el backend no necesita
+// saber en qué modo se escribió). Si el usuario no toca nada, queda en 50/50 y el campo
+// repartoAmbos ni se manda — comportamiento idéntico al de siempre.
+let repartoModo_ = 'pct'; // 'pct' | 'monto'
+function actualizarBloqueReparto_(){
+  const esAmbos = document.getElementById('co-negocio-group').dataset.valor === 'Ambos';
+  document.getElementById('co-reparto-wrap').style.display = esAmbos ? 'block' : 'none';
+  if (esAmbos) cambiarModoReparto_('pct');
+}
+function cambiarModoReparto_(modo){
+  repartoModo_ = modo;
+  const total = Number(document.getElementById('co-monto').value) || 0;
+  document.getElementById('co-reparto-btn-pct').style.background = modo==='pct' ? 'var(--forest)' : '#fff';
+  document.getElementById('co-reparto-btn-pct').style.color = modo==='pct' ? '#fff' : 'var(--ink-soft)';
+  document.getElementById('co-reparto-btn-monto').style.background = modo==='monto' ? 'var(--forest)' : '#fff';
+  document.getElementById('co-reparto-btn-monto').style.color = modo==='monto' ? '#fff' : 'var(--ink-soft)';
+  document.getElementById('co-reparto-unidad-cima').textContent = modo==='pct' ? '%' : '$';
+  document.getElementById('co-reparto-unidad-vc').textContent = modo==='pct' ? '%' : '$';
+  document.getElementById('co-reparto-cima').value = modo==='pct' ? 50 : Math.round(total/2);
+  document.getElementById('co-reparto-vc').value = modo==='pct' ? 50 : Math.round(total/2);
+  pintarReferenciaReparto_(50);
+}
+function pintarReferenciaReparto_(pctCima){
+  const total = Number(document.getElementById('co-monto').value) || 0;
+  const refCima = document.getElementById('co-reparto-ref-cima');
+  const refVc = document.getElementById('co-reparto-ref-vc');
+  if (repartoModo_ === 'pct') {
+    refCima.textContent = fmt(total * pctCima / 100);
+    refVc.textContent = fmt(total * (100 - pctCima) / 100);
+  } else {
+    refCima.textContent = Math.round(pctCima) + '%';
+    refVc.textContent = Math.round(100 - pctCima) + '%';
+  }
+}
+function repartoDesde_(origen){
+  const total = Number(document.getElementById('co-monto').value) || 0;
+  const tope = repartoModo_ === 'pct' ? 100 : total;
+  const inCima = document.getElementById('co-reparto-cima');
+  const inVc = document.getElementById('co-reparto-vc');
+  const propio = origen === 'cima' ? inCima : inVc;
+  const otro = origen === 'cima' ? inVc : inCima;
+  let v = Number(propio.value) || 0;
+  if (v > tope) v = tope; if (v < 0) v = 0;
+  otro.value = tope - v;
+  const valorCima = origen === 'cima' ? v : tope - v;
+  const pctCima = repartoModo_ === 'pct' ? valorCima : (total ? (valorCima / total * 100) : 50);
+  pintarReferenciaReparto_(pctCima);
+}
+// Devuelve { cima: <pct 0-100> } listo para el backend, o null si Negocio no es "Ambos".
+function calcularRepartoAmbosParaEnvio_(){
+  if (document.getElementById('co-negocio-group').dataset.valor !== 'Ambos') return null;
+  const total = Number(document.getElementById('co-monto').value) || 0;
+  const valorCima = Number(document.getElementById('co-reparto-cima').value) || 0;
+  const pct = repartoModo_ === 'pct' ? valorCima : (total ? (valorCima / total * 100) : 50);
+  return { cima: pct };
+}
+
 async function enviarCompra(){
   const v = validarPagosCliente('co');
   if(!v.ok){ document.getElementById('co-error').textContent=v.error; return; }
@@ -2347,7 +2437,7 @@ async function enviarCompra(){
   if(!fecha){ document.getElementById('co-error').textContent='Selecciona la fecha'; return; }
   const data = { fecha, negocio:document.getElementById('co-negocio-group').dataset.valor, naturaleza:valorSearchSelect('ss-co-naturaleza'), proveedor:valorSearchSelect('ss-co-proveedor'),
     tipoDocumento:document.getElementById('co-tipo-doc').value, nDocumento:document.getElementById('co-ndoc').value, monto:document.getElementById('co-monto').value||0,
-    descripcion:document.getElementById('co-desc').value, pagos:v.pagos, estado:v.estado, abono:v.abono };
+    descripcion:document.getElementById('co-desc').value, pagos:v.pagos, estado:v.estado, abono:v.abono, repartoAmbos:calcularRepartoAmbosParaEnvio_() };
   if(!data.monto||data.monto<=0){ document.getElementById('co-error').textContent='Ingresa un monto válido'; return; }
   if(!data.proveedor){ document.getElementById('co-error').textContent='Selecciona la contraparte (proveedor o equipo)'; return; }
   const r = await llamarAPI('registrarCompra',{data});
