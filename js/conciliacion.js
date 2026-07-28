@@ -1056,6 +1056,12 @@ function construirCuerpoNotificacion_(mensaje, fechaCreacion) {
       return { titulo: 'Producción confirmada', fechaDestacada: fechaDestacada, esAlerta: false,
         cuerpo: '<p style="font-size:12.5px;color:var(--ink-soft);margin:0;">' + (payload.resumen || '') + ' — ' + payload.nombre + '</p>' };
     }
+    // NUEVO 28/07/2026 (con Osmar — módulo Equipo): comunicado enviado desde Equipo a uno
+    // o varios colaboradores. Se pinta con la misma notif-card genérica de siempre.
+    if (payload.tipo === 'comunicado') {
+      return { titulo: 'Comunicado de ' + (payload.de || ''), fechaDestacada: fechaDestacada, esAlerta: false,
+        cuerpo: '<p style="font-size:13px;color:var(--ink);margin:0;line-height:1.5;">' + (payload.texto || '') + '</p>' };
+    }
   }
 
   if (!payload || !payload.dias) {
