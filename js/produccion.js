@@ -82,24 +82,42 @@ async function abrirConteo(forzar) {
   //
   // Vegan Corner no recepciona (no reciben entregas de sí mismos): para ellos, directo al
   // conteo, igual que antes.
-  if (forzar && Object.keys(conteoCantidades).length) await guardarBorradorConteo_();
-  const necesitaCatalogo = !cacheConteoCatalogo || forzar;
+  //
+  // NUEVO 28/07/2026 (con Osmar): candado anti doble-toque. El chequeo de recepción es una
+  // llamada al servidor; hasta que volvía, no cambiaba nada en pantalla y la gente tocaba
+  // "Contar stock" una y otra vez, apilando llamadas. El candado ignora los toques repetidos
+  // mientras la apertura está en curso.
+  if (abrirConteoEnCurso_) return;
+  abrirConteoEnCurso_ = true;
+  try {
+    if (forzar && Object.keys(conteoCantidades).length) await guardarBorradorConteo_();
+    const necesitaCatalogo = !cacheConteoCatalogo || forzar;
 
-  // Dispara la carga del catálogo YA, sin await — corre de fondo mientras se decide la
-  // recepción. Si no hace falta recargarlo, la promesa resuelve al toque.
-  precargaConteoPromesa_ = necesitaCatalogo ? cargarCatalogoConteo_() : Promise.resolve(true);
+    // Dispara la carga del catálogo YA, sin await — corre de fondo mientras se decide la
+    // recepción. Si no hace falta recargarlo, la promesa resuelve al toque.
+    precargaConteoPromesa_ = necesitaCatalogo ? cargarCatalogoConteo_() : Promise.resolve(true);
 
-  // La recepción solo aplica a Cima. Se consulta antes de decidir a qué pantalla ir.
-  if (!esVeganCorner_()) {
-    let rec = null;
-    try { rec = await llamarAPISilencioso('obtenerEntregasPendientesRecepcion'); } catch (e) { rec = null; }
-    if (rec && rec.ok && rec.items && rec.items.length) {
-      mostrarPantallaRecepcion_(rec);
-      return; // el conteo se abre desde las salidas de la pantalla de recepción
+    // La recepción solo aplica a Cima. Se consulta antes de decidir a qué pantalla ir.
+    if (!esVeganCorner_()) {
+      // NUEVO 28/07/2026 (con Osmar): con overlay. Antes era silencioso y el toque se sentía
+      // muerto durante toda la ida y vuelta al servidor. Feedback inmediato = no vuelven a tocar.
+      let rec = null;
+      const ov = document.getElementById('loading-overlay');
+      if (ov) ov.classList.add('active');
+      try { rec = await llamarAPISilencioso('obtenerEntregasPendientesRecepcion'); }
+      catch (e) { rec = null; }
+      finally { if (ov) ov.classList.remove('active'); }
+      if (rec && rec.ok && rec.items && rec.items.length) {
+        mostrarPantallaRecepcion_(rec);
+        return; // el conteo se abre desde las salidas de la pantalla de recepción
+      }
     }
+    await entrarAlConteo_();
+  } finally {
+    abrirConteoEnCurso_ = false;
   }
-  await entrarAlConteo_();
 }
+let abrirConteoEnCurso_ = false;   // candado de abrirConteo (anti doble-toque)
 
 // Carga el catálogo del conteo y siembra la precarga. Separada de abrirConteo para poder
 // dispararla en paralelo. Devuelve true si quedó lista, false si falló.
@@ -1888,15 +1906,38 @@ function volverAEditarPauta() {
 async function revisarPauta() {
   document.getElementById('pauta-error').textContent = '';
   const visibles = cachePauta.pauta;
-  const completados = visibles.filter(it => it.estadoBorrador === 'Hecho');
-  const faltantes = visibles.filter(it => it.estadoBorrador !== 'Hecho');
-  if (!completados.length && !faltantes.length) {
+  if (!visibles.length) {
     document.getElementById('pauta-error').textContent = 'No hay nada que confirmar.';
     return;
   }
+  // NUEVO 28/07/2026 (con Osmar): ataja-errores antes de la revisión. El error recurrente
+  // era editar la cantidad de un producto y olvidar marcarlo Hecho: quedaba con número puesto
+  // pero fuera de la producción, y se les pasaba uno sin darse cuenta. Acá se detectan esos
+  // ítems —cantidad EDITADA (cantidadBorrador seteado, no la programada por defecto) y sin
+  // marcar— y se ofrece elegir cuáles incluir. NO se marca nada en bloque ni en silencio:
+  // algunos productos deben quedar pendientes a propósito aunque tengan cantidad, así que la
+  // decisión es por ítem. Si no hay ninguno, sigue directo a la revisión como siempre.
+  const editadosSinMarcar = visibles.filter(it =>
+    it.estadoBorrador !== 'Hecho' &&
+    it.cantidadBorrador !== null && it.cantidadBorrador !== undefined &&
+    Number(it.cantidadBorrador) > 0
+  );
+  if (editadosSinMarcar.length) {
+    abrirAvisoPautaSinMarcar_(editadosSinMarcar);
+    return;
+  }
+  irARevisionPauta_();
+}
+
+// Cuerpo de la revisión, extraído de revisarPauta para poder entrar desde dos lados (directo,
+// o después de resolver el aviso de cantidad-sin-marcar) sin duplicar la lógica.
+function irARevisionPauta_() {
+  const visibles = cachePauta.pauta;
+  const completados = visibles.filter(it => it.estadoBorrador === 'Hecho');
+  const faltantes = visibles.filter(it => it.estadoBorrador !== 'Hecho');
   // Red de seguridad: toda empanada completada tiene que llegar acá con desglose sembrado.
   // toggleHechoPauta ya lo hace al marcarla; esto cubre cualquier ítem que haya quedado en
-  // 'Hecho' por otra vía (borrador recuperado del servidor, por ejemplo).
+  // 'Hecho' por otra vía (borrador recuperado del servidor, o el aviso de abajo).
   completados.filter(it => it.dual).forEach(asegurarDesglose_);
   pintarResumenPauta(completados, faltantes);
   const obsTextarea = document.getElementById('resumen-pauta-observacion');
@@ -1907,6 +1948,80 @@ async function revisarPauta() {
   // qué no se entregó completa, sin agregar una etiqueta ni un banner aparte.
   obsTextarea.placeholder = faltantes.length ? '¿Por qué quedó incompleta? (comentario obligatorio)' : 'Observaciones';
   irA('screen-resumen-pauta');
+}
+
+// ===== AVISO "cantidad sin marcar" antes de la revisión (NUEVO 28/07/2026 — con Osmar) =====
+// Diseño cerrado con Osmar: sin párrafos (la gente no los lee), la lista con checks hace el
+// trabajo. Checks PRE-MARCADOS —el caso normal es "lo hice y olvidé marcar"—, se destilda el
+// que debe quedar pendiente. Confirmar marca Hecho solo los tildados y sigue a la revisión.
+let pautaAvisoItems = [];        // refs a los ítems detectados (editados sin marcar)
+let pautaAvisoSeleccion = {};    // { id: true|false } — true = incluir (marcar Hecho)
+
+function abrirAvisoPautaSinMarcar_(items) {
+  pautaAvisoItems = items;
+  pautaAvisoSeleccion = {};
+  items.forEach(it => { pautaAvisoSeleccion[it.id] = true; });
+  mostrarAvisoPautaSinMarcar_();
+}
+
+function mostrarAvisoPautaSinMarcar_() {
+  const n = pautaAvisoItems.length;
+  const filas = pautaAvisoItems.map((it, i) => {
+    const sel = pautaAvisoSeleccion[it.id];
+    const cant = it.cantidadBorrador !== null && it.cantidadBorrador !== undefined ? it.cantidadBorrador : it.cantidadProgramada;
+    const idEsc = it.id.replace(/'/g, "\\'");
+    const borde = i < n - 1 ? 'border-bottom:1px solid #EBE4D8;' : '';
+    const check = sel
+      ? '<span style="width:24px;height:24px;border-radius:7px;background:#2B4638;display:flex;align-items:center;justify-content:center;flex-shrink:0;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"></path></svg></span>'
+      : '<span style="width:24px;height:24px;border-radius:7px;background:#FFFFFF;border:1.5px solid #CFC6B6;flex-shrink:0;"></span>';
+    const tint = sel ? '#2B2B2B' : '#9A9488';
+    const tintNum = sel ? '#2B4638' : '#9A9488';
+    return '<button type="button" onclick="togglePautaAviso_(\'' + idEsc + '\')" style="width:100%;display:flex;align-items:center;gap:11px;padding:12px 8px;min-height:44px;background:none;border:none;' + borde + 'text-align:left;cursor:pointer;">' +
+        check +
+        '<span style="flex:1;font-size:14.5px;color:' + tint + ';">' + it.producto + '</span>' +
+        '<span style="font-family:\'JetBrains Mono\',monospace;font-size:13.5px;font-weight:600;color:' + tintNum + ';">' + cant + '</span>' +
+      '</button>';
+  }).join('');
+
+  abrirModal(
+    '<div style="display:flex;align-items:center;gap:9px;margin-bottom:6px;">' +
+      '<span style="width:32px;height:32px;border-radius:50%;background:#F5E4DA;display:flex;align-items:center;justify-content:center;flex-shrink:0;">' +
+        '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#BE5A2B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><path d="M12 9v4"></path><path d="M12 17h.01"></path></svg>' +
+      '</span>' +
+      '<span class="serif" style="font-size:19px;color:var(--forest);">Falta marcar</span>' +
+    '</div>' +
+    '<p style="font-size:13.5px;color:var(--ink-soft);margin:0 0 14px 41px;">Tienen cantidad pero sin marcar como hecho.</p>' +
+    '<div style="background:var(--paper);border:1px solid #EBE4D8;border-radius:12px;padding:4px 6px;margin-bottom:18px;">' + filas + '</div>' +
+    '<button class="btn-primary" style="margin-bottom:9px;" onclick="confirmarAvisoPauta_()">Confirmar</button>' +
+    '<button class="btn-secondary" onclick="cerrarModal()">Volver a la pauta</button>'
+  );
+}
+
+function togglePautaAviso_(id) {
+  pautaAvisoSeleccion[id] = !pautaAvisoSeleccion[id];
+  mostrarAvisoPautaSinMarcar_();
+}
+
+async function confirmarAvisoPauta_() {
+  const elegidos = pautaAvisoItems.filter(it => pautaAvisoSeleccion[it.id]);
+  // Los no elegidos no se tocan: quedan con su cantidad y sin marcar, pendientes a propósito.
+  elegidos.forEach(it => {
+    it.estadoBorrador = 'Hecho';
+    if (it.dual) asegurarDesglose_(it);
+  });
+  cerrarModal();
+  // El servidor lee el estado desde el borrador guardado (confirmarPauta no recibe el estado
+  // de la pantalla), así que hay que persistir el "Hecho" ANTES de pasar a la revisión. Con
+  // overlay porque son varias llamadas y sin feedback la pausa se vería como cuelgue.
+  if (elegidos.length) {
+    const ov = document.getElementById('loading-overlay');
+    if (ov) ov.classList.add('active');
+    try {
+      await Promise.all(elegidos.map(it => llamarAPISilencioso('actualizarBorradorPauta', { data: { id: it.id, estadoBorrador: 'Hecho', cantidadBorrador: it.cantidadBorrador } })));
+    } catch (e) { /* si alguna falla, igual seguimos; el estado local ya quedó marcado */ }
+    if (ov) ov.classList.remove('active');
+  }
+  irARevisionPauta_();
 }
 
 // NUEVO 24/07/2026 (con Osmar): la Revisión ya no pregunta el desglose, lo muestra. Es una
