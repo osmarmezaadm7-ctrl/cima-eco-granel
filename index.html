@@ -1248,6 +1248,44 @@
     <div class="submit-bar"><button class="btn-primary btn-enviar-pedido" onclick="enviarPedidoAbastecimiento()"><span>Enviar pedido</span><span class="abast-contador" id="abast-contador" onclick="event.stopPropagation();abrirRevisarPedidoAbast();">0</span></button></div>
   </div>
 
+  <!-- EQUIPO (NUEVO 28/07/2026) -->
+  <div class="screen desktop-wide" id="screen-equipo">
+    <div class="header-row" style="margin-bottom:10px;">
+      <button class="back-link" style="margin-bottom:0;" onclick="irA('screen-home')"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"></path></svg> Volver</button>
+      <button class="icon-btn" title="Actualizar" onclick="abrirEquipo(true)"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 4v6h-6"></path><path d="M1 20v-6h6"></path><path d="M3.5 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.65 4.36A9 9 0 0 0 20.5 15"></path></svg></button>
+    </div>
+    <h2 style="font-size:17px;">Equipo</h2>
+    <div id="equipo-lista"></div>
+    <button type="button" class="btn-secondary" style="width:100%;margin-top:10px;" onclick="abrirComunicadoEquipo('Todos')">Enviar comunicado a todos</button>
+    <button type="button" class="btn-primary" style="width:100%;margin-top:8px;" onclick="abrirFichaEquipo(null)">+ Nuevo colaborador</button>
+  </div>
+
+  <div class="screen desktop-wide" id="screen-ficha-equipo">
+    <button class="back-link" onclick="irA('screen-equipo')"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"></path></svg> Volver</button>
+    <div id="ficha-equipo-cont" class="form-ancho-max"></div>
+  </div>
+
+  <div class="screen" id="screen-movimiento-equipo">
+    <button class="back-link" onclick="irA('screen-ficha-equipo')"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"></path></svg> Volver</button>
+    <div id="movimiento-equipo-cont" class="form-ancho-max"></div>
+  </div>
+
+  <div class="screen" id="screen-cierre-equipo">
+    <button class="back-link" onclick="irA('screen-ficha-equipo')"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"></path></svg> Volver</button>
+    <div id="cierre-equipo-cont" class="form-ancho-max"></div>
+  </div>
+
+  <div class="screen" id="screen-comunicado-equipo">
+    <button class="back-link" onclick="irA('screen-equipo')"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"></path></svg> Volver</button>
+    <div id="comunicado-equipo-cont" class="form-ancho-max"></div>
+  </div>
+
+  <div class="screen" id="screen-mi-pago">
+    <div class="greeting"><small>Hola,</small><h1 id="mipago-nombre"></h1></div>
+    <div id="mi-pago-cont"></div>
+    <div class="logout"><button onclick="irA('screen-home')">Volver al inicio</button></div>
+  </div>
+
   <div class="screen confirm-screen" id="screen-confirm">
     <div class="confirm-check">✓</div>
     <h2 id="confirm-title" style="font-size:18px;">Registro guardado</h2>
@@ -1790,7 +1828,10 @@ function pintarSidebar(){
 
   nav.insertAdjacentHTML('beforeend', '<div class="grupo">Operaciones</div>'+itemProx(ICONS.config,'Operaciones'));
   nav.insertAdjacentHTML('beforeend', '<div class="grupo">CRM</div>'+itemProx(ICONS.crm,'Clientes'));
-  nav.insertAdjacentHTML('beforeend', '<div class="grupo">Remuneraciones</div>'+itemProx(ICONS.remuneraciones,'Sueldos'));
+  // NUEVO 28/07/2026 (con Osmar — módulo Equipo): reemplaza el stub "Remuneraciones/Sueldos
+  // (Próximamente)". Quien administra ve la lista del equipo; el resto ve solo su propio pago.
+  if (tienePermisoLocal('GestionarEquipo')) nav.insertAdjacentHTML('beforeend', '<div class="grupo">Equipo</div>'+item('screen-equipo',ICONS.remuneraciones,'Equipo'));
+  else nav.insertAdjacentHTML('beforeend', '<div class="grupo">Equipo</div>'+item('screen-mi-pago',ICONS.remuneraciones,'Mi pago'));
 
   let confHtml='';
   if (tienePermisoLocal('ConfigurarSistema')) confHtml += item('screen-creditos',ICONS.banco,'Créditos') + item('screen-permisos',ICONS.usuarios,'Usuarios y permisos') + item('screen-config-sistema',ICONS.config,'Tolerancia y configuración');
@@ -1818,6 +1859,8 @@ function onEntrarScreen(id){
   if(id==='screen-venta-vegan') abrirVentaVegan();
   if(id==='screen-compra') prepararCompra();
   if(id==='screen-cierre'){ document.getElementById('cc-fecha').value = fechaLocalISO(); setModoCierre('dia',document.querySelector('#cc-modo-group button')); }
+  if(id==='screen-equipo') abrirEquipo();
+  if(id==='screen-mi-pago') abrirMiPago();
 }
 
 function abrirModal(html){ document.getElementById('modal-card').innerHTML=html; document.getElementById('modal-bg').classList.add('active'); }
@@ -3155,6 +3198,7 @@ pintarUsuarios();
 <script src="js/ingresos-vc.js"></script>
 <script src="js/produccion.js"></script>
 <script src="js/abastecimiento.js"></script>
+<script src="js/equipo.js"></script>
 
 </body>
 </html>
