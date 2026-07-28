@@ -184,7 +184,7 @@ function ivcRenderRevision(r){
 
 // Encabezado de sección con barra de color a la izquierda.
 function ivcSeccion_(titulo, color, contenido){
-  return '<div class="ivc-sec-tit"><span style="background:' + color + ';"></span>' + titulo + '</div>' +
+  return '<div class="ivc-sec-tit"><span class="ivc-sec-dot" style="background:' + color + ';"></span>' + titulo + '</div>' +
     '<div class="ivc-sec-body">' + contenido + '</div>';
 }
 
