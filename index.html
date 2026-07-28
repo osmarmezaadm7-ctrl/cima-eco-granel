@@ -544,33 +544,6 @@
       <div><label>Fecha</label><input type="date" id="co-fecha" autocomplete="off"></div>
       <div><label>Negocio</label><div class="toggle-group" id="co-negocio-group" style="flex-wrap:wrap;"></div></div>
     </div>
-    <div id="co-reparto-wrap" style="display:none;background:var(--forest-soft);border-radius:9px;padding:12px 12px 14px;margin-top:6px;">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
-        <span style="font-size:12.5px;font-weight:700;color:var(--forest);">Reparto entre negocios</span>
-        <div style="display:flex;background:#fff;border:1.5px solid var(--border);border-radius:8px;overflow:hidden;">
-          <button type="button" id="co-reparto-btn-pct" onclick="cambiarModoReparto_('pct')" style="padding:4px 11px;font-size:12px;font-weight:700;border:none;background:var(--forest);color:#fff;">%</button>
-          <button type="button" id="co-reparto-btn-monto" onclick="cambiarModoReparto_('monto')" style="padding:4px 11px;font-size:12px;font-weight:600;border:none;background:#fff;color:var(--ink-soft);">$</button>
-        </div>
-      </div>
-      <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
-        <span style="width:90px;font-size:13px;flex-shrink:0;">Cima</span>
-        <div style="position:relative;flex:1;">
-          <input type="number" id="co-reparto-cima" oninput="repartoDesde_('cima')" style="width:100%;box-sizing:border-box;padding:9px 26px 9px 10px;border:1.5px solid var(--border);border-radius:8px;font-family:'JetBrains Mono',monospace;font-size:14px;font-weight:700;color:var(--forest);">
-          <span id="co-reparto-unidad-cima" style="position:absolute;right:10px;top:9px;font-size:12.5px;color:var(--ink-soft);">%</span>
-        </div>
-      </div>
-      <div style="display:flex;align-items:center;gap:10px;">
-        <span style="width:90px;font-size:13px;flex-shrink:0;">Vegan Corner</span>
-        <div style="position:relative;flex:1;">
-          <input type="number" id="co-reparto-vc" oninput="repartoDesde_('vc')" style="width:100%;box-sizing:border-box;padding:9px 26px 9px 10px;border:1.5px solid var(--border);border-radius:8px;font-family:'JetBrains Mono',monospace;font-size:14px;font-weight:700;color:var(--caramel);">
-          <span id="co-reparto-unidad-vc" style="position:absolute;right:10px;top:9px;font-size:12.5px;color:var(--ink-soft);">%</span>
-        </div>
-      </div>
-      <div style="border-top:1px solid var(--border);margin-top:10px;padding-top:8px;display:flex;justify-content:space-between;font-family:'JetBrains Mono',monospace;font-size:12px;">
-        <span id="co-reparto-ref-cima" style="color:var(--forest);"></span>
-        <span id="co-reparto-ref-vc" style="color:var(--caramel);"></span>
-      </div>
-    </div>
     <div class="desktop-grid2">
       <div>
         <label>Categoría</label>
@@ -622,6 +595,50 @@
         <input type="checkbox" id="co-multi-check" onchange="toggleSegundoPago('co')">Agregar otro medio de pago
       </label>
       <div id="co-pagos-resumen" style="font-size:12px;margin-top:6px;"></div>
+    </div>
+    <div id="co-reparto-wrap" style="display:none;background:var(--forest-soft);border-radius:9px;padding:12px 12px 14px;margin-top:14px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+        <span style="font-size:12.5px;font-weight:700;color:var(--forest);">Reparto entre negocios</span>
+        <div style="display:flex;background:#fff;border:1.5px solid var(--border);border-radius:8px;overflow:hidden;">
+          <button type="button" id="co-reparto-btn-pct" onclick="cambiarModoReparto_('pct')" style="padding:4px 11px;font-size:12px;font-weight:700;border:none;background:var(--forest);color:#fff;">%</button>
+          <button type="button" id="co-reparto-btn-monto" onclick="cambiarModoReparto_('monto')" style="padding:4px 11px;font-size:12px;font-weight:600;border:none;background:#fff;color:var(--ink-soft);">$</button>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
+        <span style="width:90px;font-size:13px;flex-shrink:0;">Cima</span>
+        <div style="position:relative;flex:1;">
+          <input type="number" id="co-reparto-cima" oninput="repartoDesde_('cima')" style="width:100%;box-sizing:border-box;padding:9px 26px 9px 10px;border:1.5px solid var(--border);border-radius:8px;font-family:'JetBrains Mono',monospace;font-size:14px;font-weight:700;color:var(--forest);">
+          <span id="co-reparto-unidad-cima" style="position:absolute;right:10px;top:9px;font-size:12.5px;color:var(--ink-soft);">%</span>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;">
+        <span style="width:90px;font-size:13px;flex-shrink:0;">Vegan Corner</span>
+        <div style="position:relative;flex:1;">
+          <input type="number" id="co-reparto-vc" oninput="repartoDesde_('vc')" style="width:100%;box-sizing:border-box;padding:9px 26px 9px 10px;border:1.5px solid var(--border);border-radius:8px;font-family:'JetBrains Mono',monospace;font-size:14px;font-weight:700;color:var(--caramel);">
+          <span id="co-reparto-unidad-vc" style="position:absolute;right:10px;top:9px;font-size:12.5px;color:var(--ink-soft);">%</span>
+        </div>
+      </div>
+      <div style="border-top:1px solid var(--border);margin-top:10px;padding-top:8px;display:flex;justify-content:space-between;font-family:'JetBrains Mono',monospace;font-size:12px;">
+        <span id="co-reparto-ref-cima" style="color:var(--forest);"></span>
+        <span id="co-reparto-ref-vc" style="color:var(--caramel);"></span>
+      </div>
+      <label style="display:flex;align-items:center;gap:7px;margin:12px 0 0;padding-top:10px;border-top:1px solid var(--border);font-weight:400;font-size:13px;">
+        <input type="checkbox" id="co-categoria-distinta" onchange="toggleCategoriaDistinta_()">Categoría distinta por negocio
+      </label>
+      <div id="co-categoria-distinta-wrap" style="display:none;margin-top:10px;">
+        <label style="font-size:12px;font-weight:600;color:var(--forest);margin:0 0 4px;">Categoría · Cima</label>
+        <div class="search-select" id="ss-co-categoria-cima">
+          <input type="text" placeholder="Buscar categoría…" autocomplete="off" onfocus="abrirSearchSelect('ss-co-categoria-cima')" oninput="filtrarSearchSelect('ss-co-categoria-cima')">
+          <input type="hidden" id="ss-co-categoria-cima-valor">
+          <div class="search-select-list" id="ss-co-categoria-cima-list"></div>
+        </div>
+        <label style="font-size:12px;font-weight:600;color:var(--caramel);margin:10px 0 4px;">Categoría · Vegan Corner</label>
+        <div class="search-select" id="ss-co-categoria-vc">
+          <input type="text" placeholder="Buscar categoría…" autocomplete="off" onfocus="abrirSearchSelect('ss-co-categoria-vc')" oninput="filtrarSearchSelect('ss-co-categoria-vc')">
+          <input type="hidden" id="ss-co-categoria-vc-valor">
+          <div class="search-select-list" id="ss-co-categoria-vc-list"></div>
+        </div>
+      </div>
     </div>
     <div class="error-msg" id="co-error"></div>
     <div class="submit-bar"><button class="btn-primary" onclick="enviarCompra()">Guardar compra/gasto</button></div>
@@ -2300,7 +2317,7 @@ function prepararCompra(){
   document.getElementById('co-fecha').value = fechaLocalISO();
   const grupo = document.getElementById('co-negocio-group');
   const opciones = sesion.rol==='Staff' ? [sesion.negocio] : CONFIG.NEGOCIOS;
-  grupo.innerHTML = opciones.map((n,i)=>'<button type="button" class="'+(i===0?'selected':'')+'" onclick="seleccionarToggle(\'co-negocio-group\',this,\''+n+'\');actualizarBloqueReparto_();">'+n+'</button>').join('');
+  grupo.innerHTML = opciones.map((n,i)=>'<button type="button" class="'+(i===0?'selected':'')+'" onclick="seleccionarToggle(\'co-negocio-group\',this,\''+n+'\');actualizarBloqueReparto_();pintarCategoriasFiltradas_();">'+n+'</button>').join('');
   grupo.dataset.valor = opciones[0];
   cambiarModoReparto_('pct');
   actualizarBloqueReparto_();
@@ -2316,7 +2333,16 @@ function prepararCompra(){
 }
 async function cargarCategoriasCompra(){
   if(!cacheCategorias.length){ const r = await llamarAPI('listarCategorias',{}); cacheCategorias = r.categorias||[]; }
-  initSearchSelect('ss-co-naturaleza', cacheCategorias.map(c=>({value:c.naturaleza, label:c.naturaleza})), {
+  pintarCategoriasFiltradas_();
+}
+// NUEVO 28/07/2026 (con Osmar): las categorías ahora traen su negocio (Cima Eco-Granel /
+// Vegan Corner / Ambos). Con Cima o Vegan Corner elegido en el formulario, se muestran solo
+// las suyas + las compartidas. Con "Ambos" se muestran las 17 completas — un gasto "Ambos"
+// puede ser de cualquier naturaleza (con o sin categoría distinta por negocio).
+function pintarCategoriasFiltradas_(){
+  const negocio = document.getElementById('co-negocio-group').dataset.valor;
+  const filtradas = negocio === 'Ambos' ? cacheCategorias : cacheCategorias.filter(c => c.negocio === 'Ambos' || c.negocio === negocio);
+  initSearchSelect('ss-co-naturaleza', filtradas.map(c=>({value:c.naturaleza, label:c.naturaleza})), {
     onSelect: (v)=>recargarContraparte(v)
   });
 }
@@ -2381,6 +2407,10 @@ function actualizarBloqueReparto_(){
   const esAmbos = document.getElementById('co-negocio-group').dataset.valor === 'Ambos';
   document.getElementById('co-reparto-wrap').style.display = esAmbos ? 'block' : 'none';
   if (esAmbos) cambiarModoReparto_('pct');
+  else {
+    document.getElementById('co-categoria-distinta').checked = false;
+    toggleCategoriaDistinta_();
+  }
 }
 function cambiarModoReparto_(modo){
   repartoModo_ = modo;
@@ -2429,17 +2459,36 @@ function calcularRepartoAmbosParaEnvio_(){
   const pct = repartoModo_ === 'pct' ? valorCima : (total ? (valorCima / total * 100) : 50);
   return { cima: pct };
 }
+function toggleCategoriaDistinta_(){
+  const activo = document.getElementById('co-categoria-distinta').checked;
+  document.getElementById('co-categoria-distinta-wrap').style.display = activo ? 'block' : 'none';
+  // El selector de Categoría general queda inhabilitado mientras se usa el par por negocio —
+  // ya no aplica, evita que alguien llene los dos caminos a la vez sin darse cuenta.
+  document.querySelector('#ss-co-naturaleza input[type=text]').disabled = activo;
+  if (activo) pintarCategoriasDuales_();
+}
+function pintarCategoriasDuales_(){
+  const cimas = cacheCategorias.filter(c => c.negocio === 'Cima Eco-Granel' || c.negocio === 'Ambos');
+  const vcs = cacheCategorias.filter(c => c.negocio === 'Vegan Corner' || c.negocio === 'Ambos');
+  initSearchSelect('ss-co-categoria-cima', cimas.map(c=>({value:c.naturaleza, label:c.naturaleza})), {});
+  initSearchSelect('ss-co-categoria-vc', vcs.map(c=>({value:c.naturaleza, label:c.naturaleza})), {});
+}
 
 async function enviarCompra(){
   const v = validarPagosCliente('co');
   if(!v.ok){ document.getElementById('co-error').textContent=v.error; return; }
   const fecha = document.getElementById('co-fecha').value;
   if(!fecha){ document.getElementById('co-error').textContent='Selecciona la fecha'; return; }
-  const data = { fecha, negocio:document.getElementById('co-negocio-group').dataset.valor, naturaleza:valorSearchSelect('ss-co-naturaleza'), proveedor:valorSearchSelect('ss-co-proveedor'),
+  const categoriaDistinta = document.getElementById('co-categoria-distinta').checked;
+  const naturaleza = categoriaDistinta ? valorSearchSelect('ss-co-categoria-cima') : valorSearchSelect('ss-co-naturaleza');
+  const categoriaVC = categoriaDistinta ? valorSearchSelect('ss-co-categoria-vc') : null;
+  const data = { fecha, negocio:document.getElementById('co-negocio-group').dataset.valor, naturaleza, categoriaVC, proveedor:valorSearchSelect('ss-co-proveedor'),
     tipoDocumento:document.getElementById('co-tipo-doc').value, nDocumento:document.getElementById('co-ndoc').value, monto:document.getElementById('co-monto').value||0,
     descripcion:document.getElementById('co-desc').value, pagos:v.pagos, estado:v.estado, abono:v.abono, repartoAmbos:calcularRepartoAmbosParaEnvio_() };
   if(!data.monto||data.monto<=0){ document.getElementById('co-error').textContent='Ingresa un monto válido'; return; }
   if(!data.proveedor){ document.getElementById('co-error').textContent='Selecciona la contraparte (proveedor o equipo)'; return; }
+  if(categoriaDistinta && (!naturaleza || !categoriaVC)){ document.getElementById('co-error').textContent='Selecciona la categoría de Cima y de Vegan Corner'; return; }
+  if(!categoriaDistinta && !naturaleza){ document.getElementById('co-error').textContent='Selecciona la categoría'; return; }
   const r = await llamarAPI('registrarCompra',{data});
   if(r.ok){
     cachePanel = {}; movimientosCache = null;
@@ -2640,16 +2689,46 @@ async function confirmarImport(loteAnteriorId){
   } else { document.getElementById('import-error').textContent = (r&&r.error)||'Error al importar'; }
 }
 
+// NUEVO 28/07/2026 (con Osmar): agrupado por proveedor (colapsable) y luego por documento —
+// un documento nunca aparece dividido, aunque por dentro (categoría distinta por negocio)
+// sean dos filas enlazadas (backend ya las agrupa en listarCuentasPorPagar). Dentro de cada
+// proveedor se puede marcar más de un documento y pagarlos juntos con un solo "Registrar
+// pago" (misma fecha/medio para todos los seleccionados).
+function idProveedor_(nombre){ return (nombre||'').replace(/[^a-zA-Z0-9]/g,'_'); }
 function pintarCuentasPorPagar(r){
   document.getElementById('cxp-resumen').innerHTML = '<div class="rowline" style="font-size:14px;font-weight:700;"><span>'+r.cantidad+' documento(s) pendientes</span><b>'+fmt(r.total)+'</b></div>';
   const cont = document.getElementById('cxp-lista'); cont.innerHTML='';
-  (r.cuentas||[]).forEach(c=>{
-    const div = document.createElement('div'); div.className='card'; div.dataset.fila=c.fila;
-    const etiquetaParcial = c.estado==='Pago parcial' ? ' <span style="color:var(--terracotta);font-weight:600;">(parcial, de '+fmt(c.monto)+')</span>' : '';
-    div.innerHTML = '<div style="display:flex;justify-content:space-between;"><strong style="font-size:13px;">'+c.proveedor+'</strong><b class="mono">'+fmt(c.saldo)+'</b></div>'+
-      '<p style="font-size:11.5px;color:var(--ink-soft);">'+c.negocio+' &middot; '+c.fecha+' &middot; '+(c.descripcion||'')+etiquetaParcial+'</p>'+
-      '<button class="btn-secondary btn-small" onclick="abrirModalPago('+c.fila+')">Registrar pago</button>';
-    cont.appendChild(div);
+  const porProveedor = {};
+  (r.cuentas||[]).forEach(c=>{ (porProveedor[c.proveedor] = porProveedor[c.proveedor]||[]).push(c); });
+  Object.keys(porProveedor).forEach(proveedor=>{
+    const docs = porProveedor[proveedor];
+    const totalProveedor = docs.reduce((s,c)=>s+c.saldo,0);
+    const pid = idProveedor_(proveedor);
+    const wrap = document.createElement('div'); wrap.className='card'; wrap.style.padding='0'; wrap.style.overflow='hidden';
+    const filasDocs = docs.map((c,i)=>{
+      const etiquetaParcial = c.estado==='Pago parcial' ? ' <span style="color:var(--terracotta);font-weight:600;">(parcial, de '+fmt(c.monto)+')</span>' : '';
+      const desgloseHtml = c.dividido ? '<div style="display:flex;gap:6px;margin:6px 0;">'+c.desglose.map(d=>'<span style="font-size:11px;background:var(--forest-soft);color:var(--forest);padding:2px 8px;border-radius:6px;">'+d.negocio+' '+fmt(d.monto)+'</span>').join('')+'</div>' : '';
+      const filasJson = JSON.stringify(c.filas).replace(/"/g,'&quot;');
+      return '<label style="display:flex;align-items:flex-start;gap:9px;padding:9px 0;border-top:0.5px solid var(--border);">'+
+        '<input type="checkbox" class="chk-cxp-'+pid+'" data-filas="'+filasJson+'" data-saldo="'+c.saldo+'" onchange="recalcSeleccionCxp_(\''+pid+'\')" style="width:auto;accent-color:var(--forest);margin-top:2px;">'+
+        '<span style="flex:1;"><span style="font-size:13px;display:block;">'+(c.nDocumento||'Sin documento')+' <span style="color:var(--ink-soft);font-size:11.5px;">&middot; '+c.fecha+'</span></span>'+
+        desgloseHtml+
+        '<span style="font-size:11.5px;color:var(--ink-soft);">'+(c.dividido?'dividido entre negocios':(c.descripcion||''))+etiquetaParcial+'</span></span>'+
+        '<b class="mono" style="font-size:13px;">'+fmt(c.saldo)+'</b>'+
+      '</label>';
+    }).join('');
+    wrap.innerHTML = '<button type="button" onclick="toggleProveedorCxp_(\''+pid+'\')" style="width:100%;display:flex;justify-content:space-between;align-items:center;padding:12px 13px;background:none;border:none;text-align:left;">'+
+        '<span style="display:flex;align-items:center;gap:8px;"><svg id="chev-cxp-'+pid+'" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--ink-soft)" stroke-width="2.2" style="transition:transform .15s;"><path d="M9 6l6 6-6 6"></path></svg>'+
+        '<strong style="font-size:13.5px;color:var(--forest);">'+proveedor+'</strong></span>'+
+        '<b class="mono" style="font-size:13.5px;color:var(--forest);">'+fmt(totalProveedor)+'</b>'+
+      '</button>'+
+      '<div id="docs-cxp-'+pid+'" style="display:none;padding:0 13px 12px;">'+filasDocs+
+        '<div id="bar-cxp-'+pid+'" style="display:none;margin-top:8px;background:var(--forest-soft);border-radius:9px;padding:9px 11px;align-items:center;justify-content:space-between;">'+
+          '<span id="bar-cxp-'+pid+'-txt" style="font-size:12px;color:var(--forest);font-weight:600;"></span>'+
+          '<button class="btn-primary btn-small" onclick="abrirModalPagoLote_(\''+pid+'\')">Registrar pago</button>'+
+        '</div>'+
+      '</div>';
+    cont.appendChild(wrap);
   });
   (r.saldosCanje||[]).forEach(s=>{
     const div = document.createElement('div'); div.className='card';
@@ -2660,15 +2739,48 @@ function pintarCuentasPorPagar(r){
   });
   if(!(r.cuentas||[]).length && !(r.saldosCanje||[]).length) cont.innerHTML = '<p style="font-size:12px;color:var(--ink-soft);">No hay facturas pendientes.</p>';
 }
-async function abrirCuentasPorPagar(forzar){
-  irA('screen-cxp');
-  if(forzar) cacheModulo.cxp = null;
-  if(cacheModulo.cxp){ pintarCuentasPorPagar(cacheModulo.cxp); return; }
-  document.getElementById('cxp-resumen').innerHTML = '<div class="skel-line" style="height:24px;width:220px;"></div>';
-  document.getElementById('cxp-lista').innerHTML = skeletonCards(3);
-  const r = await llamarAPISilencioso('listarCuentasPorPagar',{});
-  cacheModulo.cxp = r;
-  if(document.getElementById('screen-cxp').classList.contains('active')) pintarCuentasPorPagar(r);
+function toggleProveedorCxp_(pid){
+  const docs = document.getElementById('docs-cxp-'+pid);
+  const chev = document.getElementById('chev-cxp-'+pid);
+  const abierto = docs.style.display !== 'none';
+  docs.style.display = abierto ? 'none' : 'block';
+  chev.style.transform = abierto ? 'rotate(0deg)' : 'rotate(90deg)';
+}
+function recalcSeleccionCxp_(pid){
+  const boxes = document.querySelectorAll('.chk-cxp-'+pid);
+  let total = 0, n = 0;
+  boxes.forEach(b=>{ if(b.checked){ total += Number(b.dataset.saldo); n++; } });
+  const bar = document.getElementById('bar-cxp-'+pid);
+  const txt = document.getElementById('bar-cxp-'+pid+'-txt');
+  if(n>0){ bar.style.display='flex'; txt.textContent = n+' seleccionado(s) · '+fmt(total); }
+  else bar.style.display='none';
+}
+function abrirModalPagoLote_(pid){
+  const boxes = [...document.querySelectorAll('.chk-cxp-'+pid)].filter(b=>b.checked);
+  const filas = [];
+  boxes.forEach(b=>{ JSON.parse(b.dataset.filas).forEach(f=>filas.push(f)); });
+  abrirModalPago(filas);
+}
+function abrirModalPago(filas){
+  abrirModal(
+    '<h3 style="font-size:15px;">Registrar pago</h3>'+
+    (filas.length>1 ? '<p style="font-size:11.5px;color:var(--ink-soft);background:var(--forest-soft);border-radius:8px;padding:6px 9px;margin:2px 0 8px;">'+filas.length+' documento(s) seleccionados — se pagan juntos, con la misma fecha y medio de pago.</p>' : '')+
+    '<label>Fecha de pago</label><input type="date" id="pg-fecha">'+
+    '<label>Medio de pago</label><select id="pg-medio"><option>Transferencia</option><option>Efectivo</option><option>Débito</option><option>Crédito</option></select>'+
+    '<div class="error-msg" id="pg-error"></div>'+
+    '<div style="display:flex;gap:8px;margin-top:14px;"><button class="btn-secondary" onclick="cerrarModal()">Cancelar</button><button class="btn-primary" onclick="confirmarPago('+JSON.stringify(filas).replace(/"/g,'&quot;')+')">Guardar</button></div>'
+  );
+  document.getElementById('pg-fecha').value = fechaLocalISO();
+}
+async function confirmarPago(filas){
+  if (typeof filas === 'number') filas = [filas]; // compatibilidad si algo llama con una sola fila
+  const d = { filas, fechaPago:document.getElementById('pg-fecha').value, medioPago:document.getElementById('pg-medio').value };
+  const r = await llamarAPI('registrarPagoFactura',{data:d});
+  if(r.ok){
+    cachePanel = {};
+    cerrarModal();
+    abrirCuentasPorPagar(true);
+  } else document.getElementById('pg-error').textContent=r.error||'Error al registrar el pago';
 }
 
 function abrirModalLiquidarCanje(contraparte, saldo){
@@ -2692,30 +2804,15 @@ async function confirmarLiquidarCanje(contraparte){
   }
   else document.getElementById('lq-error').textContent=r.error||'Error al liquidar';
 }
-function abrirModalPago(fila){
-  abrirModal(
-    '<h3 style="font-size:15px;">Registrar pago</h3>'+
-    '<label>Fecha de pago</label><input type="date" id="pg-fecha">'+
-    '<label>Medio de pago</label><select id="pg-medio"><option>Transferencia</option><option>Efectivo</option><option>Débito</option><option>Crédito</option></select>'+
-    '<div class="error-msg" id="pg-error"></div>'+
-    '<div style="display:flex;gap:8px;margin-top:14px;"><button class="btn-secondary" onclick="cerrarModal()">Cancelar</button><button class="btn-primary" onclick="confirmarPago('+fila+')">Guardar</button></div>'
-  );
-  document.getElementById('pg-fecha').value = fechaLocalISO();
-}
-async function confirmarPago(fila){
-  const d = { fila, fechaPago:document.getElementById('pg-fecha').value, medioPago:document.getElementById('pg-medio').value };
-  const r = await llamarAPI('registrarPagoFactura',{data:d});
-  if(r.ok){
-    cachePanel = {};
-    if(cacheModulo.cxp){
-      cacheModulo.cxp.cuentas = (cacheModulo.cxp.cuentas||[]).filter(c=>c.fila!==fila);
-      cacheModulo.cxp.cantidad = cacheModulo.cxp.cuentas.length + (cacheModulo.cxp.saldosCanje||[]).length;
-    }
-    cerrarModal();
-    const card = document.querySelector('#cxp-lista .card[data-fila="'+fila+'"]');
-    if(card) card.remove(); else abrirCuentasPorPagar(true);
-    if(cacheModulo.cxp) document.getElementById('cxp-resumen').innerHTML = '<div class="rowline" style="font-size:14px;font-weight:700;"><span>'+cacheModulo.cxp.cantidad+' documento(s) pendientes</span><b>'+fmt(cacheModulo.cxp.cuentas.reduce((s,c)=>s+c.saldo,0))+'</b></div>';
-  } else document.getElementById('pg-error').textContent=r.error||'Error al registrar el pago';
+async function abrirCuentasPorPagar(forzar){
+  irA('screen-cxp');
+  if(forzar) cacheModulo.cxp = null;
+  if(cacheModulo.cxp){ pintarCuentasPorPagar(cacheModulo.cxp); return; }
+  document.getElementById('cxp-resumen').innerHTML = '<div class="skel-line" style="height:24px;width:220px;"></div>';
+  document.getElementById('cxp-lista').innerHTML = skeletonCards(3);
+  const r = await llamarAPISilencioso('listarCuentasPorPagar',{});
+  cacheModulo.cxp = r;
+  if(document.getElementById('screen-cxp').classList.contains('active')) pintarCuentasPorPagar(r);
 }
 
 function pintarCuentasPorCobrar(r){
