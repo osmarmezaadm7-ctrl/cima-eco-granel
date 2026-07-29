@@ -1168,8 +1168,16 @@ async function abrirRetiroVC() {
   retiroVCCantidades = {};
   retiroVCVerMas = new Set();
   retiroVCCliente = '';
-  document.getElementById('retiro-vc-cliente').value = '';
+  const selCliente = document.getElementById('retiro-vc-cliente');
+  selCliente.innerHTML = '<option value="">— sin cliente —</option>';
+  const fechaInput = document.getElementById('retiro-vc-fecha');
+  const ahora = new Date();
+  fechaInput.value = ahora.getFullYear() + '-' + String(ahora.getMonth() + 1).padStart(2, '0') + '-' + String(ahora.getDate()).padStart(2, '0') +
+    'T' + String(ahora.getHours()).padStart(2, '0') + ':' + String(ahora.getMinutes()).padStart(2, '0');
   document.getElementById('retiro-vc-error').textContent = '';
+  llamarAPISilencioso('listarClientes', {}).then(r => {
+    if (r.ok) selCliente.innerHTML += (r.clientes || []).map(c => '<option value="' + c.nombre + '">' + c.nombre + '</option>').join('');
+  });
   if (!cacheCatalogoCompleto) {
     document.getElementById('retiro-vc-chips').innerHTML = skeletonCards(1);
     document.getElementById('retiro-vc-lista').innerHTML = skeletonCards(3);
@@ -1313,7 +1321,8 @@ async function confirmarRetiroVC() {
   const boton = document.getElementById('resumen-retiro-btn-confirmar');
   boton.disabled = true;
   const r = await llamarAPI('guardarRetiroStockVC', {
-    data: { responsable: sesion.nombre, clienteMotivo: retiroVCCliente, items: resumenRetiroVCItems.map(it => ({ productoProduccion: it.productoProduccion, cantidad: it.cantidad })) }
+    data: { responsable: sesion.nombre, clienteMotivo: retiroVCCliente, fecha: document.getElementById('retiro-vc-fecha').value,
+      items: resumenRetiroVCItems.map(it => ({ productoProduccion: it.productoProduccion, cantidad: it.cantidad })) }
   });
   boton.disabled = false;
   if (!r.ok) { err.textContent = r.error || 'Error al registrar el retiro'; return; }
