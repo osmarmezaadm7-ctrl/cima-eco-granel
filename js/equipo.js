@@ -1,16 +1,17 @@
 /**
- * equipo.js — módulo Equipo: ficha de cada colaborador (perfil, jornada, monto,
- * periodicidad), registro de ausencias/jornadas extra/anticipos, cierre y confirmación
- * de pago, comunicados y la vista propia del colaborador ("Mi pago").
+ * equipo.js — módulo Equipo, versión 2 (29/07/2026, con Osmar).
  *
- * NUEVO 28/07/2026 (con Osmar). Archivo propio, funciones namespaced con sufijo "Equipo"
- * para no chocar con nombres ya usados en produccion.js / abastecimiento.js / conciliacion.js.
+ * Estructura: Equipo (lista) → Ficha [tab Datos / tab Historial] → Acciones → Anotar / Cerrar
+ * pago. Resumen y Comunicados se abren directo desde la lista, no desde la ficha.
+ * La ficha es solo lectura (con un link "Editar" que abre el formulario aparte) — no mezcla
+ * botones de acción con los datos, a pedido explícito de Osmar tras varias rondas de mockup.
  */
 
 const DIAS_CHIPS_EQUIPO = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
-let equipoCache = { lista: null, fichaActual: null, jornadaEdit: [], todosColaboradores: [], comunicadoPara: [] };
+let equipoCache = { lista: null, fichaActual: null, jornadaEdit: [], todosColaboradores: [],
+  comunicadoPara: [], tipoMovimientoActual: 'Ausencia' };
 
-// ============ LISTA ============
+// ============ 1. LISTA ============
 async function abrirEquipo(forzar) {
   irA('screen-equipo');
   if (forzar) equipoCache.lista = null;
@@ -41,92 +42,134 @@ function pintarListaEquipo(r) {
   if (!(r.colaboradores || []).length) cont.innerHTML = '<p style="font-size:12px;color:var(--ink-soft);">Todavía no hay colaboradores cargados.</p>';
 }
 
-// ============ FICHA (ver / crear / editar) ============
+// ============ 2. FICHA — tabs Datos / Historial (solo lectura) ============
 async function abrirFichaEquipo(nombre) {
   irA('screen-ficha-equipo');
   const cont = document.getElementById('ficha-equipo-cont');
-  if (!nombre) { equipoCache.fichaActual = null; equipoCache.jornadaEdit = []; pintarFormularioFicha_(null, null, true); return; }
   cont.innerHTML = skeletonCards(3);
   const r = await llamarAPISilencioso('obtenerFichaColaborador', { nombre: nombre });
   if (!r.ok) { cont.innerHTML = '<p class="error-msg">' + r.error + '</p>'; return; }
   equipoCache.fichaActual = r.colaborador;
-  equipoCache.jornadaEdit = (r.colaborador.jornada || []).map(b => Object.assign({}, b));
-  pintarFormularioFicha_(r.colaborador, r.calculado, false);
+  equipoCache.fichaTabActual = 'datos';
+  pintarFichaEquipo_(r.colaborador, r.calculado);
 }
 
-function pintarFormularioFicha_(c, calc, esNuevo) {
+function pintarFichaEquipo_(c, calc) {
   const cont = document.getElementById('ficha-equipo-cont');
+  const iniciales = c.nombre.split(' ').map(p => p[0]).slice(0, 2).join('').toUpperCase();
+  let html =
+    '<div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">' +
+      '<div class="avatar">' + iniciales + '</div>' +
+      '<div><strong style="font-size:16px;">' + c.nombre + '</strong><p style="font-size:12.5px;color:var(--ink-soft);margin:1px 0 0;">' + c.negocio + '</p></div>' +
+    '</div>' +
+    '<div class="pillbar">' +
+      '<button class="' + (equipoCache.fichaTabActual === 'datos' ? 'sel' : '') + '" onclick="cambiarTabFichaEquipo_(\'datos\')">Datos</button>' +
+      '<button class="' + (equipoCache.fichaTabActual === 'historial' ? 'sel' : '') + '" onclick="cambiarTabFichaEquipo_(\'historial\')">Historial</button>' +
+    '</div>' +
+    '<div id="ficha-tab-cont"></div>' +
+    '<button class="btn-primary" style="margin-top:16px;" onclick="irA(\'screen-acciones-equipo\');pintarAccionesEquipo_()">Acciones →</button>';
+  cont.innerHTML = html;
+  if (equipoCache.fichaTabActual === 'datos') pintarTabDatosEquipo_(c, calc);
+  else pintarTabHistorialEquipo_(c.nombre);
+}
+
+function cambiarTabFichaEquipo_(tab) {
+  equipoCache.fichaTabActual = tab;
+  pintarFichaEquipo_(equipoCache.fichaActual, equipoCache.calculadoActual);
+}
+
+function filaEquipo_(label, valor) {
+  return '<div style="display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border);font-size:13.5px;">' +
+    '<span style="color:var(--ink-soft);">' + label + '</span><span style="text-align:right;">' + valor + '</span></div>';
+}
+
+function pintarTabDatosEquipo_(c, calc) {
+  equipoCache.calculadoActual = calc;
+  const tab = document.getElementById('ficha-tab-cont');
+  let html = filaEquipo_('Teléfono', c.telefono || '—');
+  html += '<div style="padding:10px 0 4px;font-size:11px;text-transform:uppercase;letter-spacing:.4px;color:var(--ink-soft);">Responsabilidades</div>';
+  html += '<p style="font-size:13.5px;line-height:1.5;margin:0 0 8px;">' + (c.responsabilidades || '—') + '</p>';
+  html += filaEquipo_('Monto', fmt(c.monto) + (c.periodicidad === 'Semanal' ? ' / semana' : ' / mes'));
+  html += filaEquipo_('Periodicidad', c.periodicidad + (c.periodicidad === 'Quincenal' ? ' (' + fmt(c.monto / 2) + ' c/u)' : ''));
+  html += filaEquipo_('Fecha de pago', c.diasDePago || '—');
+  html += '<div style="padding:14px 0 6px;font-size:11px;text-transform:uppercase;letter-spacing:.4px;color:var(--ink-soft);">Jornada</div>';
+  (c.jornada || []).forEach(b => {
+    const dias = b.dias.join(' · ');
+    const horario = (b.horaInicio != null && b.horaFin != null) ? b.horaInicio + ':00–' + b.horaFin + ':00' : 'sin horario fijo';
+    const colacion = num_(b.colacionMin) > 0 ? b.colacionMin + ' min colación' : 'sin colación';
+    html += filaEquipo_(dias, horario + ' · ' + colacion + ' · <strong>' + b.horas + 'h</strong>');
+  });
+  html += '<div style="padding:14px 0 6px;font-size:11px;text-transform:uppercase;letter-spacing:.4px;color:var(--ink-soft);">Modalidad de pago</div>';
+  if (c.unidadDescuento === 'hora') html += filaEquipo_('Cálculo', 'Por hora · ' + fmt(calc.valorHora) + '/h');
+  else html += filaEquipo_('Cálculo', 'Por día · ' + fmt(calc.valorDia) + '/día');
+  html += '<button type="button" class="btn-secondary" style="margin-top:14px;" onclick="abrirFormularioFichaEquipo_(\'' + c.nombre + '\')">Editar</button>';
+  tab.innerHTML = html;
+}
+
+async function pintarTabHistorialEquipo_(nombre) {
+  const tab = document.getElementById('ficha-tab-cont');
+  tab.innerHTML = skeletonCards(2);
+  const r = await llamarAPISilencioso('obtenerHistorialPagos', { colaborador: nombre });
+  if (!r.ok) { tab.innerHTML = '<p class="error-msg">' + r.error + '</p>'; return; }
+  let html = '<div style="padding:10px 0 6px;font-size:11px;text-transform:uppercase;letter-spacing:.4px;color:var(--ink-soft);">Pagos</div>';
+  (r.pagos || []).forEach(p => { html += filaEquipo_(p.desde + ' – ' + p.hasta, '<strong>' + fmt(p.total) + '</strong>'); });
+  if (!(r.pagos || []).length) html += '<p style="font-size:12.5px;color:var(--ink-soft);">Sin pagos registrados todavía.</p>';
+  html += '<div style="padding:14px 0 6px;font-size:11px;text-transform:uppercase;letter-spacing:.4px;color:var(--ink-soft);">Cambios en la ficha</div>';
+  (r.cambiosFicha || []).forEach(cm => { html += '<p style="font-size:13px;color:var(--ink-soft);padding:6px 0;border-bottom:1px solid var(--border);">' + cm.descripcion + ' · ' + cm.fecha + '</p>'; });
+  if (!(r.cambiosFicha || []).length) html += '<p style="font-size:12.5px;color:var(--ink-soft);">Sin cambios registrados.</p>';
+  tab.innerHTML = html;
+}
+
+// ============ 2b. EDITAR / CREAR FICHA ============
+function abrirFormularioFichaEquipo_(nombre) {
+  irA('screen-editar-equipo');
+  if (!nombre) { equipoCache.jornadaEdit = []; pintarFormularioFicha_(null, true); return; }
+  const c = equipoCache.fichaActual && equipoCache.fichaActual.nombre === nombre ? equipoCache.fichaActual : null;
+  if (!c) { irA('screen-equipo'); return; }
+  equipoCache.jornadaEdit = (c.jornada || []).map(b => Object.assign({}, b));
+  pintarFormularioFicha_(c, false);
+}
+
+function pintarFormularioFicha_(c, esNuevo) {
+  const cont = document.getElementById('editar-equipo-cont');
   const val = (campo, def) => c ? (c[campo] != null ? c[campo] : def) : def;
-  let html = '<h2 style="font-size:17px;">' + (esNuevo ? 'Nuevo colaborador' : c.nombre) + '</h2>';
-
-  if (!esNuevo) {
-    html += '<div class="pillbar" style="margin-bottom:12px;">' +
-      '<button type="button" onclick="abrirRegistrarMovimientoEquipo(\'' + c.nombre + '\')">+ Anotar</button>' +
-      '<button type="button" onclick="abrirCierrePagoEquipo(\'' + c.nombre + '\')">Cerrar pago</button>' +
-      '</div>';
-  }
-
+  let html = '<h2 style="font-size:17px;">' + (esNuevo ? 'Nuevo colaborador' : 'Editar · ' + c.nombre) + '</h2>';
   html += '<label>Nombre</label><input type="text" id="fe-nombre" value="' + val('nombre', '') + '" ' + (esNuevo ? '' : 'readonly') + '>';
   html += '<label>Teléfono</label><input type="tel" id="fe-telefono" value="' + val('telefono', '') + '" placeholder="+56 9 ....">';
   html += '<label>Responsabilidades</label><textarea id="fe-responsabilidades" rows="2">' + val('responsabilidades', '') + '</textarea>';
-
   html += '<div style="display:flex;gap:10px;">' +
     '<div style="flex:1;"><label>Negocio</label><select id="fe-negocio">' +
       '<option ' + (val('negocio', '') === 'Cima Eco-Granel' ? 'selected' : '') + '>Cima Eco-Granel</option>' +
       '<option ' + (val('negocio', '') === 'Vegan Corner' ? 'selected' : '') + '>Vegan Corner</option></select></div>' +
-    '<div style="flex:1;"><label>Monto (semanal si es Semanal; mensual si es Quincenal/Mensual)</label><input type="number" id="fe-monto" value="' + val('monto', '') + '" onchange="pintarDesgloseMontoEquipo_()" oninput="pintarDesgloseMontoEquipo_()"></div>' +
+    '<div style="flex:1;"><label>Monto (semanal si Semanal; mensual si Quincenal/Mensual)</label><input type="number" id="fe-monto" value="' + val('monto', '') + '" oninput="pintarDesgloseMontoEquipo_()"></div>' +
     '</div>';
-
   html += '<div style="display:flex;gap:10px;">' +
     '<div style="flex:1;"><label>Periodicidad</label><select id="fe-periodicidad" onchange="pintarDesgloseMontoEquipo_()">' +
       ['Semanal', 'Quincenal', 'Mensual'].map(p => '<option ' + (val('periodicidad', 'Semanal') === p ? 'selected' : '') + '>' + p + '</option>').join('') +
       '</select></div>' +
-    '<div style="flex:1;"><label>Días de pago</label><input type="text" id="fe-diaspago" value="' + val('diasDePago', '') + '" placeholder="Ej: lunes, o 15 y 30"></div>' +
+    '<div style="flex:1;"><label>Fecha de pago</label><input type="text" id="fe-diaspago" value="' + val('diasDePago', '') + '" placeholder="Ej: lunes, o 15 y 30"></div>' +
     '</div>';
-
   html += '<div id="fe-desglose-monto" style="font-size:12.5px;color:var(--forest);background:var(--forest-soft);border-radius:8px;padding:8px 12px;margin-bottom:12px;"></div>';
-
-  html += '<label>Unidad de descuento por ausencia</label><select id="fe-unidad" onchange="pintarJornadaEquipo_()">' +
-    '<option value="dia" ' + (val('unidadDescuento', 'dia') === 'dia' ? 'selected' : '') + '>Por día (sin horario, o monto fijo por día)</option>' +
-    '<option value="hora" ' + (val('unidadDescuento', 'dia') === 'hora' ? 'selected' : '') + '>Por hora (jornada con horario)</option>' +
+  html += '<label>Modalidad de pago</label><select id="fe-unidad" onchange="pintarJornadaEquipo_()">' +
+    '<option value="dia" ' + (val('unidadDescuento', 'dia') === 'dia' ? 'selected' : '') + '>Por día</option>' +
+    '<option value="hora" ' + (val('unidadDescuento', 'dia') === 'hora' ? 'selected' : '') + '>Por hora</option>' +
     '</select>';
-
-  html += '<div style="font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--ink-soft);margin:12px 0 6px;">Jornada</div>';
+  html += '<div style="font-size:11px;text-transform:uppercase;letter-spacing:.4px;color:var(--ink-soft);margin:12px 0 6px;">Jornada</div>';
   html += '<div id="fe-jornada-bloques"></div>';
-  html += '<button type="button" class="btn-secondary" style="width:100%;margin:6px 0 10px;" onclick="agregarBloqueJornadaEquipo_()">+ Agregar bloque de jornada</button>';
-  html += '<div id="fe-jornada-resumen" style="font-size:12px;background:var(--forest-soft);color:var(--forest);border-radius:8px;padding:8px 12px;margin-bottom:14px;"></div>';
-
+  html += '<button type="button" class="btn-secondary" onclick="agregarBloqueJornadaEquipo_()">+ Agregar bloque de jornada</button>';
+  html += '<div id="fe-jornada-resumen" style="font-size:12px;background:var(--paper);border-radius:8px;padding:8px 12px;margin:10px 0 14px;"></div>';
   if (esNuevo) {
-    html += '<div style="font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--ink-soft);margin:4px 0 6px;">Acceso al sistema</div>';
+    html += '<div style="font-size:11px;text-transform:uppercase;letter-spacing:.4px;color:var(--ink-soft);margin:4px 0 6px;">Acceso al sistema</div>';
     html += '<label>PIN inicial (4 dígitos)</label><input type="tel" id="fe-pin" maxlength="4" inputmode="numeric" placeholder="Ej: 4521">';
-    html += '<p style="font-size:12px;color:var(--ink-soft);">Con esto queda creado su acceso — solo va a ver el detalle de su propio pago y los comunicados.</p>';
   }
-
   html += '<div class="error-msg" id="fe-error"></div>';
-  html += '<button class="btn-primary" style="width:100%;margin-top:10px;" onclick="guardarFichaEquipo_(' + (esNuevo ? 'true' : "false, '" + c.nombre + "'") + ')">' + (esNuevo ? 'Crear ficha y acceso' : 'Guardar cambios') + '</button>';
-
+  html += '<button class="btn-primary" style="margin-top:10px;" onclick="guardarFichaEquipo_(' + (esNuevo ? 'true' : "false, '" + c.nombre + "'") + ')">' + (esNuevo ? 'Crear ficha y acceso' : 'Guardar cambios') + '</button>';
   cont.innerHTML = html;
   pintarJornadaEquipo_();
   pintarDesgloseMontoEquipo_();
 }
 
-// Traduce 'Monto' (semanal si Semanal; MENSUAL si Quincenal/Mensual — ver nota en Equipo.gs)
-// a lo que realmente se le paga en un ciclo, para que nunca se lea "350.000 quincenal"
-// cuando en realidad son $175.000 cada 15 días.
-function pintarDesgloseMontoEquipo_() {
-  const el = document.getElementById('fe-desglose-monto');
-  if (!el) return;
-  const monto = num_(document.getElementById('fe-monto') ? document.getElementById('fe-monto').value : 0);
-  const periodicidad = document.getElementById('fe-periodicidad') ? document.getElementById('fe-periodicidad').value : 'Semanal';
-  if (periodicidad === 'Quincenal') {
-    el.textContent = fmt(monto) + ' al mes → ' + fmt(monto / 2) + ' cada quincena (15 y 30, u otras fechas que definas)';
-  } else if (periodicidad === 'Mensual') {
-    el.textContent = fmt(monto) + ' al mes, en un solo pago';
-  } else {
-    el.textContent = fmt(monto) + ' a la semana';
-  }
-  recalcularResumenJornadaEquipo_();
-}
+function num_(v) { const n = Number(v); return isNaN(n) ? 0 : n; }
 
 function pintarJornadaEquipo_() {
   const cont = document.getElementById('fe-jornada-bloques');
@@ -135,20 +178,30 @@ function pintarJornadaEquipo_() {
   equipoCache.jornadaEdit.forEach((b, idx) => {
     const div = document.createElement('div');
     div.style.cssText = 'background:var(--paper);border-radius:8px;padding:8px 10px;margin-bottom:8px;';
-    const unidad = document.getElementById('fe-unidad') ? document.getElementById('fe-unidad').value : 'dia';
     div.innerHTML =
       '<div class="conteo-chips" style="margin-bottom:6px;">' +
       DIAS_CHIPS_EQUIPO.map(d => '<span class="chip-sub' + (b.dias.indexOf(d) > -1 ? ' activo' : '') + '" onclick="toggleDiaBloqueEquipo_(' + idx + ',\'' + d + '\')">' + d + '</span>').join('') +
       '</div>' +
-      (unidad === 'hora'
-        ? '<div style="display:flex;align-items:center;gap:6px;"><input type="number" style="width:64px;" value="' + (b.horaInicio || '') + '" onchange="equipoCache.jornadaEdit[' + idx + '].horaInicio=this.value" placeholder="Desde"><span>a</span><input type="number" style="width:64px;" value="' + (b.horaFin || '') + '" onchange="actualizarHorasBloqueEquipo_(' + idx + ')" placeholder="Hasta"><span style="font-size:12px;color:var(--ink-soft);">' + (num_(b.horas) || 0) + ' h</span><button type="button" class="icon-btn" style="margin-left:auto;" onclick="quitarBloqueJornadaEquipo_(' + idx + ')">✕</button></div>'
-        : '<div style="display:flex;align-items:center;"><button type="button" class="icon-btn" style="margin-left:auto;" onclick="quitarBloqueJornadaEquipo_(' + idx + ')">✕</button></div>');
+      '<div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap;">' +
+        '<span style="font-size:11.5px;color:var(--ink-soft);">Desde</span><input type="number" style="width:50px;" value="' + (b.horaInicio != null ? b.horaInicio : '') + '" onchange="actualizarBloqueEquipo_(' + idx + ')">' +
+        '<span style="font-size:11.5px;color:var(--ink-soft);">Hasta</span><input type="number" style="width:50px;" value="' + (b.horaFin != null ? b.horaFin : '') + '" onchange="actualizarBloqueEquipo_(' + idx + ')">' +
+        '<span style="font-size:11.5px;color:var(--ink-soft);">Colación (min)</span><input type="number" style="width:56px;" value="' + (b.colacionMin || 0) + '" onchange="actualizarBloqueEquipo_(' + idx + ')">' +
+        '<span style="font-size:11.5px;color:var(--ink-soft);margin-left:auto;">' + (b.horas || 0) + 'h neto</span>' +
+        '<button type="button" class="icon-btn" onclick="quitarBloqueJornadaEquipo_(' + idx + ')">✕</button>' +
+      '</div>';
     cont.appendChild(div);
   });
   recalcularResumenJornadaEquipo_();
 }
 
-function num_(v) { const n = Number(v); return isNaN(n) ? 0 : n; }
+function actualizarBloqueEquipo_(idx) {
+  const inputs = document.querySelectorAll('#fe-jornada-bloques > div')[idx].querySelectorAll('input[type=number]');
+  const b = equipoCache.jornadaEdit[idx];
+  b.horaInicio = num_(inputs[0].value); b.horaFin = num_(inputs[1].value); b.colacionMin = num_(inputs[2].value);
+  const bruto = Math.max(0, b.horaFin - b.horaInicio);
+  b.horas = Math.max(0, bruto - b.colacionMin / 60);
+  pintarJornadaEquipo_();
+}
 
 function toggleDiaBloqueEquipo_(idx, dia) {
   const b = equipoCache.jornadaEdit[idx];
@@ -157,16 +210,8 @@ function toggleDiaBloqueEquipo_(idx, dia) {
   pintarJornadaEquipo_();
 }
 
-function actualizarHorasBloqueEquipo_(idx) {
-  const b = equipoCache.jornadaEdit[idx];
-  const inputs = document.querySelectorAll('#fe-jornada-bloques > div')[idx].querySelectorAll('input[type=number]');
-  b.horaInicio = inputs[0].value; b.horaFin = inputs[1].value;
-  b.horas = Math.max(0, num_(b.horaFin) - num_(b.horaInicio));
-  pintarJornadaEquipo_();
-}
-
 function agregarBloqueJornadaEquipo_() {
-  equipoCache.jornadaEdit.push({ dias: [], horas: 0, horaInicio: '', horaFin: '' });
+  equipoCache.jornadaEdit.push({ dias: [], horaInicio: null, horaFin: null, colacionMin: 0, horas: 0 });
   pintarJornadaEquipo_();
 }
 
@@ -175,28 +220,36 @@ function quitarBloqueJornadaEquipo_(idx) {
   pintarJornadaEquipo_();
 }
 
-function semanasParaTasaEquipo_(periodicidad) {
-  return periodicidad === 'Semanal' ? 1 : 52 / 12; // Quincenal y Mensual: 'monto' es la cifra mensual
-}
+function semanasParaTasaEquipo_(periodicidad) { return periodicidad === 'Semanal' ? 1 : 52 / 12; }
 
 function recalcularResumenJornadaEquipo_() {
   const resumen = document.getElementById('fe-jornada-resumen');
+  if (!resumen) return;
   const unidad = document.getElementById('fe-unidad') ? document.getElementById('fe-unidad').value : 'dia';
   const periodicidad = document.getElementById('fe-periodicidad') ? document.getElementById('fe-periodicidad').value : 'Semanal';
   const monto = num_(document.getElementById('fe-monto') ? document.getElementById('fe-monto').value : 0);
   const semanas = semanasParaTasaEquipo_(periodicidad);
   const diasSemana = equipoCache.jornadaEdit.reduce((s, b) => s + b.dias.length, 0);
+  const horasSemana = equipoCache.jornadaEdit.reduce((s, b) => s + b.dias.length * num_(b.horas), 0);
   if (unidad === 'hora') {
-    const horasSemana = equipoCache.jornadaEdit.reduce((s, b) => s + b.dias.length * num_(b.horas), 0);
     const valorHora = (horasSemana * semanas) > 0 ? Math.round(monto / (horasSemana * semanas)) : 0;
-    resumen.textContent = 'Jornada semanal: ' + horasSemana + ' h · valor hora ' + fmt(valorHora);
+    resumen.textContent = horasSemana + ' h netas por semana · valor hora ' + fmt(valorHora);
   } else {
     const valorDia = (diasSemana * semanas) > 0 ? Math.round(monto / (diasSemana * semanas)) : 0;
     resumen.textContent = diasSemana + ' día(s) por semana · valor día ' + fmt(valorDia);
   }
 }
-document.addEventListener('input', e => { if (e.target && (e.target.id === 'fe-monto')) recalcularResumenJornadaEquipo_(); });
-document.addEventListener('change', e => { if (e.target && (e.target.id === 'fe-periodicidad')) recalcularResumenJornadaEquipo_(); });
+
+function pintarDesgloseMontoEquipo_() {
+  const el = document.getElementById('fe-desglose-monto');
+  if (!el) return;
+  const monto = num_(document.getElementById('fe-monto') ? document.getElementById('fe-monto').value : 0);
+  const periodicidad = document.getElementById('fe-periodicidad') ? document.getElementById('fe-periodicidad').value : 'Semanal';
+  if (periodicidad === 'Quincenal') el.textContent = fmt(monto) + ' al mes → ' + fmt(monto / 2) + ' cada quincena';
+  else if (periodicidad === 'Mensual') el.textContent = fmt(monto) + ' al mes, en un solo pago';
+  else el.textContent = fmt(monto) + ' a la semana';
+  recalcularResumenJornadaEquipo_();
+}
 
 async function guardarFichaEquipo_(esNuevo, nombreOriginal) {
   const err = document.getElementById('fe-error'); err.textContent = '';
@@ -227,75 +280,74 @@ async function guardarFichaEquipo_(esNuevo, nombreOriginal) {
   irA('screen-confirm');
 }
 
-// ============ MOVIMIENTOS (Ausencia / Extra / Anticipo) ============
-async function abrirRegistrarMovimientoEquipo(nombre) {
+// ============ 3. ACCIONES ============
+function pintarAccionesEquipo_() {
+  const c = equipoCache.fichaActual;
+  document.getElementById('acciones-equipo-cont').innerHTML =
+    '<button class="back-link" onclick="abrirFichaEquipo(\'' + c.nombre + '\')"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"></path></svg> ' + c.nombre + '</button>' +
+    '<div style="display:flex;flex-direction:column;gap:8px;margin-top:12px;">' +
+      '<button type="button" class="btn-secondary" style="text-align:left;height:auto;padding:14px 16px;" onclick="abrirRegistrarMovimientoEquipo(\'' + c.nombre + '\')">' +
+        '<div style="font-weight:700;">Anotar</div><div style="font-size:12px;font-weight:400;color:var(--ink-soft);">Ausencia, extra, licencia, vacaciones, anticipo</div></button>' +
+      '<button type="button" class="btn-primary" style="text-align:left;height:auto;padding:14px 16px;" onclick="abrirCierrePagoEquipo(\'' + c.nombre + '\')">' +
+        '<div>Pagar ahora</div><div style="font-size:12px;font-weight:400;opacity:.85;">Calcula el período y confirma el pago</div></button>' +
+    '</div>';
+}
+
+// ============ 4. ANOTAR — 5 tipos ============
+const TIPOS_MOVIMIENTO_EQUIPO = [
+  { tipo: 'Ausencia', label: 'Ausencia' }, { tipo: 'Extra', label: 'Extra' },
+  { tipo: 'Licencia', label: 'Licencia médica' }, { tipo: 'Vacaciones', label: 'Vacaciones' },
+  { tipo: 'Anticipo', label: 'Anticipo' }
+];
+
+function abrirRegistrarMovimientoEquipo(nombre) {
   irA('screen-movimiento-equipo');
-  const cont = document.getElementById('movimiento-equipo-cont');
-  cont.innerHTML =
-    '<h2 style="font-size:17px;">Anotar</h2><p style="font-size:12.5px;color:var(--ink-soft);margin-top:-6px;">' + nombre + '</p>' +
-    '<div class="toggle-group" id="me-tipo-group">' +
-      '<button type="button" class="selected" onclick="setTipoMovimientoEquipo_(\'Ausencia\',this)">Ausencia</button>' +
-      '<button type="button" onclick="setTipoMovimientoEquipo_(\'Extra\',this)">Extra</button>' +
-      '<button type="button" onclick="setTipoMovimientoEquipo_(\'Anticipo\',this)">Anticipo</button>' +
-    '</div>' +
-    '<label>Día</label><input type="date" id="me-fecha" value="' + fechaLocalISO() + '" onchange="previsualizarMontoMovimientoEquipo_(\'' + nombre + '\')">' +
-    '<div id="me-campos-extra"></div>' +
-    '<div id="me-preview" style="background:var(--paper);border-radius:8px;padding:11px 12px;margin:8px 0 12px;font-size:14px;"></div>' +
-    '<label>Observación (opcional)</label><input type="text" id="me-observacion" placeholder="Ej: motivo, o a cuenta de qué">' +
-    '<div class="error-msg" id="me-error"></div>' +
-    '<button class="btn-primary" style="width:100%;margin-top:8px;" onclick="guardarMovimientoEquipo_(\'' + nombre + '\')">Guardar</button>' +
-    '<div style="font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--ink-soft);margin:16px 0 6px;">Registrado este período</div>' +
-    '<div id="me-lista-periodo"></div>';
   equipoCache.tipoMovimientoActual = 'Ausencia';
-  previsualizarMontoMovimientoEquipo_(nombre);
+  pintarFormularioMovimientoEquipo_(nombre);
+}
+
+function pintarFormularioMovimientoEquipo_(nombre) {
+  const cont = document.getElementById('movimiento-equipo-cont');
+  const tipo = equipoCache.tipoMovimientoActual;
+  let html = '<h2 style="font-size:17px;">Anotar</h2><p style="font-size:12.5px;color:var(--ink-soft);margin-top:-6px;">' + nombre + '</p>';
+  html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:12px 0;">';
+  TIPOS_MOVIMIENTO_EQUIPO.slice(0, 4).forEach(t => {
+    html += '<button type="button" class="btn-secondary' + (tipo === t.tipo ? ' selected' : '') + '" style="' + (tipo === t.tipo ? 'background:var(--forest);color:#fff;border-color:var(--forest);' : '') + '" onclick="cambiarTipoMovimientoEquipo_(\'' + t.tipo + '\',\'' + nombre + '\')">' + t.label + '</button>';
+  });
+  html += '</div>';
+  html += '<button type="button" class="btn-secondary' + (tipo === 'Anticipo' ? ' selected' : '') + '" style="' + (tipo === 'Anticipo' ? 'background:var(--forest);color:#fff;border-color:var(--forest);' : '') + '" onclick="cambiarTipoMovimientoEquipo_(\'Anticipo\',\'' + nombre + '\')">Anticipo</button>';
+
+  html += '<label style="margin-top:14px;">Día' + (tipo === 'Licencia' || tipo === 'Vacaciones' ? ' (desde)' : '') + '</label><input type="date" id="me-fecha" value="' + fechaLocalISO() + '">';
+  if (tipo === 'Licencia' || tipo === 'Vacaciones') {
+    html += '<label>Hasta</label><input type="date" id="me-fecha-hasta" value="' + fechaLocalISO() + '">';
+  }
+  if (tipo === 'Anticipo') {
+    html += '<label>Monto del anticipo</label><input type="number" id="me-monto-anticipo">';
+  }
+  const c = equipoCache.fichaActual;
+  if (tipo === 'Extra' && c && c.unidadDescuento === 'hora') {
+    html += '<label>Horas trabajadas ese día (si es fuera de su jornada regular)</label><input type="number" id="me-horas-extra">';
+  }
+  html += '<label>Observación (opcional)</label><input type="text" id="me-observacion">';
+  html += '<div class="error-msg" id="me-error"></div>';
+  html += '<button class="btn-primary" style="margin-top:8px;" onclick="guardarMovimientoEquipo_(\'' + nombre + '\')">Guardar</button>';
+  html += '<div style="font-size:11px;text-transform:uppercase;letter-spacing:.4px;color:var(--ink-soft);margin:16px 0 6px;">Registrado este período</div>';
+  html += '<div id="me-lista-periodo"></div>';
+  cont.innerHTML = html;
   pintarMovimientosDelPeriodoEquipo_(nombre);
 }
 
-function setTipoMovimientoEquipo_(tipo, btn) {
-  document.querySelectorAll('#me-tipo-group button').forEach(b => b.classList.remove('selected'));
-  btn.classList.add('selected');
+function cambiarTipoMovimientoEquipo_(tipo, nombre) {
   equipoCache.tipoMovimientoActual = tipo;
-  const extra = document.getElementById('me-campos-extra');
-  const nombre = equipoCache.fichaActual ? equipoCache.fichaActual.nombre : '';
-  if (tipo === 'Anticipo') {
-    extra.innerHTML = '<label>Monto del anticipo</label><input type="number" id="me-monto-anticipo">';
-  } else {
-    extra.innerHTML = '';
-  }
-  previsualizarMontoMovimientoEquipo_(nombre);
-}
-
-async function previsualizarMontoMovimientoEquipo_(nombre) {
-  const preview = document.getElementById('me-preview');
-  const tipo = equipoCache.tipoMovimientoActual || 'Ausencia';
-  if (tipo === 'Anticipo') { preview.textContent = 'Ingresa el monto del anticipo arriba.'; return; }
-  const fecha = document.getElementById('me-fecha').value;
-  const dow = new Date(fecha + 'T12:00:00').getDay();
-  const diaAbrev = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'][dow];
-  const c = equipoCache.fichaActual;
-  if (!c) return;
-  const bloque = (c.jornada || []).find(b => (b.dias || []).indexOf(diaAbrev) > -1);
-  if (bloque) {
-    // El monto exacto lo calcula y valida el servidor recién al guardar (guardarMovimientoEquipo_) —
-    // acá solo se confirma visualmente que el día cae dentro de la jornada, sin escribir nada todavía.
-    preview.innerHTML = diaAbrev + (c.unidadDescuento === 'hora' ? ' · ' + bloque.horas + ' h' : '') +
-      '<span style="float:right;font-weight:600;color:' + (tipo === 'Ausencia' ? 'var(--danger)' : 'var(--success)') + ';">' +
-      (tipo === 'Ausencia' ? 'Se descuenta el día' : 'Se suma el día') + '</span>';
-  } else if (tipo === 'Extra' && c.unidadDescuento === 'hora') {
-    document.getElementById('me-campos-extra').innerHTML = '<label>Horas trabajadas ese día</label><input type="number" id="me-horas-extra">';
-    preview.textContent = diaAbrev + ' no es parte de su jornada regular — indica las horas.';
-  } else if (tipo === 'Extra') {
-    preview.textContent = diaAbrev + ' fuera de su jornada — se sumará un día completo.';
-  } else {
-    preview.innerHTML = '<span style="color:var(--danger);">' + diaAbrev + ' no está en la jornada de ' + c.nombre + '.</span>';
-  }
+  pintarFormularioMovimientoEquipo_(nombre);
 }
 
 async function guardarMovimientoEquipo_(nombre) {
   const err = document.getElementById('me-error'); err.textContent = '';
-  const tipo = equipoCache.tipoMovimientoActual || 'Ausencia';
+  const tipo = equipoCache.tipoMovimientoActual;
   const d = { colaborador: nombre, fecha: document.getElementById('me-fecha').value, tipo: tipo,
     observacion: document.getElementById('me-observacion').value.trim() };
+  if (tipo === 'Licencia' || tipo === 'Vacaciones') d.fechaHasta = document.getElementById('me-fecha-hasta').value;
   if (tipo === 'Anticipo') d.monto = document.getElementById('me-monto-anticipo').value;
   const horasEl = document.getElementById('me-horas-extra');
   if (horasEl) d.horas = horasEl.value;
@@ -310,40 +362,46 @@ async function pintarMovimientosDelPeriodoEquipo_(nombre) {
   const cont = document.getElementById('me-lista-periodo');
   const c = equipoCache.fichaActual;
   if (!c) return;
-  const desde = c.ultimaFechaPagada ? c.ultimaFechaPagada : '';
-  const r = await llamarAPISilencioso('obtenerCierrePago', { colaborador: nombre, desde: desde || fechaLocalISO(), hasta: fechaLocalISO() });
+  const desdeISO = c.ultimaFechaPagada ? fechaCLaISO_(c.ultimaFechaPagada) : fechaLocalISO();
+  const r = await llamarAPISilencioso('obtenerCierrePago', { colaborador: nombre, desde: fechaISOaCL_(desdeISO), hasta: fechaISOaCL_(fechaLocalISO()) });
   if (!r.ok || !r.cierre) { cont.innerHTML = ''; return; }
-  cont.innerHTML = (r.cierre.movimientos || []).map(m =>
-    '<div style="display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--border);font-size:13px;">' +
-    '<span>' + m.tipo + ' · ' + m.fecha + (m.observacion ? ' — ' + m.observacion : '') + '</span>' +
-    '<span style="color:' + (m.tipo === 'Extra' ? 'var(--success)' : 'var(--danger)') + ';font-weight:600;">' + (m.tipo === 'Extra' ? '+' : '−') + fmt(m.monto) + '</span>' +
-    '</div>').join('') || '<p style="font-size:12px;color:var(--ink-soft);">Nada registrado todavía en este período.</p>';
+  cont.innerHTML = (r.cierre.movimientos || []).map(m => {
+    const signo = m.tipo === 'Extra' ? '+' : (m.tipo === 'Licencia' || m.tipo === 'Vacaciones') ? '' : '−';
+    const color = m.tipo === 'Extra' ? 'var(--success)' : (m.tipo === 'Licencia' || m.tipo === 'Vacaciones') ? 'var(--ink-soft)' : 'var(--danger)';
+    return '<div style="display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--border);font-size:13px;">' +
+      '<span>' + m.tipo + ' · ' + m.fecha + (m.fechaHasta && m.fechaHasta !== m.fecha ? ' a ' + m.fechaHasta : '') + (m.observacion ? ' — ' + m.observacion : '') + '</span>' +
+      '<span style="color:' + color + ';font-weight:600;">' + signo + (m.monto ? fmt(m.monto) : 'informativo') + '</span></div>';
+  }).join('') || '<p style="font-size:12px;color:var(--ink-soft);">Nada registrado todavía en este período.</p>';
 }
 
-// ============ CIERRE Y CONFIRMACIÓN DE PAGO ============
+// ============ 5. CIERRE Y CONFIRMACIÓN DE PAGO ============
+function fechaCLaISO_(cl) { const p = cl.split('/'); return p[2] + '-' + p[1] + '-' + p[0]; }
+function fechaISOaCL_(iso) { const p = iso.split('-'); return p[2] + '/' + p[1] + '/' + p[0]; }
+
 async function abrirCierrePagoEquipo(nombre) {
   irA('screen-cierre-equipo');
   const cont = document.getElementById('cierre-equipo-cont');
   cont.innerHTML = skeletonCards(2);
   const r = await llamarAPISilencioso('obtenerEquipo', {});
   const info = (r.colaboradores || []).find(c => c.nombre === nombre) || {};
-  const desde = info.desde || fechaLocalISO();
-  const hasta = info.hasta || fechaLocalISO();
-  pintarCierrePagoEquipo_(nombre, desde, hasta, null);
+  // obtenerEquipo entrega las fechas en formato CL (dd/MM/yyyy) — se convierten UNA vez a
+  // ISO para los <input type=date>, y de vuelta a CL solo al mandarlas al servidor.
+  const desdeISO = info.desde ? fechaCLaISO_(info.desde) : fechaLocalISO();
+  const hastaISO = info.hasta ? fechaCLaISO_(info.hasta) : fechaLocalISO();
+  await pintarCierrePagoEquipo_(nombre, desdeISO, hastaISO);
 }
 
-async function pintarCierrePagoEquipo_(nombre, desde, hasta, cierre) {
+async function pintarCierrePagoEquipo_(nombre, desdeISO, hastaISO) {
   const cont = document.getElementById('cierre-equipo-cont');
-  if (!cierre) {
-    const r = await llamarAPISilencioso('obtenerCierrePago', { colaborador: nombre, desde: fechaISOaCL_(desde), hasta: fechaISOaCL_(hasta) });
-    if (!r.ok) { cont.innerHTML = '<p class="error-msg">' + r.error + '</p>'; return; }
-    cierre = r.cierre;
-  }
+  const r = await llamarAPISilencioso('obtenerCierrePago', { colaborador: nombre, desde: fechaISOaCL_(desdeISO), hasta: fechaISOaCL_(hastaISO) });
+  if (!r.ok) { cont.innerHTML = '<p class="error-msg">' + r.error + '</p>'; return; }
+  const cierre = r.cierre;
+  equipoCache.cierreActual = cierre;
   cont.innerHTML =
     '<h2 style="font-size:17px;">Cierre de pago</h2><p style="font-size:12.5px;color:var(--ink-soft);margin-top:-6px;">' + nombre + '</p>' +
     '<div style="display:flex;gap:10px;">' +
-      '<div style="flex:1;"><label>Desde</label><input type="date" id="ce-desde" value="' + desde + '" onchange="recalcularCierrePagoEquipo_(\'' + nombre + '\')"></div>' +
-      '<div style="flex:1;"><label>Hasta</label><input type="date" id="ce-hasta" value="' + hasta + '" onchange="recalcularCierrePagoEquipo_(\'' + nombre + '\')"></div>' +
+      '<div style="flex:1;"><label>Desde</label><input type="date" id="ce-desde" value="' + desdeISO + '" onchange="recalcularCierrePagoEquipo_(\'' + nombre + '\')"></div>' +
+      '<div style="flex:1;"><label>Hasta</label><input type="date" id="ce-hasta" value="' + hastaISO + '" onchange="recalcularCierrePagoEquipo_(\'' + nombre + '\')"></div>' +
     '</div>' +
     '<div style="display:flex;justify-content:space-between;padding:9px 0;font-size:14px;"><span style="color:var(--ink-soft);">Base del período</span><span>' + fmt(cierre.base) + '</span></div>' +
     '<div style="display:flex;justify-content:space-between;padding:9px 0;font-size:14px;"><span style="color:var(--ink-soft);">Ausencias</span><span style="color:var(--danger);">−' + fmt(cierre.ausencias) + '</span></div>' +
@@ -351,23 +409,18 @@ async function pintarCierrePagoEquipo_(nombre, desde, hasta, cierre) {
     '<div style="display:flex;justify-content:space-between;padding:9px 0;font-size:14px;border-bottom:1px solid var(--border);"><span style="color:var(--ink-soft);">Anticipos</span><span style="color:var(--danger);">−' + fmt(cierre.anticipos) + '</span></div>' +
     '<div style="display:flex;justify-content:space-between;padding:14px 0;font-size:17px;font-weight:700;"><span>A pagar</span><span>' + fmt(cierre.total) + '</span></div>' +
     '<div class="error-msg" id="ce-error"></div>' +
-    '<button class="btn-primary" style="width:100%;" onclick="confirmarPagoEquipo_(\'' + nombre + '\')">Confirmar y registrar pago</button>' +
+    '<button class="btn-primary" onclick="confirmarPagoEquipo_(\'' + nombre + '\')">Confirmar y registrar pago</button>' +
     '<p style="font-size:12px;color:var(--ink-soft);text-align:center;margin-top:8px;">Queda guardado y visible para ' + nombre.split(' ')[0] + '</p>';
-  equipoCache.cierreActual = cierre;
 }
 
-function fechaISOaCL_(iso) { const p = iso.split('-'); return p[2] + '/' + p[1] + '/' + p[0]; }
-
 async function recalcularCierrePagoEquipo_(nombre) {
-  const desde = document.getElementById('ce-desde').value, hasta = document.getElementById('ce-hasta').value;
-  await pintarCierrePagoEquipo_(nombre, desde, hasta, null);
+  await pintarCierrePagoEquipo_(nombre, document.getElementById('ce-desde').value, document.getElementById('ce-hasta').value);
 }
 
 async function confirmarPagoEquipo_(nombre) {
   const err = document.getElementById('ce-error'); err.textContent = '';
   const c = equipoCache.cierreActual;
-  const d = { colaborador: nombre, desde: c.desde, hasta: c.hasta, base: c.base, ausencias: c.ausencias, extras: c.extras, anticipos: c.anticipos, total: c.total };
-  const r = await llamarAPI('confirmarPago', { data: d });
+  const r = await llamarAPI('confirmarPago', { data: { colaborador: nombre, desde: c.desde, hasta: c.hasta, base: c.base, ausencias: c.ausencias, extras: c.extras, anticipos: c.anticipos, total: c.total } });
   if (!r.ok) { err.textContent = r.error; return; }
   equipoCache.lista = null;
   document.getElementById('confirm-title').textContent = 'Pago confirmado';
@@ -379,7 +432,54 @@ async function confirmarPagoEquipo_(nombre) {
   irA('screen-confirm');
 }
 
-// ============ COMUNICADOS ============
+// ============ 6. RESUMEN CONSOLIDADO ============
+async function abrirResumenEquipo() {
+  irA('screen-resumen-equipo');
+  const hoy = new Date();
+  const desde = fechaLocalISO(new Date(hoy.getFullYear(), hoy.getMonth(), 1));
+  const hasta = fechaLocalISO();
+  await pintarResumenEquipo_(desde, hasta);
+}
+
+async function pintarResumenEquipo_(desdeISO, hastaISO) {
+  const cont = document.getElementById('resumen-equipo-cont');
+  cont.innerHTML = skeletonCards(2);
+  const r = await llamarAPISilencioso('obtenerResumenEquipo', { desde: fechaISOaCL_(desdeISO), hasta: fechaISOaCL_(hastaISO) });
+  if (!r.ok) { cont.innerHTML = '<p class="error-msg">' + r.error + '</p>'; return; }
+  let html = '<div style="display:flex;gap:10px;margin-bottom:14px;">' +
+      '<div style="flex:1;"><label>Desde</label><input type="date" id="re-desde" value="' + desdeISO + '" onchange="pintarResumenEquipo_(this.value,document.getElementById(\'re-hasta\').value)"></div>' +
+      '<div style="flex:1;"><label>Hasta</label><input type="date" id="re-hasta" value="' + hastaISO + '" onchange="pintarResumenEquipo_(document.getElementById(\'re-desde\').value,this.value)"></div>' +
+    '</div>';
+  html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px;">' +
+    '<div class="card" style="text-align:center;"><p style="font-size:11.5px;color:var(--ink-soft);margin:0;">Total pagado</p><p style="font-size:20px;font-weight:700;margin:2px 0 0;">' + fmt(r.total) + '</p></div>' +
+    '<div class="card" style="text-align:center;"><p style="font-size:11.5px;color:var(--ink-soft);margin:0;">Pagos</p><p style="font-size:20px;font-weight:700;margin:2px 0 0;">' + r.cantidadPagos + '</p></div>' +
+    '</div>';
+  html += '<div style="font-size:11px;text-transform:uppercase;letter-spacing:.4px;color:var(--ink-soft);margin-bottom:6px;">Por persona</div>';
+  (r.porPersona || []).forEach(p => { html += filaEquipo_(p.nombre, '<strong>' + fmt(p.total) + '</strong>'); });
+  if (!(r.porPersona || []).length) html += '<p style="font-size:12.5px;color:var(--ink-soft);">Sin pagos en este rango.</p>';
+  cont.innerHTML = html;
+}
+
+// ============ 7. COMUNICADOS — hub con historial + composición ============
+async function abrirComunicadosEquipo() {
+  irA('screen-comunicados-equipo');
+  const cont = document.getElementById('comunicados-equipo-cont');
+  cont.innerHTML = skeletonCards(2);
+  const r = await llamarAPISilencioso('obtenerHistorialComunicados', {});
+  if (!r.ok) { cont.innerHTML = '<p class="error-msg">' + r.error + '</p>'; return; }
+  let html = '';
+  (r.comunicados || []).forEach(c => {
+    html += '<div style="padding:10px 0;border-bottom:1px solid var(--border);">' +
+      '<div style="display:flex;justify-content:space-between;font-size:12.5px;color:var(--ink-soft);"><span>A ' + c.para + '</span><span>' + c.fecha + '</span></div>' +
+      '<p style="font-size:13.5px;margin:3px 0 0;">' + c.texto + '</p>' +
+      '<p style="font-size:11.5px;color:var(--ink-soft);margin:4px 0 0;">' + c.leidos + ' de ' + c.totalDestinatarios + ' leído' + (c.totalDestinatarios === 1 ? '' : 's') + '</p>' +
+    '</div>';
+  });
+  if (!(r.comunicados || []).length) html = '<p style="font-size:12.5px;color:var(--ink-soft);">Todavía no has enviado comunicados.</p>';
+  html += '<button class="btn-primary" style="margin-top:14px;" onclick="abrirComunicadoEquipo(null)">Nuevo comunicado</button>';
+  cont.innerHTML = html;
+}
+
 function abrirComunicadoEquipo(paraPreseleccionado) {
   irA('screen-comunicado-equipo');
   equipoCache.comunicadoPara = paraPreseleccionado === 'Todos' ? 'Todos' : (paraPreseleccionado ? [paraPreseleccionado] : []);
@@ -391,6 +491,7 @@ function pintarComunicadoEquipo_() {
   const esTodos = equipoCache.comunicadoPara === 'Todos';
   const nombres = equipoCache.todosColaboradores || [];
   cont.innerHTML =
+    '<button class="back-link" onclick="abrirComunicadosEquipo()"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"></path></svg> Comunicados</button>' +
     '<h2 style="font-size:17px;">Enviar comunicado</h2>' +
     '<label>Para</label>' +
     '<div class="conteo-chips" style="margin:6px 0 14px;">' +
@@ -399,8 +500,7 @@ function pintarComunicadoEquipo_() {
     '</div>' +
     '<label>Mensaje</label><textarea id="ce-mensaje" rows="4"></textarea>' +
     '<div class="error-msg" id="ce-mensaje-error"></div>' +
-    '<button class="btn-primary" style="width:100%;margin-top:8px;" onclick="enviarComunicadoEquipo_()">Enviar</button>' +
-    '<p style="font-size:12px;color:var(--ink-soft);text-align:center;margin-top:8px;">Le aparece la próxima vez que abra el sistema</p>';
+    '<button class="btn-primary" style="margin-top:8px;" onclick="enviarComunicadoEquipo_()">Enviar</button>';
 }
 
 function setComunicadoTodosEquipo_() { equipoCache.comunicadoPara = 'Todos'; pintarComunicadoEquipo_(); }
@@ -426,7 +526,7 @@ async function enviarComunicadoEquipo_() {
   irA('screen-confirm');
 }
 
-// ============ MI PAGO (vista del colaborador) ============
+// ============ 8. MI PAGO (vista del colaborador) ============
 async function abrirMiPago() {
   irA('screen-mi-pago');
   document.getElementById('mipago-nombre').textContent = sesion.nombre;
@@ -439,8 +539,7 @@ async function abrirMiPago() {
     '<div class="card" style="text-align:center;margin-bottom:14px;">' +
       '<p style="font-size:12px;color:var(--ink-soft);margin:0;">Período ' + p.desde + ' a ' + p.hasta + '</p>' +
       '<p style="font-size:28px;font-weight:700;margin:2px 0 0;">' + fmt(p.total) + '</p>' +
-    '</div>' +
-    '<div style="font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--ink-soft);margin-bottom:4px;">Detalle</div>';
+    '</div>';
   (p.movimientos || []).forEach(m => {
     html += '<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border);font-size:13px;">' +
       '<span>' + m.fecha + ' · ' + m.tipo + '</span>' +
