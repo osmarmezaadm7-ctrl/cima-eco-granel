@@ -1,438 +1,451 @@
 /**
- * Equipo.gs — módulo de gestión de colaboradores: ficha (perfil, jornada, monto,
+ * equipo.js — módulo Equipo: ficha de cada colaborador (perfil, jornada, monto,
  * periodicidad), registro de ausencias/jornadas extra/anticipos, cierre y confirmación
- * de pago (que además genera el gasto correspondiente en Respuestas, categoría "Sueldos" —
- * ya existe en Categorias, mapeada a tipoCuenta "Gasto de personal", así que
- * estadoResultados() la refleja sola, sin tocar Finanzas.gs), y comunicados.
+ * de pago, comunicados y la vista propia del colaborador ("Mi pago").
  *
- * NUEVO 28/07/2026 (con Osmar).
- *
- * Cálculo del valor de un día (ver valorDiaColaborador_):
- * - unidadDescuento 'dia': el colaborador no tiene horario (Rosa, Katherine) o su pago es
- *   fijo por día trabajado (Lucas). valorDia = monto del período ÷ cantidad de días
- *   laborales configurados en su jornada. Para Lucas, monto YA es el total de sus 3 días
- *   ($75.000), así que valorDia = $75.000 / 3 = $25.000 — coincide con lo acordado.
- * - unidadDescuento 'hora': el colaborador tiene bloques de jornada con horas distintas
- *   por día (Cecilia). valorHora = monto del período ÷ horas totales de la jornada.
- *   valorDia(fecha) = horas del bloque de ese día de semana × valorHora.
- *
- * Los períodos de pago (fechas desde/hasta) NO se infieren en automático más allá de una
- * sugerencia — Osmar los confirma/ajusta en pantalla antes de cerrar el pago. Con 4
- * periodicidades distintas y un caso (Rosa) donde el pago cae días después del cierre de
- * semana, forzar una fecha exacta por código es más riesgoso que dejarla como sugerencia
- * editable — es dinero real.
+ * NUEVO 28/07/2026 (con Osmar). Archivo propio, funciones namespaced con sufijo "Equipo"
+ * para no chocar con nombres ya usados en produccion.js / abastecimiento.js / conciliacion.js.
  */
 
-const H_COLABORADORES = 'Colaboradores';
-const H_MOVIMIENTOS_EQUIPO = 'MovimientosEquipo';
-const H_PAGOS_EQUIPO = 'PagosEquipo';
+const DIAS_CHIPS_EQUIPO = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
+let equipoCache = { lista: null, fichaActual: null, jornadaEdit: [], todosColaboradores: [], comunicadoPara: [] };
 
-const DIAS_SEMANA_ = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
-
-function requierePermisoEquipo_(solicitante) {
-  if (!solicitante || !tienePermiso(solicitante, 'GestionarEquipo')) {
-    return { ok: false, error: 'No tienes permiso para gestionar el equipo' };
-  }
-  return null;
+// ============ LISTA ============
+async function abrirEquipo(forzar) {
+  irA('screen-equipo');
+  if (forzar) equipoCache.lista = null;
+  if (equipoCache.lista) { pintarListaEquipo(equipoCache.lista); return; }
+  document.getElementById('equipo-lista').innerHTML = skeletonCards(4);
+  const r = await llamarAPISilencioso('obtenerEquipo', {});
+  equipoCache.lista = r;
+  if (document.getElementById('screen-equipo').classList.contains('active')) pintarListaEquipo(r);
 }
 
-// ============ FICHAS ============
-
-function hojaColaboradores_() {
-  const sh = getSheet(H_COLABORADORES);
-  if (sh.getLastRow() === 0) {
-    sh.appendRow(['Nombre', 'Telefono', 'Responsabilidades', 'Negocio', 'Monto', 'Periodicidad',
-      'DiasDePago', 'UnidadDescuento', 'Jornada', 'UltimaFechaPagada', 'Estado']);
-  }
-  return sh;
+function pintarListaEquipo(r) {
+  const cont = document.getElementById('equipo-lista');
+  if (!r || !r.ok) { cont.innerHTML = '<p class="error-msg">' + (r && r.error || 'No se pudo cargar el equipo') + '</p>'; return; }
+  equipoCache.todosColaboradores = (r.colaboradores || []).map(c => c.nombre);
+  cont.innerHTML = '';
+  (r.colaboradores || []).forEach(c => {
+    const iniciales = c.nombre.split(' ').map(p => p[0]).slice(0, 2).join('').toUpperCase();
+    const div = document.createElement('div');
+    div.className = 'card'; div.style.cssText = 'display:flex;align-items:center;gap:10px;cursor:pointer;margin-bottom:8px;';
+    div.onclick = () => abrirFichaEquipo(c.nombre);
+    div.innerHTML =
+      '<div class="avatar" style="width:38px;height:38px;font-size:13px;">' + iniciales + '</div>' +
+      '<div style="flex:1;"><strong style="font-size:14px;">' + c.nombre + '</strong>' +
+      '<p style="font-size:12px;color:var(--ink-soft);margin:2px 0 0;">' + c.negocio + ' · ' + c.periodicidad + '</p></div>' +
+      '<strong style="font-size:14px;">' + fmt(c.totalPendiente) + '</strong>';
+    cont.appendChild(div);
+  });
+  if (!(r.colaboradores || []).length) cont.innerHTML = '<p style="font-size:12px;color:var(--ink-soft);">Todavía no hay colaboradores cargados.</p>';
 }
 
-function filaAObjetoColaborador_(f) {
-  return {
-    nombre: f[0], telefono: f[1] || '', responsabilidades: f[2] || '', negocio: f[3],
-    monto: num(f[4]), periodicidad: f[5], diasDePago: f[6] || '',
-    unidadDescuento: f[7] || 'dia', jornada: parsearJsonArreglo_(f[8]),
-    ultimaFechaPagada: f[9] || '', estado: f[10] || 'Activo'
-  };
+// ============ FICHA (ver / crear / editar) ============
+async function abrirFichaEquipo(nombre) {
+  irA('screen-ficha-equipo');
+  const cont = document.getElementById('ficha-equipo-cont');
+  if (!nombre) { equipoCache.fichaActual = null; equipoCache.jornadaEdit = []; pintarFormularioFicha_(null, null, true); return; }
+  cont.innerHTML = skeletonCards(3);
+  const r = await llamarAPISilencioso('obtenerFichaColaborador', { nombre: nombre });
+  if (!r.ok) { cont.innerHTML = '<p class="error-msg">' + r.error + '</p>'; return; }
+  equipoCache.fichaActual = r.colaborador;
+  equipoCache.jornadaEdit = (r.colaborador.jornada || []).map(b => Object.assign({}, b));
+  pintarFormularioFicha_(r.colaborador, r.calculado, false);
 }
 
-// 'monto' en la ficha es SIEMPRE la cifra semanal (periodicidad Semanal) o la cifra MENSUAL
-// (Quincenal/Mensual) — Quincenal se paga en 2 cuotas, pero el monto configurado es el total
-// del mes completo (así lo definimos con Osmar para Cecilia: $350.000/mes, 2 pagos de
-// $175.000). Por eso hay DOS conversiones distintas que no deben mezclarse:
-//  - semanasParaTasa_: cuántas semanas representa 'monto', para sacar el valor hora/día.
-//  - baseCicloPago_: cuánto corresponde pagar en UN ciclo (una quincena, una semana, un mes).
-function semanasParaTasa_(periodicidad) {
-  return periodicidad === 'Semanal' ? 1 : 52 / 12; // Quincenal y Mensual: monto es mensual
-}
-function baseCicloPago_(monto, periodicidad) {
-  return periodicidad === 'Quincenal' ? monto / 2 : monto;
-}
+function pintarFormularioFicha_(c, calc, esNuevo) {
+  const cont = document.getElementById('ficha-equipo-cont');
+  const val = (campo, def) => c ? (c[campo] != null ? c[campo] : def) : def;
+  let html = '<h2 style="font-size:17px;">' + (esNuevo ? 'Nuevo colaborador' : c.nombre) + '</h2>';
 
-function valoresCalculadosColaborador_(c) {
-  const semanas = semanasParaTasa_(c.periodicidad);
-  const horasSemanales = (c.jornada || []).reduce((s, b) => s + (b.dias || []).length * num(b.horas), 0);
-  const diasSemanales = (c.jornada || []).reduce((s, b) => s + (b.dias || []).length, 0);
-  if (c.unidadDescuento === 'hora') {
-    const horasParaTasa = horasSemanales * semanas;
-    const valorHora = horasParaTasa > 0 ? c.monto / horasParaTasa : 0;
-    return { valorHora: Math.round(valorHora), horasTotales: horasSemanales,
-      porBloque: (c.jornada || []).map(b => ({ dias: b.dias, horas: b.horas, valorDia: Math.round(valorHora * num(b.horas)) })) };
-  }
-  const diasParaTasa = diasSemanales * semanas;
-  const valorDia = diasParaTasa > 0 ? c.monto / diasParaTasa : 0;
-  return { valorDia: Math.round(valorDia), diasTotales: diasSemanales };
-}
-
-function obtenerEquipo(solicitante) {
-  const err = requierePermisoEquipo_(solicitante); if (err) return err;
-  const datos = hojaColaboradores_().getDataRange().getValues();
-  const lista = [];
-  for (let i = 1; i < datos.length; i++) {
-    const f = datos[i];
-    if (!f[0] || f[10] === 'Inactivo') continue;
-    const c = filaAObjetoColaborador_(f);
-    const periodo = calcularPeriodoPendiente_(c);
-    lista.push({ nombre: c.nombre, negocio: c.negocio, periodicidad: c.periodicidad,
-      diasDePago: c.diasDePago, totalPendiente: periodo.total, desde: periodo.desde, hasta: periodo.hasta });
-  }
-  return { ok: true, colaboradores: lista };
-}
-
-function obtenerFichaColaborador(nombre, solicitante) {
-  const err = requierePermisoEquipo_(solicitante); if (err) return err;
-  const datos = hojaColaboradores_().getDataRange().getValues();
-  for (let i = 1; i < datos.length; i++) {
-    if (datos[i][0] !== nombre) continue;
-    const c = filaAObjetoColaborador_(datos[i]);
-    return { ok: true, colaborador: c, calculado: valoresCalculadosColaborador_(c) };
-  }
-  return { ok: false, error: 'Colaborador no encontrado' };
-}
-
-// d: {esNuevo, nombreOriginal, nombre, telefono, responsabilidades, negocio, monto,
-//     periodicidad, diasDePago, unidadDescuento, jornada:[{dias:[...],horas}], pin}
-// Si esNuevo, además crea la fila en Usuarios y en Permisos (acceso al sistema) —
-// acordado con Osmar: un solo botón "Crear ficha y acceso".
-function guardarFichaColaborador(d, solicitante) {
-  const err = requierePermisoEquipo_(solicitante); if (err) return err;
-  if (!d.nombre) return { ok: false, error: 'Falta el nombre' };
-  if (!/^\d{4}$/.test(String(d.pin || '')) && d.esNuevo) {
-    return { ok: false, error: 'El PIN debe tener 4 dígitos' };
+  if (!esNuevo) {
+    html += '<div class="pillbar" style="margin-bottom:12px;">' +
+      '<button type="button" onclick="abrirRegistrarMovimientoEquipo(\'' + c.nombre + '\')">+ Anotar</button>' +
+      '<button type="button" onclick="abrirCierrePagoEquipo(\'' + c.nombre + '\')">Cerrar pago</button>' +
+      '</div>';
   }
 
-  const sh = hojaColaboradores_();
-  const datos = sh.getDataRange().getValues();
-  const buscarNombre = d.esNuevo ? d.nombre : (d.nombreOriginal || d.nombre);
-  let filaExistente = -1;
-  for (let i = 1; i < datos.length; i++) {
-    if (datos[i][0] === buscarNombre) { filaExistente = i + 1; break; }
+  html += '<label>Nombre</label><input type="text" id="fe-nombre" value="' + val('nombre', '') + '" ' + (esNuevo ? '' : 'readonly') + '>';
+  html += '<label>Teléfono</label><input type="tel" id="fe-telefono" value="' + val('telefono', '') + '" placeholder="+56 9 ....">';
+  html += '<label>Responsabilidades</label><textarea id="fe-responsabilidades" rows="2">' + val('responsabilidades', '') + '</textarea>';
+
+  html += '<div style="display:flex;gap:10px;">' +
+    '<div style="flex:1;"><label>Negocio</label><select id="fe-negocio">' +
+      '<option ' + (val('negocio', '') === 'Cima Eco-Granel' ? 'selected' : '') + '>Cima Eco-Granel</option>' +
+      '<option ' + (val('negocio', '') === 'Vegan Corner' ? 'selected' : '') + '>Vegan Corner</option></select></div>' +
+    '<div style="flex:1;"><label>Monto (semanal si es Semanal; mensual si es Quincenal/Mensual)</label><input type="number" id="fe-monto" value="' + val('monto', '') + '" onchange="pintarDesgloseMontoEquipo_()" oninput="pintarDesgloseMontoEquipo_()"></div>' +
+    '</div>';
+
+  html += '<div style="display:flex;gap:10px;">' +
+    '<div style="flex:1;"><label>Periodicidad</label><select id="fe-periodicidad" onchange="pintarDesgloseMontoEquipo_()">' +
+      ['Semanal', 'Quincenal', 'Mensual'].map(p => '<option ' + (val('periodicidad', 'Semanal') === p ? 'selected' : '') + '>' + p + '</option>').join('') +
+      '</select></div>' +
+    '<div style="flex:1;"><label>Días de pago</label><input type="text" id="fe-diaspago" value="' + val('diasDePago', '') + '" placeholder="Ej: lunes, o 15 y 30"></div>' +
+    '</div>';
+
+  html += '<div id="fe-desglose-monto" style="font-size:12.5px;color:var(--forest);background:var(--forest-soft);border-radius:8px;padding:8px 12px;margin-bottom:12px;"></div>';
+
+  html += '<label>Unidad de descuento por ausencia</label><select id="fe-unidad" onchange="pintarJornadaEquipo_()">' +
+    '<option value="dia" ' + (val('unidadDescuento', 'dia') === 'dia' ? 'selected' : '') + '>Por día (sin horario, o monto fijo por día)</option>' +
+    '<option value="hora" ' + (val('unidadDescuento', 'dia') === 'hora' ? 'selected' : '') + '>Por hora (jornada con horario)</option>' +
+    '</select>';
+
+  html += '<div style="font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--ink-soft);margin:12px 0 6px;">Jornada</div>';
+  html += '<div id="fe-jornada-bloques"></div>';
+  html += '<button type="button" class="btn-secondary" style="width:100%;margin:6px 0 10px;" onclick="agregarBloqueJornadaEquipo_()">+ Agregar bloque de jornada</button>';
+  html += '<div id="fe-jornada-resumen" style="font-size:12px;background:var(--forest-soft);color:var(--forest);border-radius:8px;padding:8px 12px;margin-bottom:14px;"></div>';
+
+  if (esNuevo) {
+    html += '<div style="font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--ink-soft);margin:4px 0 6px;">Acceso al sistema</div>';
+    html += '<label>PIN inicial (4 dígitos)</label><input type="tel" id="fe-pin" maxlength="4" inputmode="numeric" placeholder="Ej: 4521">';
+    html += '<p style="font-size:12px;color:var(--ink-soft);">Con esto queda creado su acceso — solo va a ver el detalle de su propio pago y los comunicados.</p>';
   }
-  if (d.esNuevo && filaExistente > -1) return { ok: false, error: 'Ya existe un colaborador con ese nombre' };
-  if (!d.esNuevo && filaExistente === -1) return { ok: false, error: 'Colaborador no encontrado' };
 
-  const fila = [d.nombre, d.telefono || '', d.responsabilidades || '', d.negocio, num(d.monto),
-    d.periodicidad, d.diasDePago || '', d.unidadDescuento || 'dia', JSON.stringify(d.jornada || []),
-    d.esNuevo ? '' : undefined, 'Activo'];
+  html += '<div class="error-msg" id="fe-error"></div>';
+  html += '<button class="btn-primary" style="width:100%;margin-top:10px;" onclick="guardarFichaEquipo_(' + (esNuevo ? 'true' : "false, '" + c.nombre + "'") + ')">' + (esNuevo ? 'Crear ficha y acceso' : 'Guardar cambios') + '</button>';
 
-  if (d.esNuevo) {
-    sh.appendRow([d.nombre, d.telefono || '', d.responsabilidades || '', d.negocio, num(d.monto),
-      d.periodicidad, d.diasDePago || '', d.unidadDescuento || 'dia', JSON.stringify(d.jornada || []),
-      '', 'Activo']);
-    getSheet(H_USUARIOS).appendRow([d.nombre, String(d.pin), 'Staff', d.negocio, 'Activo']);
-    getSheet(H_PERMISOS).appendRow([d.nombre, JSON.stringify({})]);
+  cont.innerHTML = html;
+  pintarJornadaEquipo_();
+  pintarDesgloseMontoEquipo_();
+}
+
+// Traduce 'Monto' (semanal si Semanal; MENSUAL si Quincenal/Mensual — ver nota en Equipo.gs)
+// a lo que realmente se le paga en un ciclo, para que nunca se lea "350.000 quincenal"
+// cuando en realidad son $175.000 cada 15 días.
+function pintarDesgloseMontoEquipo_() {
+  const el = document.getElementById('fe-desglose-monto');
+  if (!el) return;
+  const monto = num_(document.getElementById('fe-monto') ? document.getElementById('fe-monto').value : 0);
+  const periodicidad = document.getElementById('fe-periodicidad') ? document.getElementById('fe-periodicidad').value : 'Semanal';
+  if (periodicidad === 'Quincenal') {
+    el.textContent = fmt(monto) + ' al mes → ' + fmt(monto / 2) + ' cada quincena (15 y 30, u otras fechas que definas)';
+  } else if (periodicidad === 'Mensual') {
+    el.textContent = fmt(monto) + ' al mes, en un solo pago';
   } else {
-    const rango = sh.getRange(filaExistente, 1, 1, 9);
-    rango.setValues([[d.nombre, d.telefono || '', d.responsabilidades || '', d.negocio, num(d.monto),
-      d.periodicidad, d.diasDePago || '', d.unidadDescuento || 'dia', JSON.stringify(d.jornada || [])]]);
-    // Si cambió el nombre, se actualiza también en Usuarios/Permisos para no perder el acceso.
-    if (d.nombreOriginal && d.nombreOriginal !== d.nombre) {
-      actualizarNombreEnHoja_(H_USUARIOS, d.nombreOriginal, d.nombre);
-      actualizarNombreEnHoja_(H_PERMISOS, d.nombreOriginal, d.nombre);
-    }
+    el.textContent = fmt(monto) + ' a la semana';
   }
-  return { ok: true, mensaje: d.esNuevo ? 'Colaborador y acceso creados' : 'Ficha actualizada' };
+  recalcularResumenJornadaEquipo_();
 }
 
-function actualizarNombreEnHoja_(nombreHoja, nombreViejo, nombreNuevo) {
-  const sh = getSheet(nombreHoja);
-  const datos = sh.getDataRange().getValues();
-  for (let i = 1; i < datos.length; i++) {
-    if (datos[i][0] === nombreViejo) { sh.getRange(i + 1, 1).setValue(nombreNuevo); return; }
+function pintarJornadaEquipo_() {
+  const cont = document.getElementById('fe-jornada-bloques');
+  if (!cont) return;
+  cont.innerHTML = '';
+  equipoCache.jornadaEdit.forEach((b, idx) => {
+    const div = document.createElement('div');
+    div.style.cssText = 'background:var(--paper);border-radius:8px;padding:8px 10px;margin-bottom:8px;';
+    const unidad = document.getElementById('fe-unidad') ? document.getElementById('fe-unidad').value : 'dia';
+    div.innerHTML =
+      '<div class="conteo-chips" style="margin-bottom:6px;">' +
+      DIAS_CHIPS_EQUIPO.map(d => '<span class="chip-sub' + (b.dias.indexOf(d) > -1 ? ' activo' : '') + '" onclick="toggleDiaBloqueEquipo_(' + idx + ',\'' + d + '\')">' + d + '</span>').join('') +
+      '</div>' +
+      (unidad === 'hora'
+        ? '<div style="display:flex;align-items:center;gap:6px;"><input type="number" style="width:64px;" value="' + (b.horaInicio || '') + '" onchange="equipoCache.jornadaEdit[' + idx + '].horaInicio=this.value" placeholder="Desde"><span>a</span><input type="number" style="width:64px;" value="' + (b.horaFin || '') + '" onchange="actualizarHorasBloqueEquipo_(' + idx + ')" placeholder="Hasta"><span style="font-size:12px;color:var(--ink-soft);">' + (num_(b.horas) || 0) + ' h</span><button type="button" class="icon-btn" style="margin-left:auto;" onclick="quitarBloqueJornadaEquipo_(' + idx + ')">✕</button></div>'
+        : '<div style="display:flex;align-items:center;"><button type="button" class="icon-btn" style="margin-left:auto;" onclick="quitarBloqueJornadaEquipo_(' + idx + ')">✕</button></div>');
+    cont.appendChild(div);
+  });
+  recalcularResumenJornadaEquipo_();
+}
+
+function num_(v) { const n = Number(v); return isNaN(n) ? 0 : n; }
+
+function toggleDiaBloqueEquipo_(idx, dia) {
+  const b = equipoCache.jornadaEdit[idx];
+  const pos = b.dias.indexOf(dia);
+  if (pos > -1) b.dias.splice(pos, 1); else b.dias.push(dia);
+  pintarJornadaEquipo_();
+}
+
+function actualizarHorasBloqueEquipo_(idx) {
+  const b = equipoCache.jornadaEdit[idx];
+  const inputs = document.querySelectorAll('#fe-jornada-bloques > div')[idx].querySelectorAll('input[type=number]');
+  b.horaInicio = inputs[0].value; b.horaFin = inputs[1].value;
+  b.horas = Math.max(0, num_(b.horaFin) - num_(b.horaInicio));
+  pintarJornadaEquipo_();
+}
+
+function agregarBloqueJornadaEquipo_() {
+  equipoCache.jornadaEdit.push({ dias: [], horas: 0, horaInicio: '', horaFin: '' });
+  pintarJornadaEquipo_();
+}
+
+function quitarBloqueJornadaEquipo_(idx) {
+  equipoCache.jornadaEdit.splice(idx, 1);
+  pintarJornadaEquipo_();
+}
+
+function semanasParaTasaEquipo_(periodicidad) {
+  return periodicidad === 'Semanal' ? 1 : 52 / 12; // Quincenal y Mensual: 'monto' es la cifra mensual
+}
+
+function recalcularResumenJornadaEquipo_() {
+  const resumen = document.getElementById('fe-jornada-resumen');
+  const unidad = document.getElementById('fe-unidad') ? document.getElementById('fe-unidad').value : 'dia';
+  const periodicidad = document.getElementById('fe-periodicidad') ? document.getElementById('fe-periodicidad').value : 'Semanal';
+  const monto = num_(document.getElementById('fe-monto') ? document.getElementById('fe-monto').value : 0);
+  const semanas = semanasParaTasaEquipo_(periodicidad);
+  const diasSemana = equipoCache.jornadaEdit.reduce((s, b) => s + b.dias.length, 0);
+  if (unidad === 'hora') {
+    const horasSemana = equipoCache.jornadaEdit.reduce((s, b) => s + b.dias.length * num_(b.horas), 0);
+    const valorHora = (horasSemana * semanas) > 0 ? Math.round(monto / (horasSemana * semanas)) : 0;
+    resumen.textContent = 'Jornada semanal: ' + horasSemana + ' h · valor hora ' + fmt(valorHora);
+  } else {
+    const valorDia = (diasSemana * semanas) > 0 ? Math.round(monto / (diasSemana * semanas)) : 0;
+    resumen.textContent = diasSemana + ' día(s) por semana · valor día ' + fmt(valorDia);
   }
+}
+document.addEventListener('input', e => { if (e.target && (e.target.id === 'fe-monto')) recalcularResumenJornadaEquipo_(); });
+document.addEventListener('change', e => { if (e.target && (e.target.id === 'fe-periodicidad')) recalcularResumenJornadaEquipo_(); });
+
+async function guardarFichaEquipo_(esNuevo, nombreOriginal) {
+  const err = document.getElementById('fe-error'); err.textContent = '';
+  const d = {
+    esNuevo: esNuevo, nombreOriginal: nombreOriginal || '',
+    nombre: document.getElementById('fe-nombre').value.trim(),
+    telefono: document.getElementById('fe-telefono').value.trim(),
+    responsabilidades: document.getElementById('fe-responsabilidades').value.trim(),
+    negocio: document.getElementById('fe-negocio').value,
+    monto: document.getElementById('fe-monto').value,
+    periodicidad: document.getElementById('fe-periodicidad').value,
+    diasDePago: document.getElementById('fe-diaspago').value.trim(),
+    unidadDescuento: document.getElementById('fe-unidad').value,
+    jornada: equipoCache.jornadaEdit
+  };
+  if (esNuevo) d.pin = document.getElementById('fe-pin').value.trim();
+  if (!d.nombre) { err.textContent = 'Falta el nombre'; return; }
+
+  const r = await llamarAPI('guardarFichaColaborador', { data: d });
+  if (!r.ok) { err.textContent = r.error; return; }
+  equipoCache.lista = null;
+  document.getElementById('confirm-title').textContent = esNuevo ? 'Colaborador creado' : 'Ficha actualizada';
+  document.getElementById('confirm-msg').textContent = r.mensaje;
+  document.getElementById('confirm-detalle').innerHTML = '';
+  document.getElementById('confirm-btn-otro').style.display = 'block';
+  document.getElementById('confirm-btn-otro').textContent = 'Volver al equipo';
+  confirmAccionOtro = () => abrirEquipo(true);
+  irA('screen-confirm');
 }
 
 // ============ MOVIMIENTOS (Ausencia / Extra / Anticipo) ============
-
-function hojaMovimientosEquipo_() {
-  const sh = getSheet(H_MOVIMIENTOS_EQUIPO);
-  if (sh.getLastRow() === 0) sh.appendRow(['Id', 'Fecha', 'Colaborador', 'Tipo', 'Monto', 'Observacion', 'FechaRegistro']);
-  return sh;
+async function abrirRegistrarMovimientoEquipo(nombre) {
+  irA('screen-movimiento-equipo');
+  const cont = document.getElementById('movimiento-equipo-cont');
+  cont.innerHTML =
+    '<h2 style="font-size:17px;">Anotar</h2><p style="font-size:12.5px;color:var(--ink-soft);margin-top:-6px;">' + nombre + '</p>' +
+    '<div class="toggle-group" id="me-tipo-group">' +
+      '<button type="button" class="selected" onclick="setTipoMovimientoEquipo_(\'Ausencia\',this)">Ausencia</button>' +
+      '<button type="button" onclick="setTipoMovimientoEquipo_(\'Extra\',this)">Extra</button>' +
+      '<button type="button" onclick="setTipoMovimientoEquipo_(\'Anticipo\',this)">Anticipo</button>' +
+    '</div>' +
+    '<label>Día</label><input type="date" id="me-fecha" value="' + fechaLocalISO() + '" onchange="previsualizarMontoMovimientoEquipo_(\'' + nombre + '\')">' +
+    '<div id="me-campos-extra"></div>' +
+    '<div id="me-preview" style="background:var(--paper);border-radius:8px;padding:11px 12px;margin:8px 0 12px;font-size:14px;"></div>' +
+    '<label>Observación (opcional)</label><input type="text" id="me-observacion" placeholder="Ej: motivo, o a cuenta de qué">' +
+    '<div class="error-msg" id="me-error"></div>' +
+    '<button class="btn-primary" style="width:100%;margin-top:8px;" onclick="guardarMovimientoEquipo_(\'' + nombre + '\')">Guardar</button>' +
+    '<div style="font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--ink-soft);margin:16px 0 6px;">Registrado este período</div>' +
+    '<div id="me-lista-periodo"></div>';
+  equipoCache.tipoMovimientoActual = 'Ausencia';
+  previsualizarMontoMovimientoEquipo_(nombre);
+  pintarMovimientosDelPeriodoEquipo_(nombre);
 }
 
-// Busca en la jornada el bloque que incluye ese día de semana ('Lun','Mar',...).
-function bloqueDelDia_(jornada, diaAbrev) {
-  return (jornada || []).find(b => (b.dias || []).indexOf(diaAbrev) > -1) || null;
-}
-
-// Calcula cuánto vale un día concreto para un colaborador — usado tanto para Ausencia
-// (día que sí está en su jornada regular) como base de referencia para Extra.
-function valorDiaColaborador_(c, fecha) {
-  const diaAbrev = DIAS_SEMANA_[fecha.getDay()];
-  const bloque = bloqueDelDia_(c.jornada, diaAbrev);
-  const calc = valoresCalculadosColaborador_(c);
-  if (c.unidadDescuento === 'hora') {
-    const horas = bloque ? num(bloque.horas) : 0;
-    return { horas: horas, valor: Math.round(horas * (calc.valorHora || 0)), esDiaLaboral: !!bloque };
-  }
-  return { horas: null, valor: calc.valorDia || 0, esDiaLaboral: !!bloque };
-}
-
-// d: {colaborador, fecha ('yyyy-mm-dd'), tipo:'Ausencia'|'Extra'|'Anticipo', monto (solo
-//     Anticipo, o Extra si unidadDescuento='hora' y el día no es de su jornada regular),
-//     horas (opcional, solo Extra + unidadDescuento='hora' en un día fuera de jornada),
-//     observacion}
-function registrarMovimientoEquipo(d, solicitante) {
-  const err = requierePermisoEquipo_(solicitante); if (err) return err;
-  const ficha = obtenerFichaColaborador(d.colaborador, solicitante);
-  if (!ficha.ok) return ficha;
-  const c = ficha.colaborador;
-  const fecha = parseFechaCL(d.fecha);
-  if (!fecha) return { ok: false, error: 'Fecha inválida' };
-
-  let monto;
-  if (d.tipo === 'Anticipo') {
-    monto = num(d.monto);
-    if (monto <= 0) return { ok: false, error: 'El anticipo debe ser mayor a 0' };
-  } else if (d.tipo === 'Ausencia') {
-    const v = valorDiaColaborador_(c, fecha);
-    if (!v.esDiaLaboral) return { ok: false, error: 'Ese día no está en la jornada de ' + c.nombre };
-    monto = v.valor;
-  } else if (d.tipo === 'Extra') {
-    const v = valorDiaColaborador_(c, fecha);
-    if (v.esDiaLaboral) {
-      monto = v.valor; // día ya configurado en su jornada — mismo valor que un día normal
-    } else if (c.unidadDescuento === 'hora') {
-      const calc = valoresCalculadosColaborador_(c);
-      monto = Math.round(num(d.horas) * (calc.valorHora || 0));
-      if (monto <= 0) return { ok: false, error: 'Indica las horas trabajadas ese día' };
-    } else {
-      monto = num(d.monto) || (valoresCalculadosColaborador_(c).valorDia || 0);
-    }
+function setTipoMovimientoEquipo_(tipo, btn) {
+  document.querySelectorAll('#me-tipo-group button').forEach(b => b.classList.remove('selected'));
+  btn.classList.add('selected');
+  equipoCache.tipoMovimientoActual = tipo;
+  const extra = document.getElementById('me-campos-extra');
+  const nombre = equipoCache.fichaActual ? equipoCache.fichaActual.nombre : '';
+  if (tipo === 'Anticipo') {
+    extra.innerHTML = '<label>Monto del anticipo</label><input type="number" id="me-monto-anticipo">';
   } else {
-    return { ok: false, error: 'Tipo de movimiento no reconocido' };
+    extra.innerHTML = '';
   }
-
-  const id = nuevoId('MOVEQ');
-  hojaMovimientosEquipo_().appendRow([id, d.fecha, d.colaborador, d.tipo, monto, d.observacion || '', new Date()]);
-  return { ok: true, id: id, monto: monto };
+  previsualizarMontoMovimientoEquipo_(nombre);
 }
 
-function eliminarMovimientoEquipo(id, solicitante) {
-  const err = requierePermisoEquipo_(solicitante); if (err) return err;
-  const sh = hojaMovimientosEquipo_();
-  const datos = sh.getDataRange().getValues();
-  for (let i = 1; i < datos.length; i++) {
-    if (datos[i][0] !== id) continue;
-    sh.deleteRow(i + 1);
-    return { ok: true };
+async function previsualizarMontoMovimientoEquipo_(nombre) {
+  const preview = document.getElementById('me-preview');
+  const tipo = equipoCache.tipoMovimientoActual || 'Ausencia';
+  if (tipo === 'Anticipo') { preview.textContent = 'Ingresa el monto del anticipo arriba.'; return; }
+  const fecha = document.getElementById('me-fecha').value;
+  const dow = new Date(fecha + 'T12:00:00').getDay();
+  const diaAbrev = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'][dow];
+  const c = equipoCache.fichaActual;
+  if (!c) return;
+  const bloque = (c.jornada || []).find(b => (b.dias || []).indexOf(diaAbrev) > -1);
+  if (bloque) {
+    // El monto exacto lo calcula y valida el servidor recién al guardar (guardarMovimientoEquipo_) —
+    // acá solo se confirma visualmente que el día cae dentro de la jornada, sin escribir nada todavía.
+    preview.innerHTML = diaAbrev + (c.unidadDescuento === 'hora' ? ' · ' + bloque.horas + ' h' : '') +
+      '<span style="float:right;font-weight:600;color:' + (tipo === 'Ausencia' ? 'var(--danger)' : 'var(--success)') + ';">' +
+      (tipo === 'Ausencia' ? 'Se descuenta el día' : 'Se suma el día') + '</span>';
+  } else if (tipo === 'Extra' && c.unidadDescuento === 'hora') {
+    document.getElementById('me-campos-extra').innerHTML = '<label>Horas trabajadas ese día</label><input type="number" id="me-horas-extra">';
+    preview.textContent = diaAbrev + ' no es parte de su jornada regular — indica las horas.';
+  } else if (tipo === 'Extra') {
+    preview.textContent = diaAbrev + ' fuera de su jornada — se sumará un día completo.';
+  } else {
+    preview.innerHTML = '<span style="color:var(--danger);">' + diaAbrev + ' no está en la jornada de ' + c.nombre + '.</span>';
   }
-  return { ok: false, error: 'Movimiento no encontrado' };
 }
 
-function movimientosDelPeriodo_(colaborador, desde, hasta) {
-  const datos = hojaMovimientosEquipo_().getDataRange().getValues();
-  const lista = [];
-  for (let i = 1; i < datos.length; i++) {
-    const f = datos[i];
-    if (f[2] !== colaborador) continue;
-    const fecha = parseFechaCL(f[1]);
-    if (!fecha || fecha < desde || fecha > hasta) continue;
-    lista.push({ id: f[0], fecha: f[1], tipo: f[3], monto: num(f[4]), observacion: f[5] || '' });
-  }
-  return lista;
+async function guardarMovimientoEquipo_(nombre) {
+  const err = document.getElementById('me-error'); err.textContent = '';
+  const tipo = equipoCache.tipoMovimientoActual || 'Ausencia';
+  const d = { colaborador: nombre, fecha: document.getElementById('me-fecha').value, tipo: tipo,
+    observacion: document.getElementById('me-observacion').value.trim() };
+  if (tipo === 'Anticipo') d.monto = document.getElementById('me-monto-anticipo').value;
+  const horasEl = document.getElementById('me-horas-extra');
+  if (horasEl) d.horas = horasEl.value;
+
+  const r = await llamarAPI('registrarMovimientoEquipo', { data: d });
+  if (!r.ok) { err.textContent = r.error; return; }
+  document.getElementById('me-observacion').value = '';
+  pintarMovimientosDelPeriodoEquipo_(nombre);
+}
+
+async function pintarMovimientosDelPeriodoEquipo_(nombre) {
+  const cont = document.getElementById('me-lista-periodo');
+  const c = equipoCache.fichaActual;
+  if (!c) return;
+  const desde = c.ultimaFechaPagada ? c.ultimaFechaPagada : '';
+  const r = await llamarAPISilencioso('obtenerCierrePago', { colaborador: nombre, desde: desde || fechaLocalISO(), hasta: fechaLocalISO() });
+  if (!r.ok || !r.cierre) { cont.innerHTML = ''; return; }
+  cont.innerHTML = (r.cierre.movimientos || []).map(m =>
+    '<div style="display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--border);font-size:13px;">' +
+    '<span>' + m.tipo + ' · ' + m.fecha + (m.observacion ? ' — ' + m.observacion : '') + '</span>' +
+    '<span style="color:' + (m.tipo === 'Extra' ? 'var(--success)' : 'var(--danger)') + ';font-weight:600;">' + (m.tipo === 'Extra' ? '+' : '−') + fmt(m.monto) + '</span>' +
+    '</div>').join('') || '<p style="font-size:12px;color:var(--ink-soft);">Nada registrado todavía en este período.</p>';
 }
 
 // ============ CIERRE Y CONFIRMACIÓN DE PAGO ============
+async function abrirCierrePagoEquipo(nombre) {
+  irA('screen-cierre-equipo');
+  const cont = document.getElementById('cierre-equipo-cont');
+  cont.innerHTML = skeletonCards(2);
+  const r = await llamarAPISilencioso('obtenerEquipo', {});
+  const info = (r.colaboradores || []).find(c => c.nombre === nombre) || {};
+  const desde = info.desde || fechaLocalISO();
+  const hasta = info.hasta || fechaLocalISO();
+  pintarCierrePagoEquipo_(nombre, desde, hasta, null);
+}
 
-// Sugerencia de período pendiente — editable por Osmar antes de confirmar. No intenta
-// adivinar reglas de desfase caso a caso (ver nota de diseño arriba); si no hay
-// UltimaFechaPagada, sugiere el ciclo que termina hoy.
-function calcularPeriodoPendiente_(c) {
-  const hoy = new Date();
-  let desde;
-  if (c.ultimaFechaPagada) {
-    desde = new Date(parseFechaCL(c.ultimaFechaPagada).getTime() + 86400000);
-  } else {
-    const dias = c.periodicidad === 'Semanal' ? 6 : c.periodicidad === 'Quincenal' ? 14 : 29;
-    desde = new Date(hoy.getTime() - dias * 86400000);
+async function pintarCierrePagoEquipo_(nombre, desde, hasta, cierre) {
+  const cont = document.getElementById('cierre-equipo-cont');
+  if (!cierre) {
+    const r = await llamarAPISilencioso('obtenerCierrePago', { colaborador: nombre, desde: fechaISOaCL_(desde), hasta: fechaISOaCL_(hasta) });
+    if (!r.ok) { cont.innerHTML = '<p class="error-msg">' + r.error + '</p>'; return; }
+    cierre = r.cierre;
   }
-  const hasta = hoy;
-  return calcularCierrePeriodo_(c, desde, hasta);
+  cont.innerHTML =
+    '<h2 style="font-size:17px;">Cierre de pago</h2><p style="font-size:12.5px;color:var(--ink-soft);margin-top:-6px;">' + nombre + '</p>' +
+    '<div style="display:flex;gap:10px;">' +
+      '<div style="flex:1;"><label>Desde</label><input type="date" id="ce-desde" value="' + desde + '" onchange="recalcularCierrePagoEquipo_(\'' + nombre + '\')"></div>' +
+      '<div style="flex:1;"><label>Hasta</label><input type="date" id="ce-hasta" value="' + hasta + '" onchange="recalcularCierrePagoEquipo_(\'' + nombre + '\')"></div>' +
+    '</div>' +
+    '<div style="display:flex;justify-content:space-between;padding:9px 0;font-size:14px;"><span style="color:var(--ink-soft);">Base del período</span><span>' + fmt(cierre.base) + '</span></div>' +
+    '<div style="display:flex;justify-content:space-between;padding:9px 0;font-size:14px;"><span style="color:var(--ink-soft);">Ausencias</span><span style="color:var(--danger);">−' + fmt(cierre.ausencias) + '</span></div>' +
+    '<div style="display:flex;justify-content:space-between;padding:9px 0;font-size:14px;"><span style="color:var(--ink-soft);">Extras</span><span style="color:var(--success);">+' + fmt(cierre.extras) + '</span></div>' +
+    '<div style="display:flex;justify-content:space-between;padding:9px 0;font-size:14px;border-bottom:1px solid var(--border);"><span style="color:var(--ink-soft);">Anticipos</span><span style="color:var(--danger);">−' + fmt(cierre.anticipos) + '</span></div>' +
+    '<div style="display:flex;justify-content:space-between;padding:14px 0;font-size:17px;font-weight:700;"><span>A pagar</span><span>' + fmt(cierre.total) + '</span></div>' +
+    '<div class="error-msg" id="ce-error"></div>' +
+    '<button class="btn-primary" style="width:100%;" onclick="confirmarPagoEquipo_(\'' + nombre + '\')">Confirmar y registrar pago</button>' +
+    '<p style="font-size:12px;color:var(--ink-soft);text-align:center;margin-top:8px;">Queda guardado y visible para ' + nombre.split(' ')[0] + '</p>';
+  equipoCache.cierreActual = cierre;
 }
 
-function calcularCierrePeriodo_(c, desde, hasta) {
-  const baseCicloCompleto = baseCicloPago_(c.monto, c.periodicidad);
-  const movs = movimientosDelPeriodo_(c.nombre, desde, hasta);
-  const ausencias = movs.filter(m => m.tipo === 'Ausencia').reduce((s, m) => s + m.monto, 0);
-  const extras = movs.filter(m => m.tipo === 'Extra').reduce((s, m) => s + m.monto, 0);
-  const anticipos = movs.filter(m => m.tipo === 'Anticipo').reduce((s, m) => s + m.monto, 0);
-  const total = Math.round(baseCicloCompleto - ausencias + extras - anticipos);
-  return { desde: formatFechaCL_(desde), hasta: formatFechaCL_(hasta), base: Math.round(baseCicloCompleto),
-    ausencias: ausencias, extras: extras, anticipos: anticipos, total: total, movimientos: movs };
+function fechaISOaCL_(iso) { const p = iso.split('-'); return p[2] + '/' + p[1] + '/' + p[0]; }
+
+async function recalcularCierrePagoEquipo_(nombre) {
+  const desde = document.getElementById('ce-desde').value, hasta = document.getElementById('ce-hasta').value;
+  await pintarCierrePagoEquipo_(nombre, desde, hasta, null);
 }
 
-function formatFechaCL_(fecha) {
-  return Utilities.formatDate(fecha, tzHoja(), 'dd/MM/yyyy');
-}
-
-function obtenerCierrePago(colaborador, desde, hasta, solicitante) {
-  const err = requierePermisoEquipo_(solicitante); if (err) return err;
-  const ficha = obtenerFichaColaborador(colaborador, solicitante);
-  if (!ficha.ok) return ficha;
-  const d = parseFechaCL(desde), h = parseFechaCL(hasta);
-  if (!d || !h) return { ok: false, error: 'Fechas inválidas' };
-  return { ok: true, cierre: calcularCierrePeriodo_(ficha.colaborador, d, h) };
-}
-
-// d: {colaborador, desde, hasta, base, ausencias, extras, anticipos, total} — los montos
-// vienen del cierre que Osmar ya vio y confirmó en pantalla (no se recalculan a ciegas acá,
-// para que lo que se registre sea exactamente lo que Osmar confirmó, incluida cualquier
-// fecha que haya ajustado a mano).
-function confirmarPago(d, solicitante) {
-  const err = requierePermisoEquipo_(solicitante); if (err) return err;
-  const ficha = obtenerFichaColaborador(d.colaborador, solicitante);
-  if (!ficha.ok) return ficha;
-  const c = ficha.colaborador;
-
-  const id = nuevoId('PAGOEQ');
-  getSheet(H_PAGOS_EQUIPO).appendRow([id, d.desde, d.hasta, d.colaborador, num(d.base),
-    num(d.ausencias), num(d.extras), num(d.anticipos), num(d.total), new Date()]);
-
-  // Genera el gasto en Respuestas — mismo layout de columnas que registrarCompra() en
-  // Registro.gs (ver nota de columnas en ese archivo). Categoría "Sueldos" ya existe en
-  // Categorias, mapeada a "Gasto de personal" — estadoResultados() la toma sola.
-  const fila = [
-    new Date(), 'Compra', d.hasta, '', '', '', '', '', '', '', '',
-    '', '', '', '', '', '',
-    c.negocio, 'Sueldos', d.colaborador, '', '', num(d.total),
-    'Sueldo ' + d.colaborador + ' · ' + d.desde + ' a ' + d.hasta, 'Pagado',
-    '', '', '', '', '', '', 'Equipo', id, '', ''
-  ];
-  getSheet(H_RESPUESTAS).appendRow(fila);
-
-  actualizarUltimaFechaPagada_(d.colaborador, d.hasta);
-  return { ok: true, mensaje: 'Pago confirmado y registrado' };
-}
-
-function actualizarUltimaFechaPagada_(colaborador, hasta) {
-  const sh = hojaColaboradores_();
-  const datos = sh.getDataRange().getValues();
-  for (let i = 1; i < datos.length; i++) {
-    if (datos[i][0] !== colaborador) continue;
-    sh.getRange(i + 1, 10).setValue(hasta);
-    return;
-  }
-}
-
-function obtenerHistorialPagos(colaborador, solicitante) {
-  const err = requierePermisoEquipo_(solicitante); if (err) return err;
-  const datos = getSheet(H_PAGOS_EQUIPO).getDataRange().getValues();
-  const lista = [];
-  for (let i = 1; i < datos.length; i++) {
-    const f = datos[i];
-    if (f[3] !== colaborador) continue;
-    lista.push({ id: f[0], desde: f[1], hasta: f[2], base: num(f[4]), ausencias: num(f[5]),
-      extras: num(f[6]), anticipos: num(f[7]), total: num(f[8]) });
-  }
-  return { ok: true, pagos: lista.reverse() };
-}
-
-// ============ VISTA DEL COLABORADOR (su propio pago) ============
-
-function obtenerMiPago(solicitante) {
-  if (!solicitante) return { ok: false, error: 'Sesión inválida' };
-  const ficha = obtenerFichaColaborador(solicitante, solicitante);
-  if (!ficha.ok) return { ok: false, error: 'No tienes una ficha de colaborador asociada' };
-  const c = ficha.colaborador;
-  const periodo = calcularPeriodoPendiente_(c);
-  const historial = obtenerHistorialPagosPropio_(solicitante);
-  return { ok: true, colaborador: { nombre: c.nombre, negocio: c.negocio, periodicidad: c.periodicidad, diasDePago: c.diasDePago },
-    periodoActual: periodo, historial: historial };
-}
-
-function obtenerHistorialPagosPropio_(colaborador) {
-  const datos = getSheet(H_PAGOS_EQUIPO).getDataRange().getValues();
-  const lista = [];
-  for (let i = 1; i < datos.length; i++) {
-    const f = datos[i];
-    if (f[3] !== colaborador) continue;
-    lista.push({ desde: f[1], hasta: f[2], total: num(f[8]) });
-  }
-  return lista.reverse().slice(0, 6);
+async function confirmarPagoEquipo_(nombre) {
+  const err = document.getElementById('ce-error'); err.textContent = '';
+  const c = equipoCache.cierreActual;
+  const d = { colaborador: nombre, desde: c.desde, hasta: c.hasta, base: c.base, ausencias: c.ausencias, extras: c.extras, anticipos: c.anticipos, total: c.total };
+  const r = await llamarAPI('confirmarPago', { data: d });
+  if (!r.ok) { err.textContent = r.error; return; }
+  equipoCache.lista = null;
+  document.getElementById('confirm-title').textContent = 'Pago confirmado';
+  document.getElementById('confirm-msg').textContent = fmt(c.total) + ' registrado para ' + nombre + '. Ya quedó reflejado como gasto en Finanzas.';
+  document.getElementById('confirm-detalle').innerHTML = '';
+  document.getElementById('confirm-btn-otro').style.display = 'block';
+  document.getElementById('confirm-btn-otro').textContent = 'Volver al equipo';
+  confirmAccionOtro = () => abrirEquipo(true);
+  irA('screen-confirm');
 }
 
 // ============ COMUNICADOS ============
-// Reutiliza el sistema de notificaciones existente (crearNotificacion /
-// obtenerNotificacionesActivas / marcarNotificacionVista, en Notificaciones.gs) — el
-// frontend ya sabe pintar notif-card genéricas; solo se agrega un caso 'comunicado' en
-// construirCuerpoNotificacion_ (js/conciliacion.js). No se guarda historial aparte: al
-// marcarla vista, se archiva igual que cualquier otra notificación del sistema.
-
-// d: {para: 'Todos' | nombre | [nombres], mensaje}
-function enviarComunicadoEquipo(d, solicitante) {
-  const err = requierePermisoEquipo_(solicitante); if (err) return err;
-  if (!d.mensaje) return { ok: false, error: 'Falta el mensaje' };
-
-  let destinatarios;
-  if (d.para === 'Todos') {
-    const datos = hojaColaboradores_().getDataRange().getValues();
-    destinatarios = [];
-    for (let i = 1; i < datos.length; i++) {
-      if (datos[i][0] && datos[i][10] !== 'Inactivo') destinatarios.push(datos[i][0]);
-    }
-  } else {
-    destinatarios = Array.isArray(d.para) ? d.para : [d.para];
-  }
-  if (!destinatarios.length) return { ok: false, error: 'No hay destinatarios' };
-
-  const payload = JSON.stringify({ tipo: 'comunicado', de: solicitante, texto: d.mensaje });
-  return crearNotificacion(destinatarios, payload, '');
+function abrirComunicadoEquipo(paraPreseleccionado) {
+  irA('screen-comunicado-equipo');
+  equipoCache.comunicadoPara = paraPreseleccionado === 'Todos' ? 'Todos' : (paraPreseleccionado ? [paraPreseleccionado] : []);
+  pintarComunicadoEquipo_();
 }
 
-// ============ SIEMBRA INICIAL (ejecutar UNA VEZ a mano desde el editor de Apps Script) ============
-// NUEVO 28/07/2026 (con Osmar): carga las 4 fichas cuyos datos ya quedaron acordados en la
-// sesión de diseño (Rocío queda pendiente — no se definieron su monto ni su jornada). No
-// crea Usuarios ni Permisos: las 4 personas ya tienen acceso al sistema desde antes, esto
-// solo llena Colaboradores. Es idempotente — si una fila ya existe, la salta en vez de
-// duplicarla, así que no hay problema si se ejecuta más de una vez por error.
-// Para correrla: abrir este archivo en el editor de Apps Script, elegir "sembrarEquipoInicial"
-// en el selector de función (arriba, junto al botón Ejecutar) y presionar Ejecutar.
-function sembrarEquipoInicial() {
-  const datosIniciales = [
-    { nombre: 'Lucas Ramos', telefono: '', responsabilidades: 'Staff fin de semana · Cima',
-      negocio: 'Cima Eco-Granel', monto: 75000, periodicidad: 'Semanal', diasDePago: 'lunes',
-      unidadDescuento: 'dia', jornada: [{ dias: ['Vie', 'Sáb', 'Dom'], horas: 8 }] },
-    { nombre: 'Cecilia Yevenes', telefono: '', responsabilidades: 'Atención y venta a granel · Cima',
-      negocio: 'Cima Eco-Granel', monto: 350000, periodicidad: 'Quincenal', diasDePago: '15 y 30',
-      unidadDescuento: 'hora', jornada: [{ dias: ['Lun', 'Mar'], horas: 8 }, { dias: ['Mié', 'Jue'], horas: 5 }] },
-    { nombre: 'Rosa Merino', telefono: '', responsabilidades: 'Producción · Vegan Corner',
-      negocio: 'Vegan Corner', monto: 130000, periodicidad: 'Semanal', diasDePago: 'martes',
-      unidadDescuento: 'dia', jornada: [{ dias: ['Lun', 'Mar', 'Mié', 'Jue', 'Vie'], horas: 0 }] },
-    { nombre: 'Katherine Bustamante', telefono: '', responsabilidades: 'Producción · Vegan Corner',
-      negocio: 'Vegan Corner', monto: 100000, periodicidad: 'Semanal', diasDePago: 'viernes',
-      unidadDescuento: 'dia', jornada: [{ dias: ['Lun', 'Mar', 'Mié', 'Jue', 'Vie'], horas: 0 }] }
-  ];
+function pintarComunicadoEquipo_() {
+  const cont = document.getElementById('comunicado-equipo-cont');
+  const esTodos = equipoCache.comunicadoPara === 'Todos';
+  const nombres = equipoCache.todosColaboradores || [];
+  cont.innerHTML =
+    '<h2 style="font-size:17px;">Enviar comunicado</h2>' +
+    '<label>Para</label>' +
+    '<div class="conteo-chips" style="margin:6px 0 14px;">' +
+      '<span class="chip-sub' + (esTodos ? ' activo' : '') + '" onclick="setComunicadoTodosEquipo_()">Todos</span>' +
+      nombres.map(n => '<span class="chip-sub' + (!esTodos && equipoCache.comunicadoPara.indexOf(n) > -1 ? ' activo' : '') + '" onclick="toggleComunicadoPersonaEquipo_(\'' + n + '\')">' + n.split(' ')[0] + '</span>').join('') +
+    '</div>' +
+    '<label>Mensaje</label><textarea id="ce-mensaje" rows="4"></textarea>' +
+    '<div class="error-msg" id="ce-mensaje-error"></div>' +
+    '<button class="btn-primary" style="width:100%;margin-top:8px;" onclick="enviarComunicadoEquipo_()">Enviar</button>' +
+    '<p style="font-size:12px;color:var(--ink-soft);text-align:center;margin-top:8px;">Le aparece la próxima vez que abra el sistema</p>';
+}
 
-  const sh = hojaColaboradores_();
-  const existentes = sh.getDataRange().getValues().slice(1).map(f => f[0]);
-  const creados = [], saltados = [];
-  datosIniciales.forEach(c => {
-    if (existentes.indexOf(c.nombre) > -1) { saltados.push(c.nombre); return; }
-    sh.appendRow([c.nombre, c.telefono, c.responsabilidades, c.negocio, c.monto, c.periodicidad,
-      c.diasDePago, c.unidadDescuento, JSON.stringify(c.jornada), '', 'Activo']);
-    creados.push(c.nombre);
+function setComunicadoTodosEquipo_() { equipoCache.comunicadoPara = 'Todos'; pintarComunicadoEquipo_(); }
+function toggleComunicadoPersonaEquipo_(nombre) {
+  if (equipoCache.comunicadoPara === 'Todos') equipoCache.comunicadoPara = [];
+  const pos = equipoCache.comunicadoPara.indexOf(nombre);
+  if (pos > -1) equipoCache.comunicadoPara.splice(pos, 1); else equipoCache.comunicadoPara.push(nombre);
+  pintarComunicadoEquipo_();
+}
+
+async function enviarComunicadoEquipo_() {
+  const err = document.getElementById('ce-mensaje-error'); err.textContent = '';
+  const mensaje = document.getElementById('ce-mensaje').value.trim();
+  if (!mensaje) { err.textContent = 'Escribe el mensaje'; return; }
+  const para = equipoCache.comunicadoPara;
+  if (Array.isArray(para) && !para.length) { err.textContent = 'Elige al menos un destinatario'; return; }
+  const r = await llamarAPI('enviarComunicadoEquipo', { data: { para: para, mensaje: mensaje } });
+  if (!r.ok) { err.textContent = r.error; return; }
+  document.getElementById('confirm-title').textContent = 'Comunicado enviado';
+  document.getElementById('confirm-msg').textContent = 'Le va a aparecer la próxima vez que abra el sistema.';
+  document.getElementById('confirm-detalle').innerHTML = '';
+  document.getElementById('confirm-btn-otro').style.display = 'none';
+  irA('screen-confirm');
+}
+
+// ============ MI PAGO (vista del colaborador) ============
+async function abrirMiPago() {
+  irA('screen-mi-pago');
+  document.getElementById('mipago-nombre').textContent = sesion.nombre;
+  const cont = document.getElementById('mi-pago-cont');
+  cont.innerHTML = skeletonCards(2);
+  const r = await llamarAPISilencioso('obtenerMiPago', {});
+  if (!r.ok) { cont.innerHTML = '<p style="font-size:13px;color:var(--ink-soft);">' + r.error + '</p>'; return; }
+  const p = r.periodoActual;
+  let html =
+    '<div class="card" style="text-align:center;margin-bottom:14px;">' +
+      '<p style="font-size:12px;color:var(--ink-soft);margin:0;">Período ' + p.desde + ' a ' + p.hasta + '</p>' +
+      '<p style="font-size:28px;font-weight:700;margin:2px 0 0;">' + fmt(p.total) + '</p>' +
+    '</div>' +
+    '<div style="font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--ink-soft);margin-bottom:4px;">Detalle</div>';
+  (p.movimientos || []).forEach(m => {
+    html += '<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border);font-size:13px;">' +
+      '<span>' + m.fecha + ' · ' + m.tipo + '</span>' +
+      '<span style="color:' + (m.tipo === 'Extra' ? 'var(--success)' : 'var(--danger)') + ';">' + (m.tipo === 'Extra' ? '+' : '−') + fmt(m.monto) + '</span></div>';
   });
-  Logger.log('Creados: ' + creados.join(', ') + ' | Ya existían (saltados): ' + saltados.join(', '));
-  return { creados: creados, saltados: saltados };
+  if (!(p.movimientos || []).length) html += '<p style="font-size:12.5px;color:var(--ink-soft);">Sin ausencias, extras ni anticipos en este período.</p>';
+  cont.innerHTML = html;
 }
