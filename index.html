@@ -1139,11 +1139,13 @@
   </div>
   <h2 style="font-size:17px;">Retiro hacia Vegan Corner</h2>
   <p style="font-size:12.5px;color:var(--ink-soft);margin:0 0 14px;">Marca lo que sale del stock de Cima para completar una venta al por mayor.</p>
+  <label style="font-size:12px;color:var(--ink-soft);display:block;margin:4px 0 6px;">Cliente <span style="font-weight:400;">— opcional</span></label>
+  <select id="retiro-vc-cliente" style="width:100%;margin-bottom:12px;" onchange="cambiarClienteRetiroVC(this.value)"></select>
+  <label style="font-size:12px;color:var(--ink-soft);display:block;margin:4px 0 6px;">Fecha y hora del retiro</label>
+  <input type="datetime-local" id="retiro-vc-fecha" style="width:100%;margin-bottom:14px;">
   <p style="font-size:12px;color:var(--ink-soft);margin:0 0 10px;">Categorías</p>
   <div id="retiro-vc-chips" class="conteo-chips"></div>
   <div id="retiro-vc-lista"></div>
-  <label style="font-size:12px;color:var(--ink-soft);display:block;margin:4px 0 6px;">Cliente o motivo <span style="font-weight:400;">— opcional</span></label>
-  <input type="text" id="retiro-vc-cliente" placeholder="Ej: Dulce Luna" style="width:100%;margin-bottom:14px;" oninput="cambiarClienteRetiroVC(this.value)">
   <div class="error-msg" id="retiro-vc-error"></div>
   <div class="submit-bar"><button class="btn-primary" onclick="revisarRetiroVC()">Revisar retiro</button></div>
 </div>
