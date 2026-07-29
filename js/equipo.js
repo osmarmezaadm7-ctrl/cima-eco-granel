@@ -326,9 +326,10 @@ function pintarFormularioMovimientoEquipo_(nombre) {
   }
   const c = equipoCache.fichaActual;
   if (tipo === 'Extra' && c && c.unidadDescuento === 'hora') {
-    html += '<label>Horas trabajadas ese día (si es fuera de su jornada regular)</label><input type="number" id="me-horas-extra">';
+    html += '<label>Horas extra trabajadas ese día</label><input type="number" id="me-horas-extra">';
   }
   html += '<label>Observación (opcional)</label><input type="text" id="me-observacion">';
+  html += '<div id="me-exito" style="display:none;background:var(--forest-soft);color:var(--forest);border-radius:8px;padding:9px 12px;margin-bottom:8px;font-size:13px;font-weight:600;"></div>';
   html += '<div class="error-msg" id="me-error"></div>';
   html += '<button class="btn-primary" style="margin-top:8px;" onclick="guardarMovimientoEquipo_(\'' + nombre + '\')">Guardar</button>';
   html += '<div style="font-size:11px;text-transform:uppercase;letter-spacing:.4px;color:var(--ink-soft);margin:16px 0 6px;">Registrado este período</div>';
@@ -344,6 +345,7 @@ function cambiarTipoMovimientoEquipo_(tipo, nombre) {
 
 async function guardarMovimientoEquipo_(nombre) {
   const err = document.getElementById('me-error'); err.textContent = '';
+  const exito = document.getElementById('me-exito'); exito.style.display = 'none';
   const tipo = equipoCache.tipoMovimientoActual;
   const d = { colaborador: nombre, fecha: document.getElementById('me-fecha').value, tipo: tipo,
     observacion: document.getElementById('me-observacion').value.trim() };
@@ -354,7 +356,12 @@ async function guardarMovimientoEquipo_(nombre) {
 
   const r = await llamarAPI('registrarMovimientoEquipo', { data: d });
   if (!r.ok) { err.textContent = r.error; return; }
+  exito.style.display = 'block';
+  exito.textContent = '✓ ' + tipo + ' guardada' + (r.monto ? ' — ' + fmt(r.monto) : '');
   document.getElementById('me-observacion').value = '';
+  if (horasEl) horasEl.value = '';
+  const montoAnticipoEl = document.getElementById('me-monto-anticipo');
+  if (montoAnticipoEl) montoAnticipoEl.value = '';
   pintarMovimientosDelPeriodoEquipo_(nombre);
 }
 
