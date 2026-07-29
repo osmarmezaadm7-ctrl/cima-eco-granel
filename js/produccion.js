@@ -1176,7 +1176,7 @@ async function abrirRetiroVC() {
     'T' + String(ahora.getHours()).padStart(2, '0') + ':' + String(ahora.getMinutes()).padStart(2, '0');
   document.getElementById('retiro-vc-error').textContent = '';
   llamarAPISilencioso('listarClientes', {}).then(r => {
-    if (r.ok) selCliente.innerHTML += (r.clientes || []).map(c => '<option value="' + c.nombre + '">' + c.nombre + '</option>').join('');
+    if (r.ok) selCliente.innerHTML += (r.clientes || []).map(c => { const et = c.alias || c.nombre; return '<option value="' + et + '">' + et + '</option>'; }).join('');
   });
   if (!cacheCatalogoCompleto) {
     document.getElementById('retiro-vc-chips').innerHTML = skeletonCards(1);
