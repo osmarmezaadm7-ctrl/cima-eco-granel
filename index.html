@@ -1737,11 +1737,24 @@ function agregarBloqueAbastecimiento(cont) {
   cont.appendChild(crearMenuCard(ICONS.carrito,'Lista de compra','Pedir o revisar lo pendiente',()=>abrirAbastecimiento(),true,'caramel'));
 }
 
+// NUEVO 29/07/2026 (con Osmar — bugfix: mismo problema que tuvo Abastecimiento el
+// 21/07/2026: la tarjeta de Equipo solo se había agregado al sidebar de escritorio,
+// nunca a la grilla del Home móvil). Mismo patrón que agregarBloqueAbastecimiento.
+function agregarBloqueEquipo(cont) {
+  cont.insertAdjacentHTML('beforeend','<div class="menu-grupo-titulo">Equipo</div>');
+  if (tienePermisoLocal('GestionarEquipo')) {
+    cont.appendChild(crearMenuCard(ICONS.remuneraciones,'Equipo','Fichas, pagos y comunicados',()=>abrirEquipo(),true,'neutral'));
+  } else {
+    cont.appendChild(crearMenuCard(ICONS.remuneraciones,'Mi pago','Detalle de tu pago del período',()=>abrirMiPago(),true,'neutral'));
+  }
+}
+
   const cont = document.getElementById('home-content'); cont.innerHTML='';
   const puedeCima = sesion.rol==='Admin' || sesion.negocio==='Cima Eco-Granel' || sesion.negocio==='Ambos';
 
   let bloqueProduccionAgregado = false;
   let bloqueAbastecimientoAgregado = false;
+  let bloqueEquipoAgregado = false;
   if (tienePermisoLocal('VerDashboardCompleto') || tienePermisoLocal('VisualizarReportes')){
     if (tienePermisoLocal('VerDashboardCompleto')){
       cont.insertAdjacentHTML('beforeend','<div class="menu-grupo-titulo">Panel</div>');
@@ -1766,6 +1779,7 @@ function agregarBloqueAbastecimiento(cont) {
     }
     agregarBloqueProduccion(cont); bloqueProduccionAgregado = true;
     agregarBloqueAbastecimiento(cont); bloqueAbastecimientoAgregado = true;
+    agregarBloqueEquipo(cont); bloqueEquipoAgregado = true;
     if (tienePermisoLocal('ConfigurarSistema')){
       cont.insertAdjacentHTML('beforeend','<div class="menu-grupo-titulo">Configuraciones</div>');
       cont.appendChild(crearMenuCardChica(ICONS.banco,'Créditos',()=>abrirCreditos()));
@@ -1789,6 +1803,7 @@ function agregarBloqueAbastecimiento(cont) {
   // relativa de siempre, ya que esas ramas no tienen sección de Configuraciones.
   if (!bloqueProduccionAgregado) agregarBloqueProduccion(cont);
   if (!bloqueAbastecimientoAgregado) agregarBloqueAbastecimiento(cont);
+  if (!bloqueEquipoAgregado) agregarBloqueEquipo(cont);
 
   if (esEscritorio && tienePermisoLocal('VerDashboardCompleto')) { abrirPanel(); return; }
   if (esEscritorio && tienePermisoLocal('VisualizarReportes')) { abrirEstadoResultados(); return; }
@@ -3134,15 +3149,19 @@ function pintarAlertas(r){
   const cont = document.getElementById('lista-alertas'); cont.innerHTML='';
   // NUEVO 29/07/2026 (con Osmar — módulo Equipo): recordatorios de "toca pagar" viven en
   // este mismo panel, arriba de las alertas de auditoría — un bloque aparte porque no
-  // comparten el esquema esperado/real/severidad de las alertas de auditoría.
-  if (window.recordatoriosPagoCache && window.recordatoriosPagoCache.length) {
+  // comparten el esquema esperado/real/severidad de las alertas de auditoría. Alertas usa un
+  // umbral más estricto que la sección "Toca pagar" de Equipo (que avisa hasta 2 días antes):
+  // acá solo se muestra desde el mismo día de vencimiento en adelante — mismo cálculo,
+  // filtro distinto, acordado con Osmar el 29/07/2026.
+  const recVencidos = (window.recordatoriosPagoCache || []).filter(rec => rec.diasParaVencer <= 0);
+  if (recVencidos.length) {
     const bloqueRec = document.createElement('div');
     bloqueRec.style.marginBottom = '14px';
     bloqueRec.innerHTML = '<div style="font-size:11px;text-transform:uppercase;letter-spacing:.4px;color:var(--ink-soft);margin-bottom:6px;">Toca pagar</div>' +
-      window.recordatoriosPagoCache.map(rec =>
+      recVencidos.map(rec =>
         '<div class="card" style="border-color:var(--terracotta);background:var(--terracotta-soft);margin-bottom:8px;cursor:pointer;" onclick="abrirEquipo();">' +
           '<strong style="font-size:13.5px;">' + rec.colaborador + '</strong>' +
-          '<p style="font-size:12px;color:var(--ink-soft);margin:2px 0 0;">' + fmt(rec.monto) + (rec.diasVencido > 0 ? ' · ' + rec.diasVencido + ' día(s) de atraso' : ' · corresponde hoy') + '</p>' +
+          '<p style="font-size:12px;color:var(--ink-soft);margin:2px 0 0;">' + fmt(rec.monto) + (rec.diasParaVencer < 0 ? ' · ' + Math.abs(rec.diasParaVencer) + ' día(s) de atraso' : ' · corresponde hoy') + '</p>' +
         '</div>').join('');
     cont.appendChild(bloqueRec);
   }
@@ -3155,7 +3174,7 @@ function pintarAlertas(r){
       (a.estado==='Pendiente' ? '<button class="btn-secondary btn-small" onclick="resolverAlertaUI(\''+a.id+'\','+(a.severidad==='Critica')+')">Resolver con nota</button>' : '<span class="pill pill-menor">Resuelta</span>');
     cont.appendChild(div);
   });
-  if(!alertas.length && !(window.recordatoriosPagoCache && window.recordatoriosPagoCache.length)) cont.innerHTML = '<p style="font-size:12px;color:var(--ink-soft);">Sin alertas de auditoría.</p>';
+  if(!alertas.length && !recVencidos.length) cont.innerHTML = '<p style="font-size:12px;color:var(--ink-soft);">Sin alertas de auditoría.</p>';
 }
 async function abrirAlertas(forzar){
   irA('screen-alertas');
