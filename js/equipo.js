@@ -100,17 +100,19 @@ function pintarFichaEquipo_(c, calc) {
   const proximoPagoTxt = rec ? fmt(rec.monto) : '—';
   const proximoPagoSub = rec ? rec.fechaVencimiento : c.diasDePago;
   const horasSemana = (c.jornada || []).reduce((s, b) => s + b.dias.length * num_(b.horas), 0);
+  const modalidadVal = c.unidadDescuento === 'hora' ? fmt(calc.valorHora) + '/h' : fmt(calc.valorDia) + '/día';
+  const modalidadSub = c.unidadDescuento === 'hora' ? 'Por hora' : 'Por día';
   let html =
-    '<div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">' +
-      '<div class="avatar" style="width:48px;height:48px;font-size:15px;">' + iniciales + '</div>' +
-      '<div><div style="font-weight:700;font-size:17px;">' + c.nombre + '</div><div style="font-size:12.5px;color:var(--ink-soft);">' + (c.responsabilidades || c.negocio) + '</div></div>' +
+    '<div style="display:flex;align-items:center;gap:14px;margin-bottom:18px;">' +
+      '<div class="avatar" style="width:52px;height:52px;font-size:17px;">' + iniciales + '</div>' +
+      '<div><div style="font-weight:700;font-size:19px;">' + c.nombre + '</div><div style="font-size:13.5px;color:var(--ink-soft);">' + c.negocio + '</div></div>' +
     '</div>' +
-    '<div style="display:flex;background:var(--paper);border-radius:10px;margin-bottom:16px;">' +
-      '<div style="flex:1;text-align:center;padding:10px 4px;border-right:1px solid var(--border);"><p style="font-size:10px;color:var(--ink-soft);margin:0;">PRÓXIMO PAGO</p><p style="font-size:14px;font-weight:700;margin:2px 0 0;">' + proximoPagoTxt + '</p><p style="font-size:10px;color:var(--ink-soft);margin:0;">' + proximoPagoSub + '</p></div>' +
-      '<div style="flex:1;text-align:center;padding:10px 4px;border-right:1px solid var(--border);"><p style="font-size:10px;color:var(--ink-soft);margin:0;">JORNADA</p><p style="font-size:14px;font-weight:700;margin:2px 0 0;">' + horasSemana + 'h</p><p style="font-size:10px;color:var(--ink-soft);margin:0;">por semana</p></div>' +
-      '<div style="flex:1;text-align:center;padding:10px 4px;"><p style="font-size:10px;color:var(--ink-soft);margin:0;">MODALIDAD</p><p style="font-size:14px;font-weight:700;margin:2px 0 0;">' + (c.unidadDescuento === 'hora' ? 'Por hora' : 'Por día') + '</p><p style="font-size:10px;color:var(--ink-soft);margin:0;">' + (c.unidadDescuento === 'hora' ? fmt(calc.valorHora) + '/h' : fmt(calc.valorDia) + '/día') + '</p></div>' +
+    '<div class="kpi-row" style="grid-template-columns:repeat(3,1fr);">' +
+      '<div class="kpi"><div class="lbl">Próximo pago</div><div class="val" style="font-size:19px;">' + proximoPagoTxt + '</div><div style="font-size:11.5px;color:var(--ink-soft);margin-top:2px;">' + proximoPagoSub + '</div></div>' +
+      '<div class="kpi"><div class="lbl">Jornada</div><div class="val" style="font-size:19px;">' + horasSemana + 'h</div><div style="font-size:11.5px;color:var(--ink-soft);margin-top:2px;">por semana</div></div>' +
+      '<div class="kpi"><div class="lbl">Modalidad</div><div class="val" style="font-size:19px;">' + modalidadVal + '</div><div style="font-size:11.5px;color:var(--ink-soft);margin-top:2px;">' + modalidadSub + '</div></div>' +
     '</div>' +
-    '<div class="pillbar">' +
+    '<div class="pillbar" style="margin-top:16px;">' +
       '<button class="' + (equipoCache.fichaTabActual === 'datos' ? 'sel' : '') + '" onclick="cambiarTabFichaEquipo_(\'datos\')">Datos</button>' +
       '<button class="' + (equipoCache.fichaTabActual === 'historial' ? 'sel' : '') + '" onclick="cambiarTabFichaEquipo_(\'historial\')">Historial</button>' +
     '</div>' +
@@ -127,39 +129,42 @@ function cambiarTabFichaEquipo_(tab) {
 }
 
 function filaEquipo_(label, valor) {
-  return '<div style="display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border);font-size:13.5px;">' +
-    '<span style="color:var(--ink-soft);">' + label + '</span><span style="text-align:right;">' + valor + '</span></div>';
+  return '<div class="rowline"><span>' + label + '</span><span class="mono">' + valor + '</span></div>';
 }
 
-const ICONO_EQUIPO_TEL = '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--forest)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>';
-const ICONO_EQUIPO_NOTA = '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--forest)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11H1v3h8v3l6-4.5L9 8v3z"></path><path d="M22 12A10 10 0 1 1 12 2"></path></svg>';
-const ICONO_EQUIPO_RELOJ = '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--forest)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M12 6v6l4 2"></path></svg>';
-const ICONO_EQUIPO_MONTO = '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--forest)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="13" rx="2"></rect><path d="M2 10h20"></path></svg>';
+const ICONO_EQUIPO_RELOJ = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--forest)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><circle cx="12" cy="12" r="10"></circle><path d="M12 6v6l4 2"></path></svg>';
+const ICONO_EQUIPO_MONTO = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--forest)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><rect x="2" y="6" width="20" height="13" rx="2"></rect><path d="M2 10h20"></path></svg>';
 
-function filaIconoEquipo_(icono, titulo, sub) {
-  return '<div style="display:flex;align-items:flex-start;gap:10px;padding:11px 0;border-bottom:1px solid var(--border);">' + icono +
-    '<div>' + (sub ? '<div style="font-size:13.5px;">' + titulo + '</div><div style="font-size:12px;color:var(--ink-soft);">' + sub + '</div>' : '<span style="font-size:13.5px;">' + titulo + '</span>') + '</div></div>';
+// Tarjeta con ícono + número protagonista, para datos que tienen un valor destacable
+// (horas netas, monto). Contacto/Responsabilidades no la usan — son datos simples sin un
+// número que resaltar, así que quedan como .rowline / texto plano, más liviano.
+function tarjetaIconoEquipo_(icono, tituloGrande, sub, numeroGrande, numeroSub) {
+  return '<div style="display:flex;align-items:center;gap:12px;background:var(--paper);border-radius:10px;padding:12px 14px;margin-bottom:8px;">' + icono +
+    '<div style="flex:1;min-width:0;"><strong class="mono" style="font-size:17px;">' + tituloGrande + '</strong><div style="font-size:12.5px;color:var(--ink-soft);margin-top:1px;">' + sub + '</div></div>' +
+    '<div style="text-align:right;flex-shrink:0;">' + (numeroGrande != null ? '<div class="mono" style="font-size:17px;font-weight:700;">' + numeroGrande + '</div><div style="font-size:10.5px;color:var(--ink-soft);">' + numeroSub + '</div>' : '') + '</div></div>';
 }
 
 function pintarTabDatosEquipo_(c, calc) {
   equipoCache.calculadoActual = calc;
   const tab = document.getElementById('ficha-tab-cont');
   let html = '<div style="font-size:11px;text-transform:uppercase;letter-spacing:.4px;color:var(--ink-soft);margin:12px 0 4px;">Contacto</div>';
-  html += filaIconoEquipo_(ICONO_EQUIPO_TEL, c.telefono || '—');
-  html += filaIconoEquipo_(ICONO_EQUIPO_NOTA, c.responsabilidades || '—');
+  html += '<div class="rowline"><span>Teléfono</span><span class="mono">' + (c.telefono || '—') + '</span></div>';
 
-  html += '<div style="font-size:11px;text-transform:uppercase;letter-spacing:.4px;color:var(--ink-soft);margin:14px 0 4px;">Jornada</div>';
+  html += '<div style="font-size:11px;text-transform:uppercase;letter-spacing:.4px;color:var(--ink-soft);margin:14px 0 4px;">Responsabilidades</div>';
+  html += '<p style="font-size:14px;line-height:1.5;margin:0 0 4px;">' + (c.responsabilidades || '—') + '</p>';
+
+  html += '<div style="font-size:11px;text-transform:uppercase;letter-spacing:.4px;color:var(--ink-soft);margin:16px 0 6px;">Jornada</div>';
   (c.jornada || []).forEach(b => {
     const dias = b.dias.join(' · ');
     const horario = (b.horaInicio != null && b.horaFin != null) ? b.horaInicio + ':00–' + b.horaFin + ':00' : 'sin horario fijo';
     const colacion = num_(b.colacionMin) > 0 ? b.colacionMin + ' min colación' : 'sin colación';
-    html += filaIconoEquipo_(ICONO_EQUIPO_RELOJ, dias, horario + ' · ' + colacion + ' · ' + b.horas + 'h netas');
+    html += tarjetaIconoEquipo_(ICONO_EQUIPO_RELOJ, dias, horario + ' · ' + colacion, b.horas + 'h', 'netas');
   });
 
-  html += '<div style="font-size:11px;text-transform:uppercase;letter-spacing:.4px;color:var(--ink-soft);margin:14px 0 4px;">Pago</div>';
-  const montoSub = c.periodicidad === 'Quincenal' ? 'Quincenal → ' + fmt(c.monto / 2) + ' cada quincena · vence ' + c.diasDePago
-    : c.periodicidad === 'Semanal' ? 'Semanal · vence ' + c.diasDePago : 'Mensual · vence ' + c.diasDePago;
-  html += filaIconoEquipo_(ICONO_EQUIPO_MONTO, fmt(c.monto) + (c.periodicidad === 'Semanal' ? ' a la semana' : ' al mes'), montoSub);
+  html += '<div style="font-size:11px;text-transform:uppercase;letter-spacing:.4px;color:var(--ink-soft);margin:16px 0 6px;">Pago</div>';
+  const pagoSub = c.periodicidad === 'Semanal' ? 'a la semana' : 'al mes';
+  const pagoNumSub = c.periodicidad === 'Quincenal' ? '→ ' + fmt(c.monto / 2) + '/quinc.' : 'vence ' + c.diasDePago;
+  html += tarjetaIconoEquipo_(ICONO_EQUIPO_MONTO, fmt(c.monto), pagoSub, c.periodicidad, c.periodicidad === 'Quincenal' ? pagoNumSub : 'vence ' + c.diasDePago);
 
   html += '<button type="button" class="btn-secondary" style="margin-top:14px;" onclick="abrirFormularioFichaEquipo_(\'' + c.nombre + '\')">Editar</button>';
   tab.innerHTML = html;
@@ -174,7 +179,7 @@ async function pintarTabHistorialEquipo_(nombre) {
   (r.pagos || []).forEach(p => { html += filaEquipo_(p.desde + ' – ' + p.hasta, '<strong>' + fmt(p.total) + '</strong>'); });
   if (!(r.pagos || []).length) html += '<p style="font-size:12.5px;color:var(--ink-soft);">Sin pagos registrados todavía.</p>';
   html += '<div style="padding:14px 0 6px;font-size:11px;text-transform:uppercase;letter-spacing:.4px;color:var(--ink-soft);">Cambios en la ficha</div>';
-  (r.cambiosFicha || []).forEach(cm => { html += '<p style="font-size:13px;color:var(--ink-soft);padding:6px 0;border-bottom:1px solid var(--border);">' + cm.descripcion + ' · ' + cm.fecha + '</p>'; });
+  (r.cambiosFicha || []).forEach(cm => { html += '<div class="rowline"><span>' + cm.descripcion + '</span><span class="mono">' + cm.fecha + '</span></div>'; });
   if (!(r.cambiosFicha || []).length) html += '<p style="font-size:12.5px;color:var(--ink-soft);">Sin cambios registrados.</p>';
   tab.innerHTML = html;
 }
