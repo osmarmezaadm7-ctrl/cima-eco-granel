@@ -14,32 +14,71 @@ let equipoCache = { lista: null, fichaActual: null, jornadaEdit: [], todosColabo
 // ============ 1. LISTA ============
 async function abrirEquipo(forzar) {
   irA('screen-equipo');
-  if (forzar) equipoCache.lista = null;
-  if (equipoCache.lista) { pintarListaEquipo(equipoCache.lista); return; }
+  if (forzar) { equipoCache.lista = null; equipoCache.recordatorios = null; }
+  if (equipoCache.lista) { pintarListaEquipo(equipoCache.lista, equipoCache.recordatorios); return; }
   document.getElementById('equipo-lista').innerHTML = skeletonCards(4);
-  const r = await llamarAPISilencioso('obtenerEquipo', {});
+  const [r, rec] = await Promise.all([
+    llamarAPISilencioso('obtenerEquipo', {}),
+    llamarAPISilencioso('obtenerRecordatoriosPago', {})
+  ]);
   equipoCache.lista = r;
-  if (document.getElementById('screen-equipo').classList.contains('active')) pintarListaEquipo(r);
+  equipoCache.recordatorios = (rec && rec.recordatorios) || [];
+  if (document.getElementById('screen-equipo').classList.contains('active')) pintarListaEquipo(r, equipoCache.recordatorios);
 }
 
-function pintarListaEquipo(r) {
+function pintarListaEquipo(r, recordatorios) {
   const cont = document.getElementById('equipo-lista');
   if (!r || !r.ok) { cont.innerHTML = '<p class="error-msg">' + (r && r.error || 'No se pudo cargar el equipo') + '</p>'; return; }
   equipoCache.todosColaboradores = (r.colaboradores || []).map(c => c.nombre);
-  cont.innerHTML = '';
+
+  let html = '';
+  if (recordatorios && recordatorios.length) {
+    html += '<div style="font-size:11px;text-transform:uppercase;letter-spacing:.4px;color:var(--ink-soft);margin:14px 0 8px;">Toca pagar</div>';
+    recordatorios.forEach(rec => {
+      const urgente = rec.diasParaVencer <= 0;
+      const iniciales = rec.colaborador.split(' ').map(p => p[0]).slice(0, 2).join('').toUpperCase();
+      const etiqueta = rec.diasParaVencer === 0 ? 'Vence hoy' : rec.diasParaVencer < 0 ? 'Atrasado ' + Math.abs(rec.diasParaVencer) + ' día(s)' : 'En ' + rec.diasParaVencer + ' día(s)';
+      if (urgente) {
+        html += '<div style="background:var(--terracotta-soft);border:1px solid var(--terracotta);border-radius:12px;padding:14px;margin-bottom:10px;">' +
+          '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">' +
+            '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--terracotta)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M12 8v4l3 3"></path></svg>' +
+            '<span style="font-size:11.5px;font-weight:700;color:var(--terracotta);text-transform:uppercase;letter-spacing:.3px;">' + etiqueta + '</span></div>' +
+          '<div style="display:flex;align-items:center;gap:10px;">' +
+            '<div class="avatar" style="width:36px;height:36px;font-size:12px;">' + iniciales + '</div>' +
+            '<div style="flex:1;"><strong style="font-size:14.5px;">' + rec.colaborador + '</strong><p style="font-size:12px;color:var(--ink-soft);margin:1px 0 0;">' + rec.fechaVencimiento + '</p></div>' +
+            '<strong style="font-size:17px;">' + fmt(rec.monto) + '</strong></div>' +
+          '<button type="button" class="btn-primary" style="width:100%;margin-top:12px;padding:9px;" onclick="pagarAhoraDesdeRecordatorioEquipo_(\'' + rec.colaborador + '\')">Pagar ahora</button></div>';
+      } else {
+        html += '<div style="background:var(--paper);border-radius:12px;padding:12px 14px;margin-bottom:10px;">' +
+          '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">' +
+            '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--ink-soft)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M12 8v4l3 3"></path></svg>' +
+            '<span style="font-size:11px;font-weight:600;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.3px;">' + etiqueta + '</span></div>' +
+          '<div style="display:flex;align-items:center;gap:10px;">' +
+            '<div class="avatar" style="width:32px;height:32px;font-size:11px;">' + iniciales + '</div>' +
+            '<div style="flex:1;"><strong style="font-size:13.5px;">' + rec.colaborador + '</strong><p style="font-size:11.5px;color:var(--ink-soft);margin:1px 0 0;">' + rec.fechaVencimiento + '</p></div>' +
+            '<strong style="font-size:14px;">' + fmt(rec.monto) + '</strong></div></div>';
+      }
+    });
+  }
+
+  html += '<div style="font-size:11px;text-transform:uppercase;letter-spacing:.4px;color:var(--ink-soft);margin:14px 0 8px;">Equipo completo</div><div class="card" style="padding:4px 10px;">';
   (r.colaboradores || []).forEach(c => {
     const iniciales = c.nombre.split(' ').map(p => p[0]).slice(0, 2).join('').toUpperCase();
-    const div = document.createElement('div');
-    div.className = 'card'; div.style.cssText = 'display:flex;align-items:center;gap:10px;cursor:pointer;margin-bottom:8px;';
-    div.onclick = () => abrirFichaEquipo(c.nombre);
-    div.innerHTML =
+    html += '<div style="display:flex;align-items:center;gap:10px;padding:11px 6px;border-bottom:1px solid var(--border);cursor:pointer;" onclick="abrirFichaEquipo(\'' + c.nombre + '\')">' +
       '<div class="avatar" style="width:38px;height:38px;font-size:13px;">' + iniciales + '</div>' +
-      '<div style="flex:1;"><strong style="font-size:14px;">' + c.nombre + '</strong>' +
-      '<p style="font-size:12px;color:var(--ink-soft);margin:2px 0 0;">' + c.negocio + ' · ' + c.periodicidad + '</p></div>' +
-      '<strong style="font-size:14px;">' + fmt(c.totalPendiente) + '</strong>';
-    cont.appendChild(div);
+      '<div style="flex:1;"><strong style="font-size:14px;">' + c.nombre + '</strong><p style="font-size:12px;color:var(--ink-soft);margin:2px 0 0;">' + c.negocio + ' · ' + c.periodicidad + '</p></div>' +
+      '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--ink-soft)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"></path></svg></div>';
   });
-  if (!(r.colaboradores || []).length) cont.innerHTML = '<p style="font-size:12px;color:var(--ink-soft);">Todavía no hay colaboradores cargados.</p>';
+  html += '</div>';
+  if (!(r.colaboradores || []).length) html += '<p style="font-size:12px;color:var(--ink-soft);">Todavía no hay colaboradores cargados.</p>';
+  cont.innerHTML = html;
+}
+
+async function pagarAhoraDesdeRecordatorioEquipo_(nombre) {
+  const r = await llamarAPISilencioso('obtenerFichaColaborador', { nombre: nombre });
+  if (!r.ok) return;
+  equipoCache.fichaActual = r.colaborador;
+  abrirCierrePagoEquipo(nombre);
 }
 
 // ============ 2. FICHA — tabs Datos / Historial (solo lectura) ============
@@ -57,10 +96,19 @@ async function abrirFichaEquipo(nombre) {
 function pintarFichaEquipo_(c, calc) {
   const cont = document.getElementById('ficha-equipo-cont');
   const iniciales = c.nombre.split(' ').map(p => p[0]).slice(0, 2).join('').toUpperCase();
+  const rec = (equipoCache.recordatorios || []).find(r => r.colaborador === c.nombre);
+  const proximoPagoTxt = rec ? fmt(rec.monto) : '—';
+  const proximoPagoSub = rec ? rec.fechaVencimiento : c.diasDePago;
+  const horasSemana = (c.jornada || []).reduce((s, b) => s + b.dias.length * num_(b.horas), 0);
   let html =
     '<div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">' +
-      '<div class="avatar">' + iniciales + '</div>' +
-      '<div><strong style="font-size:16px;">' + c.nombre + '</strong><p style="font-size:12.5px;color:var(--ink-soft);margin:1px 0 0;">' + c.negocio + '</p></div>' +
+      '<div class="avatar" style="width:48px;height:48px;font-size:15px;">' + iniciales + '</div>' +
+      '<div><div style="font-weight:700;font-size:17px;">' + c.nombre + '</div><div style="font-size:12.5px;color:var(--ink-soft);">' + (c.responsabilidades || c.negocio) + '</div></div>' +
+    '</div>' +
+    '<div style="display:flex;background:var(--paper);border-radius:10px;margin-bottom:16px;">' +
+      '<div style="flex:1;text-align:center;padding:10px 4px;border-right:1px solid var(--border);"><p style="font-size:10px;color:var(--ink-soft);margin:0;">PRÓXIMO PAGO</p><p style="font-size:14px;font-weight:700;margin:2px 0 0;">' + proximoPagoTxt + '</p><p style="font-size:10px;color:var(--ink-soft);margin:0;">' + proximoPagoSub + '</p></div>' +
+      '<div style="flex:1;text-align:center;padding:10px 4px;border-right:1px solid var(--border);"><p style="font-size:10px;color:var(--ink-soft);margin:0;">JORNADA</p><p style="font-size:14px;font-weight:700;margin:2px 0 0;">' + horasSemana + 'h</p><p style="font-size:10px;color:var(--ink-soft);margin:0;">por semana</p></div>' +
+      '<div style="flex:1;text-align:center;padding:10px 4px;"><p style="font-size:10px;color:var(--ink-soft);margin:0;">MODALIDAD</p><p style="font-size:14px;font-weight:700;margin:2px 0 0;">' + (c.unidadDescuento === 'hora' ? 'Por hora' : 'Por día') + '</p><p style="font-size:10px;color:var(--ink-soft);margin:0;">' + (c.unidadDescuento === 'hora' ? fmt(calc.valorHora) + '/h' : fmt(calc.valorDia) + '/día') + '</p></div>' +
     '</div>' +
     '<div class="pillbar">' +
       '<button class="' + (equipoCache.fichaTabActual === 'datos' ? 'sel' : '') + '" onclick="cambiarTabFichaEquipo_(\'datos\')">Datos</button>' +
@@ -83,25 +131,36 @@ function filaEquipo_(label, valor) {
     '<span style="color:var(--ink-soft);">' + label + '</span><span style="text-align:right;">' + valor + '</span></div>';
 }
 
+const ICONO_EQUIPO_TEL = '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--forest)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>';
+const ICONO_EQUIPO_NOTA = '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--forest)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11H1v3h8v3l6-4.5L9 8v3z"></path><path d="M22 12A10 10 0 1 1 12 2"></path></svg>';
+const ICONO_EQUIPO_RELOJ = '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--forest)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M12 6v6l4 2"></path></svg>';
+const ICONO_EQUIPO_MONTO = '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--forest)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="13" rx="2"></rect><path d="M2 10h20"></path></svg>';
+
+function filaIconoEquipo_(icono, titulo, sub) {
+  return '<div style="display:flex;align-items:flex-start;gap:10px;padding:11px 0;border-bottom:1px solid var(--border);">' + icono +
+    '<div>' + (sub ? '<div style="font-size:13.5px;">' + titulo + '</div><div style="font-size:12px;color:var(--ink-soft);">' + sub + '</div>' : '<span style="font-size:13.5px;">' + titulo + '</span>') + '</div></div>';
+}
+
 function pintarTabDatosEquipo_(c, calc) {
   equipoCache.calculadoActual = calc;
   const tab = document.getElementById('ficha-tab-cont');
-  let html = filaEquipo_('Teléfono', c.telefono || '—');
-  html += '<div style="padding:10px 0 4px;font-size:11px;text-transform:uppercase;letter-spacing:.4px;color:var(--ink-soft);">Responsabilidades</div>';
-  html += '<p style="font-size:13.5px;line-height:1.5;margin:0 0 8px;">' + (c.responsabilidades || '—') + '</p>';
-  html += filaEquipo_('Monto', fmt(c.monto) + (c.periodicidad === 'Semanal' ? ' / semana' : ' / mes'));
-  html += filaEquipo_('Periodicidad', c.periodicidad + (c.periodicidad === 'Quincenal' ? ' (' + fmt(c.monto / 2) + ' c/u)' : ''));
-  html += filaEquipo_('Fecha de pago', c.diasDePago || '—');
-  html += '<div style="padding:14px 0 6px;font-size:11px;text-transform:uppercase;letter-spacing:.4px;color:var(--ink-soft);">Jornada</div>';
+  let html = '<div style="font-size:11px;text-transform:uppercase;letter-spacing:.4px;color:var(--ink-soft);margin:12px 0 4px;">Contacto</div>';
+  html += filaIconoEquipo_(ICONO_EQUIPO_TEL, c.telefono || '—');
+  html += filaIconoEquipo_(ICONO_EQUIPO_NOTA, c.responsabilidades || '—');
+
+  html += '<div style="font-size:11px;text-transform:uppercase;letter-spacing:.4px;color:var(--ink-soft);margin:14px 0 4px;">Jornada</div>';
   (c.jornada || []).forEach(b => {
     const dias = b.dias.join(' · ');
     const horario = (b.horaInicio != null && b.horaFin != null) ? b.horaInicio + ':00–' + b.horaFin + ':00' : 'sin horario fijo';
     const colacion = num_(b.colacionMin) > 0 ? b.colacionMin + ' min colación' : 'sin colación';
-    html += filaEquipo_(dias, horario + ' · ' + colacion + ' · <strong>' + b.horas + 'h</strong>');
+    html += filaIconoEquipo_(ICONO_EQUIPO_RELOJ, dias, horario + ' · ' + colacion + ' · ' + b.horas + 'h netas');
   });
-  html += '<div style="padding:14px 0 6px;font-size:11px;text-transform:uppercase;letter-spacing:.4px;color:var(--ink-soft);">Modalidad de pago</div>';
-  if (c.unidadDescuento === 'hora') html += filaEquipo_('Cálculo', 'Por hora · ' + fmt(calc.valorHora) + '/h');
-  else html += filaEquipo_('Cálculo', 'Por día · ' + fmt(calc.valorDia) + '/día');
+
+  html += '<div style="font-size:11px;text-transform:uppercase;letter-spacing:.4px;color:var(--ink-soft);margin:14px 0 4px;">Pago</div>';
+  const montoSub = c.periodicidad === 'Quincenal' ? 'Quincenal → ' + fmt(c.monto / 2) + ' cada quincena · vence ' + c.diasDePago
+    : c.periodicidad === 'Semanal' ? 'Semanal · vence ' + c.diasDePago : 'Mensual · vence ' + c.diasDePago;
+  html += filaIconoEquipo_(ICONO_EQUIPO_MONTO, fmt(c.monto) + (c.periodicidad === 'Semanal' ? ' a la semana' : ' al mes'), montoSub);
+
   html += '<button type="button" class="btn-secondary" style="margin-top:14px;" onclick="abrirFormularioFichaEquipo_(\'' + c.nombre + '\')">Editar</button>';
   tab.innerHTML = html;
 }
@@ -123,10 +182,11 @@ async function pintarTabHistorialEquipo_(nombre) {
 // ============ 2b. EDITAR / CREAR FICHA ============
 function abrirFormularioFichaEquipo_(nombre) {
   irA('screen-editar-equipo');
-  if (!nombre) { equipoCache.jornadaEdit = []; pintarFormularioFicha_(null, true); return; }
+  if (!nombre) { equipoCache.jornadaEdit = []; equipoCache.configPagoEdit = null; pintarFormularioFicha_(null, true); return; }
   const c = equipoCache.fichaActual && equipoCache.fichaActual.nombre === nombre ? equipoCache.fichaActual : null;
   if (!c) { irA('screen-equipo'); return; }
   equipoCache.jornadaEdit = (c.jornada || []).map(b => Object.assign({}, b));
+  equipoCache.configPagoEdit = c.configPago ? JSON.parse(JSON.stringify(c.configPago)) : null;
   pintarFormularioFicha_(c, false);
 }
 
@@ -144,10 +204,10 @@ function pintarFormularioFicha_(c, esNuevo) {
     '<div style="flex:1;"><label>Monto (semanal si Semanal; mensual si Quincenal/Mensual)</label><input type="number" id="fe-monto" value="' + val('monto', '') + '" oninput="pintarDesgloseMontoEquipo_()"></div>' +
     '</div>';
   html += '<div style="display:flex;gap:10px;">' +
-    '<div style="flex:1;"><label>Periodicidad</label><select id="fe-periodicidad" onchange="pintarDesgloseMontoEquipo_()">' +
+    '<div style="flex:1;"><label>Periodicidad</label><select id="fe-periodicidad" onchange="pintarDesgloseMontoEquipo_();pintarConfigPagoEquipo_()">' +
       ['Semanal', 'Quincenal', 'Mensual'].map(p => '<option ' + (val('periodicidad', 'Semanal') === p ? 'selected' : '') + '>' + p + '</option>').join('') +
       '</select></div>' +
-    '<div style="flex:1;"><label>Fecha de pago</label><input type="text" id="fe-diaspago" value="' + val('diasDePago', '') + '" placeholder="Ej: lunes, o 15 y 30"></div>' +
+    '<div style="flex:1;"><label>Fecha de pago</label><div id="fe-config-pago"></div></div>' +
     '</div>';
   html += '<div id="fe-desglose-monto" style="font-size:12.5px;color:var(--forest);background:var(--forest-soft);border-radius:8px;padding:8px 12px;margin-bottom:12px;"></div>';
   html += '<label>Modalidad de pago</label><select id="fe-unidad" onchange="pintarJornadaEquipo_()">' +
@@ -167,6 +227,50 @@ function pintarFormularioFicha_(c, esNuevo) {
   cont.innerHTML = html;
   pintarJornadaEquipo_();
   pintarDesgloseMontoEquipo_();
+  pintarConfigPagoEquipo_();
+}
+
+// Fecha de pago estructurada (Opción A, acordada con Osmar 29/07/2026): campos distintos
+// según periodicidad, en vez del texto libre que no se podía calcular como fecha real.
+function pintarConfigPagoEquipo_() {
+  const cont = document.getElementById('fe-config-pago');
+  if (!cont) return;
+  const periodicidad = document.getElementById('fe-periodicidad').value;
+  const cfg = equipoCache.configPagoEdit;
+  if (periodicidad === 'Semanal') {
+    const diaActual = (cfg && cfg.tipo === 'semanal') ? cfg.dia : 'Lun';
+    cont.innerHTML = '<select id="fe-pago-dia" onchange="actualizarConfigPagoEquipo_()">' +
+      DIAS_CHIPS_EQUIPO.map(d => '<option ' + (d === diaActual ? 'selected' : '') + '>' + d + '</option>').join('') + '</select>';
+  } else if (periodicidad === 'Quincenal') {
+    const dias = (cfg && cfg.tipo === 'quincenal' && cfg.dias) ? cfg.dias : [15, 30];
+    cont.innerHTML = '<div style="display:flex;gap:6px;align-items:center;">' +
+      '<input type="number" id="fe-pago-dia1" value="' + dias[0] + '" style="width:60px;" onchange="actualizarConfigPagoEquipo_()"> y ' +
+      '<input type="number" id="fe-pago-dia2" value="' + dias[1] + '" style="width:60px;" onchange="actualizarConfigPagoEquipo_()"></div>';
+  } else {
+    const esUltimo = cfg && cfg.tipo === 'mensual' && cfg.dia === 'ultimo';
+    const diaActual = (cfg && cfg.tipo === 'mensual' && !esUltimo) ? cfg.dia : 1;
+    cont.innerHTML = '<div style="display:flex;gap:6px;align-items:center;">' +
+      '<input type="number" id="fe-pago-diames" value="' + diaActual + '" style="width:60px;" ' + (esUltimo ? 'disabled' : '') + ' onchange="actualizarConfigPagoEquipo_()">' +
+      '<label style="display:flex;align-items:center;gap:4px;font-size:12px;font-weight:400;"><input type="checkbox" id="fe-pago-ultimo" ' + (esUltimo ? 'checked' : '') + ' onchange="toggleUltimoDiaEquipo_()" style="width:auto;"> Último día</label></div>';
+  }
+  actualizarConfigPagoEquipo_();
+}
+
+function toggleUltimoDiaEquipo_() {
+  document.getElementById('fe-pago-diames').disabled = document.getElementById('fe-pago-ultimo').checked;
+  actualizarConfigPagoEquipo_();
+}
+
+function actualizarConfigPagoEquipo_() {
+  const periodicidad = document.getElementById('fe-periodicidad').value;
+  if (periodicidad === 'Semanal') {
+    equipoCache.configPagoEdit = { tipo: 'semanal', dia: document.getElementById('fe-pago-dia').value };
+  } else if (periodicidad === 'Quincenal') {
+    equipoCache.configPagoEdit = { tipo: 'quincenal', dias: [num_(document.getElementById('fe-pago-dia1').value), num_(document.getElementById('fe-pago-dia2').value)] };
+  } else {
+    const ultimo = document.getElementById('fe-pago-ultimo').checked;
+    equipoCache.configPagoEdit = { tipo: 'mensual', dia: ultimo ? 'ultimo' : num_(document.getElementById('fe-pago-diames').value) };
+  }
 }
 
 function num_(v) { const n = Number(v); return isNaN(n) ? 0 : n; }
@@ -261,7 +365,7 @@ async function guardarFichaEquipo_(esNuevo, nombreOriginal) {
     negocio: document.getElementById('fe-negocio').value,
     monto: document.getElementById('fe-monto').value,
     periodicidad: document.getElementById('fe-periodicidad').value,
-    diasDePago: document.getElementById('fe-diaspago').value.trim(),
+    diasDePago: '', configPago: equipoCache.configPagoEdit,
     unidadDescuento: document.getElementById('fe-unidad').value,
     jornada: equipoCache.jornadaEdit
   };
@@ -389,12 +493,11 @@ async function abrirCierrePagoEquipo(nombre) {
   irA('screen-cierre-equipo');
   const cont = document.getElementById('cierre-equipo-cont');
   cont.innerHTML = skeletonCards(2);
-  const r = await llamarAPISilencioso('obtenerEquipo', {});
-  const info = (r.colaboradores || []).find(c => c.nombre === nombre) || {};
-  // obtenerEquipo entrega las fechas en formato CL (dd/MM/yyyy) — se convierten UNA vez a
-  // ISO para los <input type=date>, y de vuelta a CL solo al mandarlas al servidor.
-  const desdeISO = info.desde ? fechaCLaISO_(info.desde) : fechaLocalISO();
-  const hastaISO = info.hasta ? fechaCLaISO_(info.hasta) : fechaLocalISO();
+  const r = await llamarAPISilencioso('obtenerSugerenciaPeriodoPago', { colaborador: nombre });
+  // El backend entrega las fechas en formato CL (dd/MM/yyyy) — se convierten UNA vez a ISO
+  // para los <input type=date>, y de vuelta a CL solo al mandarlas al servidor.
+  const desdeISO = r && r.ok && r.desde ? fechaCLaISO_(r.desde) : fechaLocalISO();
+  const hastaISO = r && r.ok && r.hasta ? fechaCLaISO_(r.hasta) : fechaLocalISO();
   await pintarCierrePagoEquipo_(nombre, desdeISO, hastaISO);
 }
 
@@ -404,16 +507,21 @@ async function pintarCierrePagoEquipo_(nombre, desdeISO, hastaISO) {
   if (!r.ok) { cont.innerHTML = '<p class="error-msg">' + r.error + '</p>'; return; }
   const cierre = r.cierre;
   equipoCache.cierreActual = cierre;
+  const movs = cierre.movimientos || [];
+  const detalle = (tipo, color) => movs.filter(m => m.tipo === tipo).map(m =>
+    '<div style="font-size:12px;color:var(--ink-soft);padding-left:10px;margin-top:3px;">· ' + m.fecha + (m.observacion ? ' — ' + m.observacion : '') + ' · <span style="color:' + color + ';">' + fmt(m.monto) + '</span></div>').join('');
   cont.innerHTML =
     '<h2 style="font-size:17px;">Cierre de pago</h2><p style="font-size:12.5px;color:var(--ink-soft);margin-top:-6px;">' + nombre + '</p>' +
     '<div style="display:flex;gap:10px;">' +
       '<div style="flex:1;"><label>Desde</label><input type="date" id="ce-desde" value="' + desdeISO + '" onchange="recalcularCierrePagoEquipo_(\'' + nombre + '\')"></div>' +
       '<div style="flex:1;"><label>Hasta</label><input type="date" id="ce-hasta" value="' + hastaISO + '" onchange="recalcularCierrePagoEquipo_(\'' + nombre + '\')"></div>' +
     '</div>' +
-    '<div style="display:flex;justify-content:space-between;padding:9px 0;font-size:14px;"><span style="color:var(--ink-soft);">Base del período</span><span>' + fmt(cierre.base) + '</span></div>' +
-    '<div style="display:flex;justify-content:space-between;padding:9px 0;font-size:14px;"><span style="color:var(--ink-soft);">Ausencias</span><span style="color:var(--danger);">−' + fmt(cierre.ausencias) + '</span></div>' +
-    '<div style="display:flex;justify-content:space-between;padding:9px 0;font-size:14px;"><span style="color:var(--ink-soft);">Extras</span><span style="color:var(--success);">+' + fmt(cierre.extras) + '</span></div>' +
-    '<div style="display:flex;justify-content:space-between;padding:9px 0;font-size:14px;border-bottom:1px solid var(--border);"><span style="color:var(--ink-soft);">Anticipos</span><span style="color:var(--danger);">−' + fmt(cierre.anticipos) + '</span></div>' +
+    '<div style="padding:9px 0;font-size:14px;"><span style="color:var(--ink-soft);">Base del período</span><span style="float:right;">' + fmt(cierre.base) + '</span></div>' +
+    '<div style="padding:9px 0;font-size:14px;border-top:1px solid var(--border);"><span style="color:var(--ink-soft);">Ausencias (' + movs.filter(m => m.tipo === 'Ausencia').length + ')</span><span style="float:right;color:var(--danger);">−' + fmt(cierre.ausencias) + '</span>' + detalle('Ausencia', 'var(--danger)') + '</div>' +
+    '<div style="padding:9px 0;font-size:14px;border-top:1px solid var(--border);"><span style="color:var(--ink-soft);">Extras (' + movs.filter(m => m.tipo === 'Extra').length + ')</span><span style="float:right;color:var(--success);">+' + fmt(cierre.extras) + '</span>' + detalle('Extra', 'var(--success)') + '</div>' +
+    '<div style="padding:9px 0;font-size:14px;border-top:1px solid var(--border);border-bottom:1px solid var(--border);"><span style="color:var(--ink-soft);">Anticipos (' + movs.filter(m => m.tipo === 'Anticipo').length + ')</span><span style="float:right;color:var(--danger);">−' + fmt(cierre.anticipos) + '</span>' + detalle('Anticipo', 'var(--danger)') + '</div>' +
+    (movs.some(m => m.tipo === 'Licencia' || m.tipo === 'Vacaciones')
+      ? '<div style="padding:9px 0;font-size:12.5px;color:var(--ink-soft);">Licencia médica / Vacaciones — informativo, no descuenta' + detalle('Licencia', 'var(--ink-soft)') + detalle('Vacaciones', 'var(--ink-soft)') + '</div>' : '') +
     '<div style="display:flex;justify-content:space-between;padding:14px 0;font-size:17px;font-weight:700;"><span>A pagar</span><span>' + fmt(cierre.total) + '</span></div>' +
     '<div class="error-msg" id="ce-error"></div>' +
     '<button class="btn-primary" onclick="confirmarPagoEquipo_(\'' + nombre + '\')">Confirmar y registrar pago</button>' +
