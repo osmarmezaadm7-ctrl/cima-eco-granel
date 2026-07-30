@@ -424,6 +424,7 @@ const TIPOS_MOVIMIENTO_EQUIPO = [
 function abrirRegistrarMovimientoEquipo(nombre) {
   irA('screen-movimiento-equipo');
   equipoCache.tipoMovimientoActual = 'Ausencia';
+  equipoCache.modoAusencia = 'completo';
   pintarFormularioMovimientoEquipo_(nombre);
 }
 
@@ -438,7 +439,20 @@ function pintarFormularioMovimientoEquipo_(nombre) {
   html += '</div>';
   html += '<button type="button" class="btn-secondary' + (tipo === 'Anticipo' ? ' selected' : '') + '" style="' + (tipo === 'Anticipo' ? 'background:var(--forest);color:#fff;border-color:var(--forest);' : '') + '" onclick="cambiarTipoMovimientoEquipo_(\'Anticipo\',\'' + nombre + '\')">Anticipo</button>';
 
-  html += '<label style="margin-top:14px;">Día' + (tipo === 'Licencia' || tipo === 'Vacaciones' ? ' (desde)' : '') + '</label><input type="date" id="me-fecha" value="' + fechaLocalISO() + '">';
+  html += '<label style="margin-top:14px;">Día' + (tipo === 'Licencia' || tipo === 'Vacaciones' || (tipo === 'Ausencia' && equipoCache.modoAusencia !== 'horas') ? ' (desde)' : '') + '</label><input type="date" id="me-fecha" value="' + fechaLocalISO() + '">';
+
+  if (tipo === 'Ausencia') {
+    const modo = equipoCache.modoAusencia || 'completo';
+    html += '<label>¿Cómo fue la ausencia?</label><div class="toggle-group">' +
+      '<button type="button" class="' + (modo === 'completo' ? 'selected' : '') + '" onclick="cambiarModoAusenciaEquipo_(\'completo\',\'' + nombre + '\')">Día(s) completo(s)</button>' +
+      '<button type="button" class="' + (modo === 'horas' ? 'selected' : '') + '" onclick="cambiarModoAusenciaEquipo_(\'horas\',\'' + nombre + '\')">Algunas horas</button>' +
+    '</div>';
+    if (modo === 'completo') {
+      html += '<label>Hasta</label><input type="date" id="me-fecha-hasta" value="' + fechaLocalISO() + '">';
+    } else {
+      html += '<label>Horas que faltó</label><input type="number" id="me-horas-ausencia" placeholder="ej. 2">';
+    }
+  }
   if (tipo === 'Licencia' || tipo === 'Vacaciones') {
     html += '<label>Hasta</label><input type="date" id="me-fecha-hasta" value="' + fechaLocalISO() + '">';
   }
@@ -461,6 +475,12 @@ function pintarFormularioMovimientoEquipo_(nombre) {
 
 function cambiarTipoMovimientoEquipo_(tipo, nombre) {
   equipoCache.tipoMovimientoActual = tipo;
+  if (tipo === 'Ausencia') equipoCache.modoAusencia = 'completo';
+  pintarFormularioMovimientoEquipo_(nombre);
+}
+
+function cambiarModoAusenciaEquipo_(modo, nombre) {
+  equipoCache.modoAusencia = modo;
   pintarFormularioMovimientoEquipo_(nombre);
 }
 
@@ -471,6 +491,11 @@ async function guardarMovimientoEquipo_(nombre) {
   const d = { colaborador: nombre, fecha: document.getElementById('me-fecha').value, tipo: tipo,
     observacion: document.getElementById('me-observacion').value.trim() };
   if (tipo === 'Licencia' || tipo === 'Vacaciones') d.fechaHasta = document.getElementById('me-fecha-hasta').value;
+  if (tipo === 'Ausencia') {
+    d.modoAusencia = equipoCache.modoAusencia || 'completo';
+    if (d.modoAusencia === 'completo') d.fechaHasta = document.getElementById('me-fecha-hasta').value;
+    else d.horas = document.getElementById('me-horas-ausencia').value;
+  }
   if (tipo === 'Anticipo') d.monto = document.getElementById('me-monto-anticipo').value;
   const horasEl = document.getElementById('me-horas-extra');
   if (horasEl) d.horas = horasEl.value;
@@ -540,6 +565,7 @@ async function pintarCierrePagoEquipo_(nombre, desdeISO, hastaISO) {
     (movs.some(m => m.tipo === 'Licencia' || m.tipo === 'Vacaciones')
       ? '<div style="padding:9px 0;font-size:12.5px;color:var(--ink-soft);">Licencia médica / Vacaciones — informativo, no descuenta' + detalle('Licencia', 'var(--ink-soft)') + detalle('Vacaciones', 'var(--ink-soft)') + '</div>' : '') +
     '<div style="display:flex;justify-content:space-between;padding:14px 0;font-size:17px;font-weight:700;"><span>A pagar</span><span>' + fmt(cierre.total) + '</span></div>' +
+    '<label>Medio de pago</label><select id="ce-medio"><option>Transferencia</option><option>Efectivo</option></select>' +
     '<div class="error-msg" id="ce-error"></div>' +
     '<button class="btn-primary" onclick="confirmarPagoEquipo_(\'' + nombre + '\')">Confirmar y registrar pago</button>' +
     '<p style="font-size:12px;color:var(--ink-soft);text-align:center;margin-top:8px;">Queda guardado y visible para ' + nombre.split(' ')[0] + '</p>';
@@ -552,7 +578,7 @@ async function recalcularCierrePagoEquipo_(nombre) {
 async function confirmarPagoEquipo_(nombre) {
   const err = document.getElementById('ce-error'); err.textContent = '';
   const c = equipoCache.cierreActual;
-  const r = await llamarAPI('confirmarPago', { data: { colaborador: nombre, desde: c.desde, hasta: c.hasta, base: c.base, ausencias: c.ausencias, extras: c.extras, anticipos: c.anticipos, total: c.total } });
+  const r = await llamarAPI('confirmarPago', { data: { colaborador: nombre, desde: c.desde, hasta: c.hasta, base: c.base, ausencias: c.ausencias, extras: c.extras, anticipos: c.anticipos, total: c.total, medioPago: document.getElementById('ce-medio').value } });
   if (!r.ok) { err.textContent = r.error; return; }
   equipoCache.lista = null;
   document.getElementById('confirm-title').textContent = 'Pago confirmado';
