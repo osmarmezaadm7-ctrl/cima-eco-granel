@@ -108,9 +108,9 @@ function pintarFichaEquipo_(c, calc) {
       '<div><div style="font-weight:700;font-size:19px;">' + c.nombre + '</div><div style="font-size:13.5px;color:var(--ink-soft);">' + c.negocio + '</div></div>' +
     '</div>' +
     '<div class="kpi-row" style="grid-template-columns:repeat(3,1fr);">' +
-      '<div class="kpi"><div class="lbl">Próximo pago</div><div class="val" style="font-size:19px;">' + proximoPagoTxt + '</div><div style="font-size:11.5px;color:var(--ink-soft);margin-top:2px;">' + proximoPagoSub + '</div></div>' +
-      '<div class="kpi"><div class="lbl">Jornada</div><div class="val" style="font-size:19px;">' + horasSemana + 'h</div><div style="font-size:11.5px;color:var(--ink-soft);margin-top:2px;">por semana</div></div>' +
-      '<div class="kpi"><div class="lbl">Modalidad</div><div class="val" style="font-size:19px;">' + modalidadVal + '</div><div style="font-size:11.5px;color:var(--ink-soft);margin-top:2px;">' + modalidadSub + '</div></div>' +
+      '<div class="kpi"><div class="lbl" style="min-height:30px;display:flex;align-items:flex-start;">Próximo pago</div><div class="val" style="font-size:19px;">' + proximoPagoTxt + '</div><div style="font-size:11.5px;color:var(--ink-soft);margin-top:2px;">' + proximoPagoSub + '</div></div>' +
+      '<div class="kpi"><div class="lbl" style="min-height:30px;display:flex;align-items:flex-start;">Jornada</div><div class="val" style="font-size:19px;">' + horasSemana + 'h</div><div style="font-size:11.5px;color:var(--ink-soft);margin-top:2px;">por semana</div></div>' +
+      '<div class="kpi"><div class="lbl" style="min-height:30px;display:flex;align-items:flex-start;">Modalidad</div><div class="val" style="font-size:19px;">' + modalidadVal + '</div><div style="font-size:11.5px;color:var(--ink-soft);margin-top:2px;">' + modalidadSub + '</div></div>' +
     '</div>' +
     '<div class="pillbar" style="margin-top:16px;">' +
       '<button class="' + (equipoCache.fichaTabActual === 'datos' ? 'sel' : '') + '" onclick="cambiarTabFichaEquipo_(\'datos\')">Datos</button>' +
@@ -155,16 +155,28 @@ function pintarTabDatosEquipo_(c, calc) {
 
   html += '<div style="font-size:11px;text-transform:uppercase;letter-spacing:.4px;color:var(--ink-soft);margin:16px 0 6px;">Jornada</div>';
   (c.jornada || []).forEach(b => {
-    const dias = b.dias.join(' · ');
+    const chips = b.dias.map(d => '<span class="chip-sub activo" style="padding:3px 9px;font-size:12.5px;">' + d + '</span>').join('');
     const horario = (b.horaInicio != null && b.horaFin != null) ? b.horaInicio + ':00–' + b.horaFin + ':00' : 'sin horario fijo';
     const colacion = num_(b.colacionMin) > 0 ? b.colacionMin + ' min colación' : 'sin colación';
-    html += tarjetaIconoEquipo_(ICONO_EQUIPO_RELOJ, dias, horario + ' · ' + colacion, b.horas + 'h', 'netas');
+    html += '<div style="display:flex;align-items:flex-start;gap:12px;background:var(--paper);border-radius:10px;padding:12px 14px;margin-bottom:8px;">' +
+      '<div style="margin-top:2px;flex-shrink:0;">' + ICONO_EQUIPO_RELOJ + '</div>' +
+      '<div style="flex:1;min-width:0;">' +
+        '<div style="display:flex;flex-wrap:wrap;gap:5px;">' + chips + '</div>' +
+        '<div style="font-size:12.5px;color:var(--ink-soft);margin-top:6px;">' + horario + ' · ' + colacion + '</div>' +
+      '</div>' +
+      '<div style="text-align:right;flex-shrink:0;"><div class="mono" style="font-size:17px;font-weight:700;">' + b.horas + 'h</div><div style="font-size:10.5px;color:var(--ink-soft);">netas</div></div>' +
+    '</div>';
   });
 
+  // Pago: ya no repite el monto (eso vive en el KPI "Próximo pago" de arriba). Acá solo
+  // lo que el KPI no tiene: la cadencia y el corte. Para Quincenal se agrega el total
+  // mensual como dato secundario, porque no aparece en ninguna otra parte de la ficha.
   html += '<div style="font-size:11px;text-transform:uppercase;letter-spacing:.4px;color:var(--ink-soft);margin:16px 0 6px;">Pago</div>';
-  const pagoSub = c.periodicidad === 'Semanal' ? 'a la semana' : 'al mes';
-  const pagoNumSub = c.periodicidad === 'Quincenal' ? '→ ' + fmt(c.monto / 2) + '/quinc.' : 'vence ' + c.diasDePago;
-  html += tarjetaIconoEquipo_(ICONO_EQUIPO_MONTO, fmt(c.monto), pagoSub, c.periodicidad, c.periodicidad === 'Quincenal' ? pagoNumSub : 'vence ' + c.diasDePago);
+  html += '<div class="rowline"><span>Periodicidad</span><span>' + c.periodicidad + '</span></div>';
+  html += '<div class="rowline"><span>Corte</span><span>vence ' + (c.diasDePago || '—') + '</span></div>';
+  if (c.periodicidad === 'Quincenal') {
+    html += '<div class="rowline"><span>Total mensual</span><span class="mono">' + fmt(c.monto) + '</span></div>';
+  }
 
   html += '<button type="button" class="btn-secondary" style="margin-top:14px;" onclick="abrirFormularioFichaEquipo_(\'' + c.nombre + '\')">Editar</button>';
   tab.innerHTML = html;
