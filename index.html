@@ -1740,11 +1740,18 @@ function agregarBloqueAbastecimiento(cont) {
 // NUEVO 29/07/2026 (con Osmar — bugfix: mismo problema que tuvo Abastecimiento el
 // 21/07/2026: la tarjeta de Equipo solo se había agregado al sidebar de escritorio,
 // nunca a la grilla del Home móvil). Mismo patrón que agregarBloqueAbastecimiento.
-function agregarBloqueEquipo(cont) {
-  cont.insertAdjacentHTML('beforeend','<div class="menu-grupo-titulo">Equipo</div>');
+// CORREGIDO el mismo día: no basta con "no tiene GestionarEquipo" para mostrar "Mi pago"
+// — Rocío (Manager, sin ficha porque no recibe sueldo por acá) la veía igual. Ahora se
+// confirma con el backend que la persona tenga una ficha real antes de mostrar la tarjeta.
+async function agregarBloqueEquipo(cont) {
   if (tienePermisoLocal('GestionarEquipo')) {
+    cont.insertAdjacentHTML('beforeend','<div class="menu-grupo-titulo">Equipo</div>');
     cont.appendChild(crearMenuCard(ICONS.remuneraciones,'Equipo','Fichas, pagos y comunicados',()=>abrirEquipo(),true,'neutral'));
-  } else {
+    return;
+  }
+  const r = await llamarAPISilencioso('obtenerMiPago', {});
+  if (r && r.ok) {
+    cont.insertAdjacentHTML('beforeend','<div class="menu-grupo-titulo">Equipo</div>');
     cont.appendChild(crearMenuCard(ICONS.remuneraciones,'Mi pago','Detalle de tu pago del período',()=>abrirMiPago(),true,'neutral'));
   }
 }
@@ -1779,7 +1786,7 @@ function agregarBloqueEquipo(cont) {
     }
     agregarBloqueProduccion(cont); bloqueProduccionAgregado = true;
     agregarBloqueAbastecimiento(cont); bloqueAbastecimientoAgregado = true;
-    agregarBloqueEquipo(cont); bloqueEquipoAgregado = true;
+    await agregarBloqueEquipo(cont); bloqueEquipoAgregado = true;
     if (tienePermisoLocal('ConfigurarSistema')){
       cont.insertAdjacentHTML('beforeend','<div class="menu-grupo-titulo">Configuraciones</div>');
       cont.appendChild(crearMenuCardChica(ICONS.banco,'Créditos',()=>abrirCreditos()));
@@ -1803,7 +1810,7 @@ function agregarBloqueEquipo(cont) {
   // relativa de siempre, ya que esas ramas no tienen sección de Configuraciones.
   if (!bloqueProduccionAgregado) agregarBloqueProduccion(cont);
   if (!bloqueAbastecimientoAgregado) agregarBloqueAbastecimiento(cont);
-  if (!bloqueEquipoAgregado) agregarBloqueEquipo(cont);
+  if (!bloqueEquipoAgregado) await agregarBloqueEquipo(cont);
 
   if (esEscritorio && tienePermisoLocal('VerDashboardCompleto')) { abrirPanel(); return; }
   if (esEscritorio && tienePermisoLocal('VisualizarReportes')) { abrirEstadoResultados(); return; }
@@ -1870,8 +1877,16 @@ function pintarSidebar(){
   nav.insertAdjacentHTML('beforeend', '<div class="grupo">CRM</div>'+itemProx(ICONS.crm,'Clientes'));
   // NUEVO 28/07/2026 (con Osmar — módulo Equipo): reemplaza el stub "Remuneraciones/Sueldos
   // (Próximamente)". Quien administra ve la lista del equipo; el resto ve solo su propio pago.
-  if (tienePermisoLocal('GestionarEquipo')) nav.insertAdjacentHTML('beforeend', '<div class="grupo">Equipo</div>'+item('screen-equipo',ICONS.remuneraciones,'Equipo'));
-  else nav.insertAdjacentHTML('beforeend', '<div class="grupo">Equipo</div>'+item('screen-mi-pago',ICONS.remuneraciones,'Mi pago'));
+  // CORREGIDO 29/07/2026: antes se mostraba "Mi pago" a cualquiera sin GestionarEquipo, sin
+  // verificar que tuviera ficha — Rocío (Manager, sin ficha en Colaboradores porque no recibe
+  // sueldo por acá) veía igual la opción. Ahora se confirma con el backend antes de mostrarla.
+  if (tienePermisoLocal('GestionarEquipo')) {
+    nav.insertAdjacentHTML('beforeend', '<div class="grupo">Equipo</div>'+item('screen-equipo',ICONS.remuneraciones,'Equipo'));
+  } else {
+    llamarAPISilencioso('obtenerMiPago', {}).then(r => {
+      if (r && r.ok) nav.insertAdjacentHTML('beforeend', '<div class="grupo">Equipo</div>'+item('screen-mi-pago',ICONS.remuneraciones,'Mi pago'));
+    });
+  }
 
   let confHtml='';
   if (tienePermisoLocal('ConfigurarSistema')) confHtml += item('screen-creditos',ICONS.banco,'Créditos') + item('screen-permisos',ICONS.usuarios,'Usuarios y permisos') + item('screen-config-sistema',ICONS.config,'Tolerancia y configuración');
@@ -1991,7 +2006,11 @@ function renderComparativaCards(cima, vegan){
 function pintarPanel(r, anio, mes){
   const c = document.getElementById('panel-contenido');
   const alertIcon = '<div class="a-ico"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 9v4M12 17h.01M10.3 3.9L2.6 17a2 2 0 0 0 1.7 3h15.4a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"></path></svg></div>';
-  const alertasHtml = (r.alertas||[]).slice(0,4).map(a=>'<div class="tag-alert">'+alertIcon+'<span>'+a.categoria+' — dif. '+fmt(Math.abs(a.diferencia))+'</span></div>').join('') || '<span style="font-size:13px;color:var(--ink-soft);">Sin alertas pendientes.</span>';
+  const alertasHtml = (r.alertas||[]).slice(0,4).map(a=>
+    a.tipo === 'pago'
+      ? '<div class="tag-alert" style="cursor:pointer;" onclick="abrirEquipo();">'+alertIcon+'<span>'+a.categoria+' — '+fmt(a.monto)+(a.diasParaVencer===0?' (hoy)':a.diasParaVencer<0?' (atrasado)':'')+'</span></div>'
+      : '<div class="tag-alert">'+alertIcon+'<span>'+a.categoria+' — dif. '+fmt(Math.abs(a.diferencia))+'</span></div>'
+  ).join('') || '<span style="font-size:13px;color:var(--ink-soft);">Sin alertas pendientes.</span>';
   const cxp = r.cuentasPorPagar||{total:0,cantidad:0};
   const cima = r.porNegocio.cima, vegan = r.porNegocio.vegan;
 
