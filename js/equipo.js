@@ -100,7 +100,7 @@ function pintarFichaEquipo_(c, calc) {
   const proximoPagoTxt = rec ? fmt(rec.monto) : '—';
   const proximoPagoSub = rec ? rec.fechaVencimiento : c.diasDePago;
   const horasSemana = (c.jornada || []).reduce((s, b) => s + b.dias.length * num_(b.horas), 0);
-  const modalidadVal = c.unidadDescuento === 'hora' ? fmt(calc.valorHora) + '/h' : fmt(calc.valorDia) + '/día';
+  const modalidadVal = c.unidadDescuento === 'hora' ? fmt(calc.valorHora) : fmt(calc.valorDia);
   const modalidadSub = c.unidadDescuento === 'hora' ? 'Por hora' : 'Por día';
   let html =
     '<div style="display:flex;align-items:center;gap:14px;margin-bottom:18px;">' +
