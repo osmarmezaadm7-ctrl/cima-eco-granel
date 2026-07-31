@@ -2277,7 +2277,7 @@ async function cargarClientes(){
   if(cacheClientes.length) return;
   const r = await llamarAPI('listarClientes',{});
   cacheClientes = (r.clientes&&r.clientes.length)?r.clientes:[{nombre:'Dulce Luna'},{nombre:'Almacén Central'},{nombre:'La Astilla'},{nombre:'Casa de la Masa'}];
-  initSearchSelect('ss-vv-cliente', cacheClientes.map(c=>({value:c.nombre, label:c.nombre})), {
+  initSearchSelect('ss-vv-cliente', cacheClientes.map(c=>({value:c.alias||c.nombre, label:c.alias||c.nombre})), {
     incluirNuevo: true,
     onSelect: (v)=>{ if(v==='__nuevo__'){ document.querySelector('#ss-vv-cliente input[type=text]').value=''; abrirModalCliente(); } }
   });
