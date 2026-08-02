@@ -196,38 +196,58 @@ function ivcHtmlDetalleIngreso_(detalle){
   return h + '</tbody></table></details>';
 }
 
-// Secciones Movimiento + Merma (compartidas entre Revisión y proceso cerrado).
+// Movimiento de stock (con Osmar, 02/08/2026): tabla única — Inicial/Entró/Retiro/Vendió/Queda —
+// sin sección de Merma aparte. Las filas confiables se muestran siempre, la fila que no calza se
+// marca ahí mismo (no hace falta una tabla adicional para eso). Las filas sin conteo de cierre
+// exacto NO se muestran por defecto (distorsionan el informe) — quedan colapsadas detrás de un
+// aviso, con opción de "Ver igual" para quien quiera revisar los números crudos igual.
 function ivcHtmlMovimientoMerma_(r){
   var mov = r.movimiento || [];
+  var sinConteo = r.sinConteo || [];
   var html = '';
 
-  // Movimiento
-  var filasMov = '';
-  mov.forEach(function(m){
-    filasMov += '<tr><td>' + m.producto + '</td><td class="r">' + m.entro + '</td><td class="r">' + m.vendio + '</td><td class="r">' + (m.queda === null ? '—' : m.queda) + '</td></tr>';
-  });
-  html += ivcSeccion_('Movimiento <span class="ivc-sec-sub">entró · vendió · queda</span>', '#A9825B',
-    '<details class="ivc-detalle" open><summary>' + mov.length + ' productos</summary>' +
-    '<table class="ivc-tabla ivc-tabla-mov"><thead><tr><th>Producto</th><th class="r">Entró</th><th class="r">Vendió</th><th class="r">Queda</th></tr></thead><tbody>' +
-    (filasMov || '<tr><td colspan="4" style="text-align:center;color:var(--ink-soft);">Sin movimiento en el período</td></tr>') +
-    '</tbody></table></details>');
+  function filaTd(m, marcada){
+    return '<tr' + (marcada ? ' class="ivc-fila-excepcion"' : '') + '>' +
+      '<td>' + m.producto + '</td>' +
+      '<td class="r mono">' + (m.inicial === null ? '—' : m.inicial) + '</td>' +
+      '<td class="r mono">' + m.entro + '</td>' +
+      '<td class="r mono">' + m.retirado + '</td>' +
+      '<td class="r mono">' + m.vendio + '</td>' +
+      '<td class="r mono">' + (m.queda === null ? '—' : m.queda) + '</td>' +
+      '</tr>';
+  }
 
-  // Merma
-  var filasMerma = '';
-  mov.forEach(function(m){
-    if(m.estado === 'revisar'){
-      filasMerma += '<tr class="ivc-fila-revisar"><td>' + m.producto + '</td><td class="r">' + (m.salidas === null ? '—' : m.salidas) + '</td><td class="r">' + m.vendio + '</td><td class="r"><b>revisar</b></td></tr>';
-    } else if(m.merma && m.merma !== 0){
-      filasMerma += '<tr><td>' + m.producto + '</td><td class="r">' + m.salidas + '</td><td class="r">' + m.vendio + '</td><td class="r ivc-merma-n">' + m.merma + '</td></tr>';
-    }
-  });
-  var mermaBody =
-    '<div class="ivc-merma-total"><span>Merma valorizada del período</span><b>' + fmt(r.mermaTotal || 0) + '</b></div>' +
-    (filasMerma ?
-      ('<table class="ivc-tabla ivc-tabla-mov"><thead><tr><th>Producto</th><th class="r">Salió</th><th class="r">Vendió</th><th class="r">Merma</th></tr></thead><tbody>' + filasMerma + '</tbody></table>')
-      : '<p style="font-size:12.5px;color:var(--ink-soft);margin:8px 0 0;">Sin merma detectada en el período.</p>') +
-    (r.hayRevisar ? '<p class="ivc-nota" style="margin-top:8px;"><i>"revisar" = el stock no calza; puede ser un conteo o una entrada sin registrar.</i></p>' : '');
-  html += ivcSeccion_('Merma <span class="ivc-badge-ref">referencial · no bloquea</span>', '#BE5A2B', mermaBody);
+  var cabecera = '<tr><th>Producto</th><th class="r">Inicial</th><th class="r">Entró</th><th class="r">Retiro</th><th class="r">Vendió</th><th class="r">Queda</th></tr>';
+
+  if (mov.length) {
+    var filasMov = mov.map(function(m){ return filaTd(m, m.estado === 'excepcion'); }).join('');
+    html += ivcSeccion_('Movimiento de stock', '#A9825B',
+      '<div class="ivc-tscroll"><table class="ivc-tabla ivc-tabla-mov"><thead>' + cabecera + '</thead><tbody>' + filasMov + '</tbody></table></div>' +
+      '<div class="ivc-merma-total"><span>Merma valorizada del período</span><b>' + fmt(r.mermaTotal || 0) + '</b></div>');
+  }
+
+  if (sinConteo.length) {
+    var filasSin = sinConteo.map(function(m){ return filaTd(m, false); }).join('');
+    var faltaMsg = r.ultimoConteoFecha
+      ? 'Sin datos confiables para ' + sinConteo.length + ' producto(s) — el último conteo es del <b>' + r.ultimoConteoFecha + '</b>, no cae en el cierre del período.'
+      : 'Sin datos confiables para ' + sinConteo.length + ' producto(s) — no hay conteo de stock registrado.';
+    var bloqueSinConteo =
+      '<details class="ivc-detalle-aviso">' +
+        '<summary>' +
+          ICONS.alerta +
+          '<p>' + faltaMsg + '</p>' +
+          '<span class="ivc-ver-igual">Ver igual</span>' +
+        '</summary>' +
+        '<div class="ivc-tscroll"><table class="ivc-tabla ivc-tabla-mov"><thead>' + cabecera + '</thead><tbody>' + filasSin + '</tbody></table></div>' +
+        '<p class="ivc-nota-cruda">Estos números no cierran entre sí — falta el conteo de cierre exacto. No se puede calcular una merma confiable con esta tabla.</p>' +
+      '</details>';
+    html += ivcSeccion_('Movimiento de stock' + (mov.length ? ' (resto del período)' : ''), '#A9825B', bloqueSinConteo);
+  }
+
+  if (!mov.length && !sinConteo.length) {
+    html += ivcSeccion_('Movimiento de stock', '#A9825B',
+      '<p style="text-align:center;color:var(--ink-soft);font-size:13px;">Sin movimiento en el período</p>');
+  }
 
   return html;
 }
