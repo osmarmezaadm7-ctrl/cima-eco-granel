@@ -1698,10 +1698,15 @@ document.addEventListener('keydown', (e)=>{
   else if(e.key==='Enter' && pinBuffer.length===4){ intentarLogin(); }
 });
 async function intentarLogin(){
-  const r = await llamarAPI('login', {nombre:usuarioSeleccionado.nombre, pin:pinBuffer});
+  // FUSIÓN LOGIN + INICIO (03/08/2026, con Osmar): el login ahora trae también permisos y
+  // panel (antes eran dos llamadas seguidas, con dos spinners y un parpadeo entre ambas donde
+  // asomaba el PIN). Se manda esEscritorio para que el backend arme el panel si corresponde,
+  // y la respuesta se pasa entera a entrarAHome — sin segunda llamada.
+  const esEscritorio = window.innerWidth >= 900;
+  const r = await llamarAPI('login', {nombre:usuarioSeleccionado.nombre, pin:pinBuffer, esEscritorio});
   if(r && r.ok && r.usuario && r.usuario.nombre){
     sesion=r.usuario;
-    await entrarAHome();
+    await entrarAHome(r);
   } else {
     document.getElementById('pin-error').textContent = (r && r.error) || 'PIN incorrecto o la respuesta del servidor no trajo el usuario esperado';
     pinBuffer=''; pintarPinDots();
@@ -1723,11 +1728,15 @@ async function guardarCambioPin(){
   else document.getElementById('cp-error').textContent=r.error||'No se pudo cambiar el PIN';
 }
 
-async function entrarAHome(){
+async function entrarAHome(inicio){
   document.getElementById('home-nombre').textContent = sesion.nombre;
   cargarNotificaciones();
   const esEscritorio = window.innerWidth >= 900;
-  const ri = await llamarAPI('obtenerInicio', {esEscritorio});
+  // inicio: la respuesta del login ya trae permisos + panel (fusión login+inicio). Si por
+  // algún motivo no vienen (ej. un despliegue viejo cacheado que aún responde el login
+  // antiguo sin permisos), se cae al comportamiento anterior — se piden con obtenerInicio.
+  // Así el despliegue nunca deja a nadie a medias.
+  const ri = (inicio && inicio.permisos) ? inicio : await llamarAPI('obtenerInicio', {esEscritorio});
   permisosSesion = {};
   (ri.permisos||[]).filter(p=>p.nombre===sesion.nombre).forEach(p=>{ permisosSesion[p.accion]=p.permitido; });
   if(esEscritorio && ri.panel){
