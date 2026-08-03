@@ -1706,6 +1706,12 @@ async function intentarLogin(){
   const r = await llamarAPI('login', {nombre:usuarioSeleccionado.nombre, pin:pinBuffer, esEscritorio});
   if(r && r.ok && r.usuario && r.usuario.nombre){
     sesion=r.usuario;
+    // Cambiar a home ANTES de que entrarAHome haga su trabajo. El overlay del login se apaga
+    // apenas responde (dentro de llamarAPI); si el cambio de pantalla ocurriera después,
+    // durante ese instante quedaría visible el PIN por debajo del overlay que se apaga
+    // (el "vuelve al login un momento"). Cambiando acá, cuando el overlay se apaga lo que hay
+    // debajo ya es el home. Va SOLO dentro del if(ok) — si el PIN falla, no se cambia.
+    irA('screen-home');
     await entrarAHome(r);
   } else {
     document.getElementById('pin-error').textContent = (r && r.error) || 'PIN incorrecto o la respuesta del servidor no trajo el usuario esperado';
