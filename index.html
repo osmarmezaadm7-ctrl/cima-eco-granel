@@ -1433,17 +1433,37 @@ function fmtCompacto(n){
 function tienePermisoLocal(accion){ return !!permisosSesion[accion]; }
 function skeletonCards(n){ let h=''; for(let i=0;i<(n||3);i++) h+='<div class="skel-line skel-card"></div>'; return h; }
 
+// Reintento por "cold start" de Apps Script (03/08/2026, con Osmar): tras un rato de
+// inactividad, la primera petición a veces devuelve HTML (una página intermedia de Google)
+// en vez de ejecutar el script — el navegador recibe algo que no parsea como JSON, o el
+// fetch mismo falla de red. La firma de ese caso es siempre la misma: o revienta res.json(),
+// o revienta el fetch. Cuando eso pasa, se reintenta UNA sola vez tras una pequeña espera
+// (el contenedor alcanza a despertar). NO se reintenta si el servidor respondió JSON válido
+// (aunque sea {ok:false}: eso es un error real de negocio, no un cold start). Devuelve el
+// objeto ya parseado, o null si ambos intentos fallaron (el llamador arma el mensaje).
+async function fetchConReintento_(accion, extra){
+  const solicitante = (sesion && sesion.nombre) ? sesion.nombre : null;
+  const cuerpo = JSON.stringify(Object.assign({accion:accion, solicitante:solicitante}, extra));
+  const opciones = { method:'POST', headers:{'Content-Type':'text/plain;charset=utf-8'}, body: cuerpo };
+  for (let intento = 0; intento < 2; intento++){
+    if (intento > 0) await new Promise(r=>setTimeout(r,1200)); // respiro para que el contenedor despierte
+    try {
+      const res = await fetch(CONFIG.API_URL, opciones);
+      return await res.json(); // si parsea, es respuesta real del script — se devuelve aunque sea {ok:false}
+    } catch(e){
+      if (intento === 1) throw e; // segundo intento también falló: que el llamador maneje el error
+      // primer intento falló (no-JSON o error de red = firma de cold start): reintentar
+    }
+  }
+}
+
 async function llamarAPI(accion, extra){
   document.getElementById('loading-overlay').classList.add('active');
   try{
     if (modoDemo){ await new Promise(r=>setTimeout(r,280)); return simularAPI(accion, extra); }
-    const solicitante = (sesion && sesion.nombre) ? sesion.nombre : null;
-    const res = await fetch(CONFIG.API_URL, { method:'POST', headers:{'Content-Type':'text/plain;charset=utf-8'}, body: JSON.stringify(Object.assign({accion:accion, solicitante:solicitante}, extra)) });
-    let r;
-    try { r = await res.json(); } catch(e){ return { ok:false, error:'El servidor respondió algo que no es JSON válido (revisa que el despliegue de Apps Script esté activo y accesible)' }; }
-    return r;
+    return await fetchConReintento_(accion, extra);
   } catch(e){
-    return { ok:false, error:'No se pudo conectar con el servidor: '+e.message };
+    return { ok:false, error:'El servidor respondió algo que no es JSON válido (revisa que el despliegue de Apps Script esté activo y accesible)' };
   } finally {
     document.getElementById('loading-overlay').classList.remove('active');
   }
@@ -1452,13 +1472,9 @@ async function llamarAPI(accion, extra){
 async function llamarAPISilencioso(accion, extra){
   try{
     if (modoDemo){ await new Promise(r=>setTimeout(r,280)); return simularAPI(accion, extra); }
-    const solicitante = (sesion && sesion.nombre) ? sesion.nombre : null;
-    const res = await fetch(CONFIG.API_URL, { method:'POST', headers:{'Content-Type':'text/plain;charset=utf-8'}, body: JSON.stringify(Object.assign({accion:accion, solicitante:solicitante}, extra)) });
-    let r;
-    try { r = await res.json(); } catch(e){ return { ok:false, error:'El servidor respondió algo que no es JSON válido' }; }
-    return r;
+    return await fetchConReintento_(accion, extra);
   } catch(e){
-    return { ok:false, error:'No se pudo conectar con el servidor: '+e.message };
+    return { ok:false, error:'El servidor respondió algo que no es JSON válido' };
   }
 }
 
