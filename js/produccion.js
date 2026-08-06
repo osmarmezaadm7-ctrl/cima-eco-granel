@@ -607,23 +607,50 @@ function pintarResumenConteo(productos) {
     productos.length + ' producto' + (productos.length === 1 ? '' : 's') + ' · ' + totalUnidades + ' unidad' + (totalUnidades === 1 ? '' : 'es') + ' en total';
 }
 
+// Banner verde de éxito tras guardar el stock congelado de VC. Reusa la clase real
+// .ivc-cerrado-banner (verde de "guardado/cerrado" ya usada en el sistema). Trae el botón
+// "Volver al inicio"; si no se toca nada, se auto-oculta a los 3s y deja al usuario en la
+// pantalla de Contar stock ya actualizada. El timer se guarda para no encimar dos.
+let bannerStockOkTimer_ = null;
+function mostrarBannerStockOk_() {
+  const cont = document.getElementById('conteo-banner-ok');
+  if (!cont) return;
+  cont.innerHTML =
+    '<div class="ivc-cerrado-banner" style="justify-content:space-between;">' +
+      '<div style="display:flex;align-items:center;gap:10px;">' +
+        '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#27500A" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"></path></svg>' +
+        '<div><b>Guardado con éxito</b><span>Tu stock quedó actualizado.</span></div>' +
+      '</div>' +
+      '<button class="aviso-accion" onclick="irA(\'screen-home\')">Volver al inicio</button>' +
+    '</div>';
+  cont.style.display = '';
+  if (bannerStockOkTimer_) clearTimeout(bannerStockOkTimer_);
+  bannerStockOkTimer_ = setTimeout(() => { cont.style.display = 'none'; cont.innerHTML = ''; }, 3000);
+}
+
 async function confirmarGuardarConteo() {
   document.getElementById('resumen-conteo-error').textContent = '';
 
   if (resumenConteoOrigenVC) {
-    for (const p of resumenConteoProductos) {
-      const r = await llamarAPI('actualizarStockCongeladoVC', { data: { producto: p.productoProduccion, stockActual: p.cantidadContada, responsable: sesion.nombre } });
-      if (!r.ok) { document.getElementById('resumen-conteo-error').textContent = r.error || 'Error al guardar el stock'; return; }
-    }
+    // GUARDADO EN LOTE (03/08/2026, con Osmar): antes esto era un bucle de N llamadas HTTP
+    // en serie (una por empanada) + limpiarBorrador — el "carga largo". Ahora es UNA sola
+    // llamada con todas las empanadas. Tras guardar: se refresca el catálogo para que los
+    // valores sean los reales recién guardados (antes quedaba el catálogo viejo en memoria y
+    // al reentrar sin recargar la página aparecía 0 en todo), se vuelve a la pantalla de
+    // stock ya actualizada, y se muestra un banner verde de éxito que se auto-oculta a los 3s.
+    const items = resumenConteoProductos.map(p => ({ producto: p.productoProduccion, stockActual: p.cantidadContada }));
+    const r = await llamarAPI('actualizarStockCongeladoVCLote', { data: { items: items, responsable: sesion.nombre } });
+    if (!r.ok) { document.getElementById('resumen-conteo-error').textContent = r.error || 'Error al guardar el stock'; return; }
     conteoCantidades = {};
-    // El conteo quedó registrado: el borrador ya no tiene razón de existir. Si no se
-    // limpiara, el próximo que entre a Conteo vería el aviso de un conteo YA confirmado.
     await llamarAPISilencioso('limpiarBorradorConteo', { negocio: negocioConteo_() });
-    document.getElementById('confirm-title').textContent = 'Stock actualizado';
-    document.getElementById('confirm-msg').textContent = 'Se guardó tu stock congelado — Rocío lo va a ver en Revisión.';
-    document.getElementById('confirm-detalle').innerHTML = '';
-    ocultarBotonOtro();
-    irA('screen-confirm');
+    // Opción A: invalidar el catálogo cacheado y recargarlo fresco, para que la precarga
+    // siembre los valores reales recién guardados (no 0). cargarCatalogoConteo_ vuelve a
+    // llamar precargarConteo_ internamente.
+    cacheConteoCatalogo = null;
+    await cargarCatalogoConteo_();
+    irA('screen-conteo');
+    if (document.getElementById('screen-conteo').classList.contains('active')) pintarConteo();
+    mostrarBannerStockOk_();
     return;
   }
 
