@@ -639,11 +639,22 @@ async function confirmarGuardarConteo() {
     const r = await llamarAPI('actualizarStockCongeladoVCLote', { data: { items: items, responsable: sesion.nombre } });
     if (!r.ok) { document.getElementById('resumen-conteo-error').textContent = r.error || 'Error al guardar el stock'; return; }
     conteoCantidades = {};
-    await llamarAPISilencioso('limpiarBorradorConteo', { negocio: negocioConteo_() });
     // CORREGIDO 06/08/2026 (con Osmar): el fix del 03/08 saltaba directo de vuelta a
     // Contar stock con un banner de 3s — Osmar no pidió eso, solo pidió que el guardado
     // fuera más rápido. Se restaura el feedback de screen-confirm (mismo componente que usa
     // el conteo de Cima), sin botón "Otro" — solo "Volver al inicio", como Cima.
+    // CORREGIDO 06/08/2026 (con Osmar, 2da vuelta): limpiarBorradorConteo ya NO se espera
+    // con await — antes, entre que terminaba el guardado real (llamada con overlay) y
+    // terminaba esta llamada silenciosa, la pantalla de revisión (screen-resumen-conteo)
+    // quedaba visible SIN overlay por el tiempo que demorara este segundo viaje al
+    // servidor — eso era el "vuelve a revisión" que reportó Osmar: no navegaba hacia
+    // atrás, nunca había navegado hacia adelante todavía. Ahora se dispara en segundo
+    // plano (fire-and-forget) — es solo housekeeping (borra un borrador que ya no hace
+    // falta), no bloquea la transición a screen-confirm. Si falla, no se avisa al usuario
+    // a propósito: el conteo YA se guardó bien (lo confirmó la llamada de arriba), un
+    // borrador huérfano no le hace daño a nada, se sobrescribe solo la próxima vez que se
+    // cuente.
+    llamarAPISilencioso('limpiarBorradorConteo', { negocio: negocioConteo_() });
     // El catálogo se sigue invalidando para que la próxima vez que se entre a Contar stock
     // los valores estén al día, pero ya NO se recarga de inmediato (sin await) — así no se
     // pierde la velocidad ganada con el guardado en lote.
