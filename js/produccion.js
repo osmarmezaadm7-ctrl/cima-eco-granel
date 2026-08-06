@@ -1,4 +1,3 @@
-
 /**
  * js/produccion.js — módulo Producción, pantalla Conteo (13/07/2026).
  * Reemplaza el conteo diario por WhatsApp. Estado en variables de módulo, no en el DOM,
@@ -635,23 +634,25 @@ async function confirmarGuardarConteo() {
   if (resumenConteoOrigenVC) {
     // GUARDADO EN LOTE (03/08/2026, con Osmar): antes esto era un bucle de N llamadas HTTP
     // en serie (una por empanada) + limpiarBorrador — el "carga largo". Ahora es UNA sola
-    // llamada con todas las empanadas. Tras guardar: se refresca el catálogo para que los
-    // valores sean los reales recién guardados (antes quedaba el catálogo viejo en memoria y
-    // al reentrar sin recargar la página aparecía 0 en todo), se vuelve a la pantalla de
-    // stock ya actualizada, y se muestra un banner verde de éxito que se auto-oculta a los 3s.
+    // llamada con todas las empanadas. El guardado en lote se mantiene: esto NO se toca acá.
     const items = resumenConteoProductos.map(p => ({ producto: p.productoProduccion, stockActual: p.cantidadContada }));
     const r = await llamarAPI('actualizarStockCongeladoVCLote', { data: { items: items, responsable: sesion.nombre } });
     if (!r.ok) { document.getElementById('resumen-conteo-error').textContent = r.error || 'Error al guardar el stock'; return; }
     conteoCantidades = {};
     await llamarAPISilencioso('limpiarBorradorConteo', { negocio: negocioConteo_() });
-    // Opción A: invalidar el catálogo cacheado y recargarlo fresco, para que la precarga
-    // siembre los valores reales recién guardados (no 0). cargarCatalogoConteo_ vuelve a
-    // llamar precargarConteo_ internamente.
+    // CORREGIDO 06/08/2026 (con Osmar): el fix del 03/08 saltaba directo de vuelta a
+    // Contar stock con un banner de 3s — Osmar no pidió eso, solo pidió que el guardado
+    // fuera más rápido. Se restaura el feedback de screen-confirm (mismo componente que usa
+    // el conteo de Cima), sin botón "Otro" — solo "Volver al inicio", como Cima.
+    // El catálogo se sigue invalidando para que la próxima vez que se entre a Contar stock
+    // los valores estén al día, pero ya NO se recarga de inmediato (sin await) — así no se
+    // pierde la velocidad ganada con el guardado en lote.
     cacheConteoCatalogo = null;
-    await cargarCatalogoConteo_();
-    irA('screen-conteo');
-    if (document.getElementById('screen-conteo').classList.contains('active')) pintarConteo();
-    mostrarBannerStockOk_();
+    document.getElementById('confirm-title').textContent = 'Stock guardado';
+    document.getElementById('confirm-msg').textContent = 'Se actualizó el stock de ' + items.length + ' producto' + (items.length === 1 ? '' : 's') + '.';
+    document.getElementById('confirm-detalle').innerHTML = '';
+    ocultarBotonOtro();
+    irA('screen-confirm');
     return;
   }
 
