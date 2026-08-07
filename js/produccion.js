@@ -373,6 +373,15 @@ function pintarConteo() {
     document.getElementById('conteo-chips').style.display = 'none';
     if (titulo) titulo.textContent = 'Stock congelado';
     if (boton) boton.textContent = 'Guardar stock';
+    // NUEVO 06/08/2026 (con Osmar — automatización freezer VC, entrada): acción rápida
+    // aparte del conteo completo — suma (no reemplaza) lo que entró al freezer hoy. El
+    // conteo completo de abajo sigue siendo la fuente de verdad, esto solo la mantiene
+    // más al día entre una recontada y otra.
+    const fzWrap = document.getElementById('freezer-add-wrap');
+    if (fzWrap) {
+      fzWrap.style.display = '';
+      fzWrap.innerHTML = '<button class="fz-add-btn" onclick="abrirModalAgregarFreezer()">+ Agregar al freezer</button>';
+    }
     const productos = cacheConteoCatalogo.catalogo.filter(p => p.categoria === 'Empanadas Congeladas');
     if (esAncho) { pintarConteoDesktop_(productos, false); return; }
     let html = '';
@@ -395,6 +404,8 @@ function pintarConteo() {
 
   if (btnUltimo) btnUltimo.style.display = '';
   document.getElementById('conteo-chips').style.display = '';
+  const fzWrapCima = document.getElementById('freezer-add-wrap');
+  if (fzWrapCima) fzWrapCima.style.display = 'none';
   if (titulo) titulo.textContent = 'Contar stock';
   if (boton) boton.textContent = 'Guardar conteo';
   const categorias = [...new Set(cacheConteoCatalogo.catalogo.map(p => p.categoria))];
@@ -646,6 +657,53 @@ function mostrarBannerStockOk_() {
   cont.style.display = '';
   if (bannerStockOkTimer_) clearTimeout(bannerStockOkTimer_);
   bannerStockOkTimer_ = setTimeout(() => { cont.style.display = 'none'; cont.innerHTML = ''; }, 3000);
+}
+
+// ============ AGREGAR AL FREEZER (NUEVO 06/08/2026 — con Osmar) ============
+// Acción rápida, separada del conteo completo: suma (delta, no reemplaza) lo que entró
+// al freezer hoy, para varios sabores a la vez. El conteo completo (Contar stock) sigue
+// siendo la fuente de verdad — esto solo lo mantiene más al día entre una recontada y
+// otra. Reusa cacheConteoCatalogo (ya cargado por la pantalla de Contar stock) para no
+// pedir el catálogo de nuevo.
+function abrirModalAgregarFreezer() {
+  if (!cacheConteoCatalogo) return;
+  const productos = cacheConteoCatalogo.catalogo.filter(p => p.categoria === 'Empanadas Congeladas');
+  const filas = productos.map(p => {
+    const idEsc = p.productoProduccion.replace(/'/g, "\\'");
+    return '<div class="fz-row"><span>' + p.nombre + '</span>' +
+      '<div><span class="fz-plus">+</span><input type="number" min="0" value="0" id="fz-add-' + p.productoProduccion.replace(/[^a-zA-Z0-9]/g, '_') + '" data-producto="' + idEsc + '"></div>' +
+    '</div>';
+  }).join('');
+  abrirModal(
+    '<h3 style="font-size:15px;">Agregar al freezer</h3>' +
+    '<p style="font-size:12.5px;color:var(--ink-soft);margin:0 0 12px;">Cuánto entró de cada sabor — se suma a lo que ya había.</p>' +
+    '<div style="max-height:280px;overflow-y:auto;">' + (filas || '<p style="font-size:13px;color:var(--ink-soft);">No hay empanadas configuradas.</p>') + '</div>' +
+    '<div class="error-msg" id="fz-add-error"></div>' +
+    '<div style="display:flex;gap:8px;margin-top:14px;"><button class="btn-secondary" onclick="cerrarModal()">Cancelar</button><button class="btn-primary" onclick="confirmarAgregarFreezer()">Agregar al freezer</button></div>'
+  );
+}
+
+async function confirmarAgregarFreezer() {
+  const inputs = document.querySelectorAll('#modal-card input[data-producto]');
+  const items = [];
+  inputs.forEach(inp => {
+    const cantidad = Number(inp.value) || 0;
+    if (cantidad > 0) items.push({ producto: inp.dataset.producto, cantidad: cantidad });
+  });
+  if (!items.length) {
+    document.getElementById('fz-add-error').textContent = 'Escribe al menos una cantidad.';
+    return;
+  }
+  const r = await llamarAPI('agregarStockCongeladoVCLote', { data: { items: items, responsable: sesion.nombre } });
+  if (!r.ok) {
+    document.getElementById('fz-add-error').textContent = r.error || 'Error al guardar';
+    return;
+  }
+  cerrarModal();
+  // El conteo en pantalla queda desactualizado respecto de lo que se acaba de sumar —
+  // se invalida el catálogo, igual que tras confirmar un conteo, para que la próxima vez
+  // que se entre a Contar stock los valores reflejen la suma.
+  cacheConteoCatalogo = null;
 }
 
 async function confirmarGuardarConteo() {
@@ -2182,7 +2240,7 @@ function totalItemPauta_(it) {
 function asegurarDesglose_(it) {
   if (!desgloseEmpanadas[it.id]) {
     const total = Number(totalItemPauta_(it)) || 0;
-    desgloseEmpanadas[it.id] = { horneadas: total, congeladas: 0 };
+    desgloseEmpanadas[it.id] = { horneadas: total, congeladas: 0, delFreezer: 0 };
   }
   return desgloseEmpanadas[it.id];
 }
@@ -2197,6 +2255,42 @@ function textoAvisoDesglose_(d, total) {
   const suma = d.horneadas + d.congeladas;
   if (suma === total) return '';
   return 'Total ' + suma + ' · ' + (suma < total ? 'faltan ' + (total - suma) : (suma - total) + ' de más') + ' respecto de las ' + total + ' que envías';
+}
+
+// NUEVO 06/08/2026 (con Osmar — automatización freezer VC, salida). Sub-reparto DENTRO
+// del mismo bloque abierto del desglose, solo si hay horneadas (d.horneadas > 0) — de
+// esas, cuántas salieron del freezer que ya existía vs se produjeron frescas el mismo
+// día. Mismo patrón de auto-reparto que Horneadas/Congeladas de arriba (editar uno ajusta
+// el otro solo), pero con acento caramelo para distinguirlo como un dato de Vegan Corner,
+// no de la entrega a Cima. Colapsado en 0 por defecto — el caso normal es producción
+// fresca, no freezer. Vive en su propio contenedor (id fz-sub-<id>) para poder
+// refrescarlo solo cuando cambian las horneadas, sin repintar toda la Pauta.
+function bloqueFreezerPauta_(it, d) {
+  if (!d.horneadas) return '<div class="fz-sub" id="fz-sub-' + it.id + '"></div>';
+  const frescas = Math.max(0, d.horneadas - (d.delFreezer || 0));
+  return '<div class="fz-sub" id="fz-sub-' + it.id + '">' +
+    '<p class="fz-sub-label">De esas ' + d.horneadas + ' horneadas</p>' +
+    '<div class="dg-campos">' +
+      '<div class="dg-campo"><label for="fz-f-' + it.id + '">Frescas hoy</label>' +
+        '<input type="number" min="0" max="' + d.horneadas + '" id="fz-f-' + it.id + '" value="' + frescas + '" oninput="cambiarDelFreezer_(\'' + it.id + '\',\'frescas\',this.value)"></div>' +
+      '<div class="dg-campo"><label for="fz-z-' + it.id + '">Del freezer</label>' +
+        '<input type="number" min="0" max="' + d.horneadas + '" id="fz-z-' + it.id + '" value="' + (d.delFreezer || 0) + '" oninput="cambiarDelFreezer_(\'' + it.id + '\',\'delFreezer\',this.value)"></div>' +
+    '</div>' +
+  '</div>';
+}
+
+// Mismo patrón que cambiarDesglose_: no repinta toda la Pauta, solo el par de campos.
+function cambiarDelFreezer_(id, campo, valor) {
+  const it = cachePauta.pauta.find(x => x.id === id);
+  if (!it) return;
+  const d = asegurarDesglose_(it);
+  const n = Math.max(0, Math.min(d.horneadas, Number(valor) || 0));
+  if (campo === 'frescas') d.delFreezer = Math.max(0, d.horneadas - n);
+  else d.delFreezer = n;
+  const inpF = document.getElementById('fz-f-' + id);
+  const inpZ = document.getElementById('fz-z-' + id);
+  if (inpF) inpF.value = Math.max(0, d.horneadas - d.delFreezer);
+  if (inpZ) inpZ.value = d.delFreezer;
 }
 
 // Devuelve el bloque que va DENTRO de la fila del producto, debajo del nombre. Vacío para
@@ -2223,6 +2317,7 @@ function bloqueDesglosePauta_(it) {
         '<input type="number" min="0" id="dg-c-' + it.id + '" value="' + d.congeladas + '" oninput="cambiarDesglose_(\'' + it.id + '\',\'congeladas\',this.value)"></div>' +
     '</div>' +
     '<p class="dg-aviso" id="dg-aviso-' + it.id + '"' + (aviso ? '' : ' style="display:none;"') + '>' + aviso + '</p>' +
+    bloqueFreezerPauta_(it, d) +
     '<button class="dg-listo" onclick="cerrarDesglose_()">Listo</button>' +
   '</div>';
 }
@@ -2256,6 +2351,14 @@ function cambiarDesglose_(id, campo, valor) {
     const inpH = document.getElementById('dg-h-' + id);
     if (inpH) inpH.value = d.horneadas;
   }
+  // NUEVO 06/08/2026 (con Osmar — freezer VC): el sub-reparto Frescas/Del freezer vive
+  // dentro de las horneadas, así que si las horneadas cambian (por cualquiera de los dos
+  // caminos de arriba), delFreezer no puede quedar por encima del nuevo total — se
+  // clampea y se refresca el sub-bloque completo (es chico, no vale la pena parchear
+  // campo por campo como el resto de esta función).
+  d.delFreezer = Math.min(d.delFreezer || 0, d.horneadas);
+  const fzSub = document.getElementById('fz-sub-' + id);
+  if (fzSub) fzSub.outerHTML = bloqueFreezerPauta_(it, d);
   const el = document.getElementById('dg-aviso-' + id);
   if (!el) return;
   const aviso = textoAvisoDesglose_(d, total);
