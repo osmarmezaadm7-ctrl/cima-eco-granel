@@ -1961,6 +1961,106 @@ async function mostrarBuscadorPauta() {
   document.querySelector('#ss-pauta-producto input[type=text]').focus();
 }
 
+// ============ AGREGAR VARIOS A LA VEZ (NUEVO 06/08/2026 — con Osmar) ============
+// Reemplaza el flujo de arriba (uno a la vez, el buscador se cerraba después de cada
+// producto). Mismo mecanismo de fondo que agregarProductoPauta para cada ítem elegido
+// (aparece optimista, se guarda en silencio, se revierte si falla) — lo único que cambia
+// es que ahora se eligen varios ANTES de confirmar, en vez de uno por vuelta.
+//
+// Decisiones de diseño (con Osmar, tras ver el primer mockup):
+// - Nada de checkbox nativo — toda la fila es tocable, con el mismo círculo con palomita
+//   que ya usa la Pauta para marcar "Hecho" (mismo lenguaje visual, no uno nuevo).
+// - El buscador NO hace foco automático al abrir — el primer intento sí lo hacía y el
+//   teclado tapaba media lista en el celular sin que nadie hubiera pedido escribir nada.
+//   Se activa solo si lo tocan.
+let pautaMultiSeleccion_ = new Set();
+let pautaMultiOpciones_ = [];
+
+async function abrirModalAgregarVariosPauta() {
+  document.getElementById('pauta-error').textContent = '';
+  if (!cacheCatalogoPauta) {
+    const r = await llamarAPI('obtenerCatalogoProduccion', { soloConteo: false });
+    if (!r.ok) { document.getElementById('pauta-error').textContent = r.error || 'Error al cargar el catálogo'; return; }
+    cacheCatalogoPauta = r;
+  }
+  const vistos = new Set();
+  pautaMultiOpciones_ = [];
+  cacheCatalogoPauta.catalogo.forEach(p => {
+    if (vistos.has(p.productoProduccion)) return;
+    vistos.add(p.productoProduccion);
+    pautaMultiOpciones_.push({ label: p.nombre, value: p.productoProduccion });
+  });
+  pautaMultiSeleccion_ = new Set();
+  abrirModal(
+    '<h3 style="font-size:15px;">Agregar productos</h3>' +
+    '<input type="text" id="pm-buscar" placeholder="Buscar producto…" autocomplete="off" oninput="pintarListaPautaMulti_()" style="width:100%;height:40px;border:1.5px solid var(--border);border-radius:9px;padding:0 12px;font-size:13.5px;font-family:inherit;margin-bottom:10px;box-sizing:border-box;">' +
+    '<div id="pm-lista" style="max-height:320px;overflow-y:auto;border:1px solid var(--border);border-radius:10px;"></div>' +
+    '<div class="error-msg" id="pm-error"></div>' +
+    '<div style="display:flex;align-items:center;justify-content:space-between;margin-top:12px;"><span style="font-size:12.5px;color:var(--ink-soft);" id="pm-contador"><b class="mono" style="color:var(--forest);">0</b> seleccionados</span></div>' +
+    '<div style="display:flex;gap:8px;margin-top:12px;"><button class="btn-secondary" onclick="cerrarModal()">Cancelar</button><button class="btn-primary" onclick="confirmarAgregarVariosPauta()">Agregar</button></div>'
+  );
+  pintarListaPautaMulti_();
+}
+
+function pintarListaPautaMulti_() {
+  const inp = document.getElementById('pm-buscar');
+  const q = (inp ? inp.value : '').toLowerCase();
+  const cont = document.getElementById('pm-lista');
+  if (!cont) return;
+  const filtrados = pautaMultiOpciones_.filter(o => o.label.toLowerCase().indexOf(q) !== -1);
+  cont.innerHTML = filtrados.map(o => {
+    const sel = pautaMultiSeleccion_.has(o.value);
+    const valEsc = o.value.replace(/'/g, "\\'");
+    return '<div class="pm-fila' + (sel ? ' sel' : '') + '" onclick="toggleSeleccionPautaMulti_(\'' + valEsc + '\')">' +
+      '<span class="pauta-check' + (sel ? ' marcado' : '') + '">' + (sel ? '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"></path></svg>' : '') + '</span>' +
+      '<span style="font-size:14.5px;flex:1;">' + o.label + '</span>' +
+    '</div>';
+  }).join('') || '<p style="font-size:12px;color:var(--ink-soft);padding:10px;">Sin resultados.</p>';
+}
+
+function toggleSeleccionPautaMulti_(valor) {
+  if (pautaMultiSeleccion_.has(valor)) pautaMultiSeleccion_.delete(valor);
+  else pautaMultiSeleccion_.add(valor);
+  pintarListaPautaMulti_();
+  const contador = document.getElementById('pm-contador');
+  if (contador) contador.innerHTML = '<b class="mono" style="color:var(--forest);">' + pautaMultiSeleccion_.size + '</b> seleccionados';
+}
+
+// Mismo cuerpo optimista que agregarProductoPauta, uno por cada elegido — sin esperarse
+// entre sí (no hay razón para serializar N guardados de fondo independientes).
+async function confirmarAgregarVariosPauta() {
+  if (!pautaMultiSeleccion_.size) {
+    document.getElementById('pm-error').textContent = 'Selecciona al menos un producto.';
+    return;
+  }
+  const seleccionados = [...pautaMultiSeleccion_];
+  cerrarModal();
+  seleccionados.forEach(valor => {
+    const opt = pautaMultiOpciones_.find(o => o.value === valor);
+    const id = nuevoIdPautaLocal_();
+    const item = {
+      id: id, fecha: fechaLocalISO(), producto: opt ? opt.label : valor, cantidadProgramada: 1,
+      estado: 'Programado', responsable: sesion.nombre, conteoId: '', cantidadContada: null,
+      comentario: '', estadoBorrador: '', cantidadBorrador: null,
+      dual: esProductoDualLocal_(valor), observacionPedido: ''
+    };
+    cachePauta.pauta.push(item);
+    pautaAgregadosSesion.push(id);
+    pintarPauta();
+    llamarAPISilencioso('agregarItemPautaDirecto', { data: { id: id, producto: valor, cantidad: 1, responsable: sesion.nombre } }).then(r => {
+      if (!r || !r.ok) {
+        cachePauta.pauta = cachePauta.pauta.filter(x => x.id !== id);
+        const i = pautaAgregadosSesion.indexOf(id);
+        if (i !== -1) pautaAgregadosSesion.splice(i, 1);
+        pintarPauta();
+        document.getElementById('pauta-error').textContent = 'No se pudo agregar "' + (opt ? opt.label : valor) + '". Intenta de nuevo.';
+        return;
+      }
+      if (typeof r.dual === 'boolean' && r.dual !== item.dual) { item.dual = r.dual; pintarPauta(); }
+    });
+  });
+}
+
 // Un producto es "dual" (empanada con desglose horneada/congelada) cuando aparece en el
 // catálogo con MÁS de una categoría — el mismo criterio que mapaProductosDuales_ en el
 // servidor, pero calculado en el cliente sobre cacheCatalogoPauta que ya está cargado. Sirve
