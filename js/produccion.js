@@ -172,8 +172,16 @@ let precargaConteoPromesa_ = null;   // promesa de carga del catálogo, corriend
 // de "cargando", que parpadearía cada vez que se sale de Conteo. Los errores se ignoran
 // —es una red de seguridad, no una operación que el usuario pidió; si falla, el flujo
 // normal de confirmar el conteo sigue funcionando igual.
+// CORREGIDO 06/08/2026 (con Osmar): antes guardaba con solo haber estado en la pantalla
+// de Conteo, sin importar si se ajustó algo — mirar sin tocar nada igual dejaba un
+// borrador. Peor aún: esto hacía que "Comenzar de nuevo" pareciera no funcionar, porque
+// apenas descartaba el borrador y volvía a la precarga (sin ajustes), el simple hecho de
+// salir de la pantalla volvía a crear un borrador "vacío" al toque. Ahora solo guarda si
+// hayAjustesEnPantalla_() es cierto — mismo criterio que ya usa ofrecerBorradorConteo_
+// para decidir si preguntar.
 async function guardarBorradorConteo_() {
   if (!sesion || !sesion.nombre || !cacheConteoCatalogo) return;
+  if (!hayAjustesEnPantalla_()) return;
   try {
     await llamarAPISilencioso('guardarBorradorConteo', {
       data: {
@@ -687,7 +695,12 @@ async function confirmarGuardarConteo() {
     return;
   }
   conteoCantidades = {};
-  await llamarAPISilencioso('limpiarBorradorConteo', { negocio: negocioConteo_() });
+  // CORREGIDO 06/08/2026 (con Osmar): mismo hueco que tenía VC — entre que terminaba
+  // guardarConteoStock (overlay) y esta llamada silenciosa, screen-resumen-conteo quedaba
+  // visible sin overlay hasta que crearNotificacion (más abajo) volvía a taparla. Menos
+  // notorio que en VC porque el hueco es corto, pero es el mismo bug. Ahora se dispara en
+  // segundo plano — no bloquea la transición a screen-confirm.
+  llamarAPISilencioso('limpiarBorradorConteo', { negocio: negocioConteo_() });
   document.getElementById('confirm-title').textContent = 'Conteo guardado';
   document.getElementById('confirm-msg').textContent = 'Se registraron ' + resumenConteoProductos.length + ' productos. Rocío u Osmar lo revisan antes de pedir a producción.';
   document.getElementById('confirm-detalle').innerHTML = '';
