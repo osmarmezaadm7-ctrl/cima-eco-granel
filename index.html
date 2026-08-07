@@ -186,6 +186,17 @@
 .dg-aviso{margin:8px 0 0;font-size:12px;color:var(--terracotta);}
 .dg-listo{width:100%;margin-top:10px;padding:11px;border:none;border-radius:9px;background:var(--forest);color:#fff;font-size:14px;font-weight:600;font-family:inherit;cursor:pointer;}
 .dg-fila-desktop .dg-linea,.dg-fila-desktop .dg-abierto{width:100%;margin-left:0;}
+/* NUEVO 06/08/2026 (con Osmar — automatización freezer VC). Acento caramelo a propósito
+   (ya reservado para Vegan Corner en el sistema) para distinguir estos elementos de los
+   .dg-* de arriba, que son del desglose para Cima — misma familia visual, dato distinto. */
+.fz-add-btn{width:100%;display:flex;align-items:center;justify-content:center;gap:7px;border:1.5px dashed var(--caramel);color:var(--caramel);background:#FBF6EF;font-weight:600;font-size:13.5px;font-family:inherit;border-radius:10px;padding:12px;margin-bottom:14px;cursor:pointer;}
+.fz-sub{margin-top:11px;padding-top:11px;border-top:1px dashed var(--border);}
+.fz-sub-label{font-size:11.5px;font-weight:700;color:var(--caramel);text-transform:uppercase;letter-spacing:.3px;margin:0 0 9px;}
+.fz-sub .dg-campo input{border-color:var(--caramel);}
+.fz-row{display:flex;justify-content:space-between;align-items:center;padding:10px 4px;border-bottom:1px solid var(--border);gap:10px;}
+.fz-row span{flex:1;font-size:14.5px;}
+.fz-row input{width:64px;height:38px;text-align:right;border:1.5px solid var(--caramel);border-radius:9px;font-family:'JetBrains Mono',monospace;font-size:14.5px;color:var(--caramel);font-weight:700;padding:0 8px;}
+.fz-plus{font-size:13px;color:var(--caramel);font-weight:700;margin-right:4px;}
 /* Línea de solo lectura en la pantalla de Revisión. */
 .dg-resumen{display:flex;align-items:center;gap:8px;width:100%;min-height:38px;margin:0 0 8px;padding:6px 2px;border:none;border-bottom:1px solid var(--border);background:none;font-family:inherit;text-align:left;cursor:pointer;}
 .dg-resumen-txt{flex:1;font-size:12px;color:var(--ink-soft);}
@@ -1109,6 +1120,7 @@
   <div id="conteo-banner-ok" style="display:none;"></div>
   <p style="font-size:12px;color:var(--ink-soft);margin:0 0 10px;">Categorías</p>
   <div id="conteo-chips" class="conteo-chips"></div>
+  <div id="freezer-add-wrap" style="display:none;"></div>
   <div id="conteo-aviso-congeladas" class="conteo-aviso" style="display:none;"></div>
   <div id="conteo-lista"></div>
   <div class="error-msg" id="conteo-error"></div>
