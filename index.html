@@ -1720,6 +1720,18 @@ async function intentarLogin(){
   }
 }
 function cerrarSesion(){
+  // CORREGIDO 06/08/2026 (con Osmar): antes se limpiaba `sesion` ANTES de llamar a irA(),
+  // que es quien normalmente dispara el guardado del borrador de Conteo al salir de esa
+  // pantalla. guardarBorradorConteo_() corta de inmediato si sesion.nombre ya es null —
+  // así que si alguien cerraba sesión con un conteo sin confirmar en pantalla (Cima o
+  // Vegan Corner, misma función para ambos), se perdía en silencio: ni siquiera llegaba a
+  // intentar la llamada al servidor. Ahora se dispara el guardado ACÁ, mientras sesion
+  // todavía es válida, antes de limpiar nada — mismo patrón fire-and-forget que ya usan
+  // irA() y el listener de visibilitychange (no se espera, no atrasa el cierre de sesión).
+  const scConteo = document.getElementById('screen-conteo');
+  if (scConteo && scConteo.classList.contains('active') && typeof guardarBorradorConteo_ === 'function') {
+    guardarBorradorConteo_();
+  }
   sesion={nombre:null,rol:null,negocio:null}; permisosSesion={};
   cacheModulo = { alertas:null, cxp:null, cxc:null, programa:null, inventario:null, listaCompra:null };
   cachePanel = {}; flujoVentasCache = {}; movimientosCache = null;
