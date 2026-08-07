@@ -1737,13 +1737,22 @@ async function guardarCambioPin(){
 
 async function entrarAHome(inicio){
   document.getElementById('home-nombre').textContent = sesion.nombre;
-  cargarNotificaciones();
   const esEscritorio = window.innerWidth >= 900;
-  // inicio: la respuesta del login ya trae permisos + panel (fusión login+inicio). Si por
-  // algún motivo no vienen (ej. un despliegue viejo cacheado que aún responde el login
-  // antiguo sin permisos), se cae al comportamiento anterior — se piden con obtenerInicio.
-  // Así el despliegue nunca deja a nadie a medias.
-  const ri = (inicio && inicio.permisos) ? inicio : await llamarAPI('obtenerInicio', {esEscritorio});
+  // SINCRONIZADO 06/08/2026 (con Osmar): antes cargarNotificaciones() se disparaba sin
+  // esperar, en paralelo con el resto de esta función — como el resto del Home se pinta
+  // casi de inmediato para quien no tiene VerDashboardCompleto/VisualizarReportes
+  // (Katherine, Rosa), esas tarjetas ya estaban visibles y tocables cuando la notificación
+  // llegaba después y se insertaba en #notif-home (que va ARRIBA de #home-content en el
+  // HTML) — empujando todo hacia abajo justo cuando alguien iba a tocar un botón. A Osmar
+  // (escritorio, con VerDashboardCompleto) esto no se le notaba porque entrarAHome lo saca
+  // de screen-home altiro (ver abrirPanel()/abrirEstadoResultados() más abajo) — nunca
+  // llegaba a ver el salto. Ahora se espera junto con obtenerInicio (Promise.all — corren
+  // en paralelo, no se suman los tiempos) antes de pintar nada, así #notif-home ya tiene su
+  // contenido final cuando #home-content recién se está armando.
+  const [ri] = await Promise.all([
+    (inicio && inicio.permisos) ? Promise.resolve(inicio) : llamarAPI('obtenerInicio', {esEscritorio}),
+    cargarNotificaciones()
+  ]);
   permisosSesion = {};
   (ri.permisos||[]).filter(p=>p.nombre===sesion.nombre).forEach(p=>{ permisosSesion[p.accion]=p.permitido; });
   if(esEscritorio && ri.panel){
