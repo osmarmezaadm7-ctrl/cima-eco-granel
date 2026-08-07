@@ -186,12 +186,24 @@ async function guardarBorradorConteo_() {
   } catch (e) { /* silencioso a propósito */ }
 }
 
+// CORREGIDO 06/08/2026 (con Osmar): Object.keys(conteoCantidades).length nunca era 0
+// después de que precargarConteo_() siembra una clave por cada producto del catálogo
+// (con su valor de arranque, aunque no se haya tocado nada) — así que el chequeo de "¿está
+// vacío?" que usaba ofrecerBorradorConteo_ para decidir si preguntar por el borrador nunca
+// daba verdadero, y el modal de "Conteo sin terminar" no podía aparecer nunca, tuviera o no
+// borrador guardado el servidor. Ahora se pregunta si el usuario AJUSTÓ algo de verdad
+// (comparando contra el valor de arranque con conteoAjustado_, ya usada para el indicador
+// azul de cada fila) — no si el mapa tiene claves.
+function hayAjustesEnPantalla_() {
+  return Object.keys(conteoCantidades).some(k => conteoAjustado_(k));
+}
+
 async function ofrecerBorradorConteo_() {
-  if (Object.keys(conteoCantidades).length) return;   // ya hay algo en pantalla: no preguntar
+  if (hayAjustesEnPantalla_()) return;   // ya hay ajustes reales en pantalla: no preguntar
   if (!cacheConteoCatalogo) return;
   const r = await llamarAPISilencioso('obtenerBorradorConteo', { negocio: negocioConteo_() });
   if (!r || !r.ok || !r.borrador) return;
-  if (Object.keys(conteoCantidades).length) return;   // por si se contó algo mientras respondía
+  if (hayAjustesEnPantalla_()) return;   // por si se contó algo mientras respondía
   const b = r.borrador;
   borradorConteoPendiente = b;
   // Total = productos del catálogo en las categorías que estaban activas. Si alguna
