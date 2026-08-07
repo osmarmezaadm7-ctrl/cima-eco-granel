@@ -1749,6 +1749,23 @@ function cerrarSesion(){
   if (scConteo && scConteo.classList.contains('active') && typeof guardarBorradorConteo_ === 'function') {
     guardarBorradorConteo_();
   }
+  // CORREGIDO 06/08/2026 (con Osmar — bug grave, confirmado en terreno): estas variables
+  // del módulo Conteo son globales de produccion.js y no se limpiaban acá. Si en el mismo
+  // dispositivo/pestaña una persona de Vegan Corner contaba y cerraba sesión SIN recargar
+  // la página, y otra de Cima entraba después, abrirConteo() encontraba cacheConteoCatalogo
+  // ya poblado (necesitaCatalogo = !cacheConteoCatalogo) y nunca volvía a pedir el catálogo
+  // ni a recalcular conteoCantidades/conteoValorArranque — la segunda persona veía el
+  // stock de la primera, de otro negocio. Un F5 "arregla" esto de pura casualidad (limpia
+  // TODA la memoria del navegador), pero cerrar sesión con el botón no debe depender de que
+  // alguien refresque después. Se limpia acá para que cada login fuerce una carga real.
+  if (typeof cacheConteoCatalogo !== 'undefined') cacheConteoCatalogo = null;
+  if (typeof conteoCategoriasActivas !== 'undefined') conteoCategoriasActivas = new Set();
+  if (typeof conteoCantidades !== 'undefined') conteoCantidades = {};
+  if (typeof conteoValorArranque !== 'undefined') conteoValorArranque = {};
+  if (typeof borradorConteoPendiente !== 'undefined') borradorConteoPendiente = null;
+  if (typeof precargaConteoPromesa_ !== 'undefined') precargaConteoPromesa_ = null;
+  if (typeof resumenConteoProductos !== 'undefined') resumenConteoProductos = [];
+  if (typeof resumenConteoOrigenVC !== 'undefined') resumenConteoOrigenVC = false;
   sesion={nombre:null,rol:null,negocio:null}; permisosSesion={};
   cacheModulo = { alertas:null, cxp:null, cxc:null, programa:null, inventario:null, listaCompra:null };
   cachePanel = {}; flujoVentasCache = {}; movimientosCache = null;
