@@ -92,6 +92,7 @@ async function abrirFichaEquipo(nombre) {
   equipoCache.fichaActual = r.colaborador;
   equipoCache.calculadoActual = r.calculado;
   equipoCache.fichaTabActual = 'datos';
+  equipoCache.verTodoHistorial = false;
   pintarFichaEquipo_(r.colaborador, r.calculado);
 }
 
@@ -193,18 +194,38 @@ async function pintarTabHistorialEquipo_(nombre) {
   tab.innerHTML = skeletonCards(2);
   const r = await llamarAPISilencioso('obtenerHistorialPagos', { colaborador: nombre });
   if (!r.ok) { tab.innerHTML = '<p class="error-msg">' + r.error + '</p>'; return; }
-  let html = '<div style="padding:10px 0 6px;font-size:11px;text-transform:uppercase;letter-spacing:.4px;color:var(--ink-soft);">Pagos</div>';
-  (r.pagos || []).forEach(p => { html += filaEquipo_(p.desde + ' – ' + p.hasta, '<strong>' + fmt(p.total) + '</strong>'); });
-  if (!(r.pagos || []).length) html += '<p style="font-size:12.5px;color:var(--ink-soft);">Sin pagos registrados todavía.</p>';
+  const verTodo = !!equipoCache.verTodoHistorial;
+  const pagos = (r.pagos || []).filter(p => verTodo || esDelMesEnCursoEquipo_(p.hasta));
+  const cambios = (r.cambiosFicha || []).filter(cm => verTodo || esDelMesEnCursoEquipo_(cm.fecha));
+  let html = barraPeriodoEquipo_(verTodo, 'alternarHistorialEquipo_(\'' + nombre + '\')');
+  html += '<div style="padding:4px 0 6px;font-size:11px;text-transform:uppercase;letter-spacing:.4px;color:var(--ink-soft);">Pagos</div>';
+  pagos.forEach(p => { html += filaEquipo_(p.desde + ' – ' + p.hasta, '<strong>' + fmt(p.total) + '</strong>'); });
+  if (!pagos.length) html += '<p style="font-size:12.5px;color:var(--ink-soft);">' +
+    (verTodo ? 'Sin pagos registrados todavía.' : 'Sin pagos en ' + nombreMesEnCursoEquipo_() + '.') + '</p>';
   html += '<div style="padding:14px 0 6px;font-size:11px;text-transform:uppercase;letter-spacing:.4px;color:var(--ink-soft);">Cambios en la ficha</div>';
-  (r.cambiosFicha || []).forEach(cm => { html += '<div class="rowline"><span>' + cm.descripcion + '</span><span class="mono">' + cm.fecha + '</span></div>'; });
-  if (!(r.cambiosFicha || []).length) html += '<p style="font-size:12.5px;color:var(--ink-soft);">Sin cambios registrados.</p>';
+  cambios.forEach(cm => { html += '<div class="rowline"><span>' + cm.descripcion + '</span><span class="mono">' + cm.fecha + '</span></div>'; });
+  if (!cambios.length) html += '<p style="font-size:12.5px;color:var(--ink-soft);">' +
+    (verTodo ? 'Sin cambios registrados.' : 'Sin cambios en ' + nombreMesEnCursoEquipo_() + '.') + '</p>';
   tab.innerHTML = html;
+}
+
+function alternarHistorialEquipo_(nombre) {
+  equipoCache.verTodoHistorial = !equipoCache.verTodoHistorial;
+  pintarTabHistorialEquipo_(nombre);
+}
+
+function alternarComunicadosEquipo_() {
+  equipoCache.verTodoComunicados = !equipoCache.verTodoComunicados;
+  abrirComunicadosEquipo();
 }
 
 // ============ 2b. EDITAR / CREAR FICHA ============
 function abrirFormularioFichaEquipo_(nombre) {
   irA('screen-editar-equipo');
+  // semanaPagoEdit se limpia SIEMPRE al abrir un formulario: si se arrastra de la ficha
+  // anterior, abrir Rosa (siguiente) y luego Katherine (misma) mostraría a Katherine con la
+  // configuración de Rosa. Mismo patrón de contaminación entre pantallas ya visto antes.
+  equipoCache.semanaPagoEdit = null;
   if (!nombre) { equipoCache.jornadaEdit = []; equipoCache.configPagoEdit = null; pintarFormularioFicha_(null, true); return; }
   const c = equipoCache.fichaActual && equipoCache.fichaActual.nombre === nombre ? equipoCache.fichaActual : null;
   if (!c) { irA('screen-equipo'); return; }
@@ -263,12 +284,26 @@ function pintarFormularioFicha_(c, esNuevo) {
 function pintarConfigPagoEquipo_() {
   const cont = document.getElementById('fe-config-pago');
   if (!cont) return;
+  if (equipoCache.semanaPagoEdit == null) {
+    const c0 = equipoCache.configPagoEdit;
+    equipoCache.semanaPagoEdit = (c0 && c0.semana === 'misma') ? 'misma' : 'siguiente';
+  }
   const periodicidad = document.getElementById('fe-periodicidad').value;
   const cfg = equipoCache.configPagoEdit;
   if (periodicidad === 'Semanal') {
     const diaActual = (cfg && cfg.tipo === 'semanal') ? cfg.dia : 'Lun';
+    // 13/08/2026: el día de pago por sí solo no basta — hay que saber si cae en la misma
+    // semana del período o en la siguiente. Katherine cobra el viernes de su propia semana;
+    // Lucas y Rosa, el lunes y el miércoles de la semana siguiente.
+    const semanaActual = (cfg && cfg.tipo === 'semanal' && cfg.semana === 'misma') ? 'misma' : 'siguiente';
     cont.innerHTML = '<select id="fe-pago-dia" onchange="actualizarConfigPagoEquipo_()">' +
-      DIAS_CHIPS_EQUIPO.map(d => '<option ' + (d === diaActual ? 'selected' : '') + '>' + d + '</option>').join('') + '</select>';
+      DIAS_CHIPS_EQUIPO.map(d => '<option ' + (d === diaActual ? 'selected' : '') + '>' + d + '</option>').join('') + '</select>' +
+      '<div style="font-size:12px;font-weight:600;margin:10px 0 5px;">¿De qué semana?</div>' +
+      '<div style="display:flex;gap:6px;">' +
+        ['misma', 'siguiente'].map(v => '<span class="chip-sub' + (semanaActual === v ? ' activo' : '') + '" style="cursor:pointer;" ' +
+          'onclick="elegirSemanaPagoEquipo_(\'' + v + '\')">La ' + v + '</span>').join('') +
+      '</div>' +
+      '<div id="fe-semana-nota" style="font-size:12px;color:var(--forest);background:var(--forest-soft);border-radius:8px;padding:8px 12px;margin-top:10px;line-height:1.45;"></div>';
   } else if (periodicidad === 'Quincenal') {
     const dias = (cfg && cfg.tipo === 'quincenal' && cfg.dias) ? cfg.dias : [15, 30];
     cont.innerHTML = '<div style="display:flex;gap:6px;align-items:center;">' +
@@ -292,13 +327,43 @@ function toggleUltimoDiaEquipo_() {
 function actualizarConfigPagoEquipo_() {
   const periodicidad = document.getElementById('fe-periodicidad').value;
   if (periodicidad === 'Semanal') {
-    equipoCache.configPagoEdit = { tipo: 'semanal', dia: document.getElementById('fe-pago-dia').value };
+    equipoCache.configPagoEdit = { tipo: 'semanal', dia: document.getElementById('fe-pago-dia').value,
+      semana: equipoCache.semanaPagoEdit || 'siguiente' };
+    pintarNotaSemanaPagoEquipo_();
   } else if (periodicidad === 'Quincenal') {
     equipoCache.configPagoEdit = { tipo: 'quincenal', dias: [num_(document.getElementById('fe-pago-dia1').value), num_(document.getElementById('fe-pago-dia2').value)] };
   } else {
     const ultimo = document.getElementById('fe-pago-ultimo').checked;
     equipoCache.configPagoEdit = { tipo: 'mensual', dia: ultimo ? 'ultimo' : num_(document.getElementById('fe-pago-diames').value) };
   }
+}
+
+function elegirSemanaPagoEquipo_(valor) {
+  equipoCache.semanaPagoEdit = valor;
+  pintarConfigPagoEquipo_();
+}
+
+// Nota en lenguaje natural con las fechas reales de la semana en curso — confirmar la
+// configuración leyendo "se le paga el viernes 14/08 la semana del 10 al 16" es mucho más
+// seguro que deducirlo de dos campos sueltos.
+function pintarNotaSemanaPagoEquipo_() {
+  const el = document.getElementById('fe-semana-nota');
+  if (!el) return;
+  const cfg = equipoCache.configPagoEdit;
+  if (!cfg || cfg.tipo !== 'semanal') { el.textContent = ''; return; }
+  const hoy = new Date();
+  const cierre = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate());
+  if (cierre.getDay() !== 0) cierre.setDate(cierre.getDate() + (7 - cierre.getDay()));
+  const inicioPeriodo = new Date(cierre.getFullYear(), cierre.getMonth(), cierre.getDate() - 6);
+  const objetivo = DIAS_CHIPS_EQUIPO.indexOf(cfg.dia) + 1;
+  const idxObjetivo = objetivo === 7 ? 0 : objetivo;
+  const cursor = new Date(cierre.getFullYear(), cierre.getMonth(), cierre.getDate());
+  if (cfg.semana === 'misma') cursor.setDate(cursor.getDate() - 6);
+  else cursor.setDate(cursor.getDate() + 1);
+  for (let i = 0; i < 7 && cursor.getDay() !== idxObjetivo; i++) cursor.setDate(cursor.getDate() + 1);
+  const dm = d => String(d.getDate()).padStart(2, '0') + '/' + String(d.getMonth() + 1).padStart(2, '0');
+  el.innerHTML = 'El período va de lunes a domingo. Se le paga el <b>' + cfg.dia.toLowerCase() + ' ' + dm(cursor) +
+    '</b> la semana del <b>' + dm(inicioPeriodo) + ' al ' + dm(cierre) + '</b>.';
 }
 
 function num_(v) { const n = Number(v); return isNaN(n) ? 0 : n; }
@@ -636,6 +701,33 @@ async function pintarMovimientosDelPeriodoEquipo_(nombre) {
 }
 
 // ============ 5. CIERRE Y CONFIRMACIÓN DE PAGO ============
+// Criterio acordado con Osmar (13/08/2026): en todo el módulo, por defecto se muestra el
+// MES EN CURSO, con opción de ver el historial completo. Un pago pertenece al mes del
+// PERÍODO TRABAJADO (su fecha "hasta"), no al mes en que se pagó — mismo criterio que usa
+// obtenerResumenEquipo y que la fecha del gasto en Finanzas.
+function esDelMesEnCursoEquipo_(fechaCL) {
+  if (!fechaCL) return false;
+  const p = String(fechaCL).split('/');
+  if (p.length !== 3) return false;
+  const hoy = new Date();
+  return Number(p[1]) === hoy.getMonth() + 1 && Number(p[2]) === hoy.getFullYear();
+}
+
+function nombreMesEnCursoEquipo_() {
+  const meses = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto',
+    'septiembre', 'octubre', 'noviembre', 'diciembre'];
+  return meses[new Date().getMonth()];
+}
+
+// Barra "Mostrando <mes> · Ver todo" reutilizada por historial y comunicados.
+function barraPeriodoEquipo_(verTodo, fnToggle) {
+  return '<div style="display:flex;justify-content:space-between;align-items:center;font-size:12px;' +
+    'color:var(--ink-soft);background:var(--paper);border-radius:8px;padding:7px 11px;margin-bottom:10px;">' +
+    '<span>' + (verTodo ? 'Mostrando todo el historial' : 'Mostrando ' + nombreMesEnCursoEquipo_()) + '</span>' +
+    '<span style="color:var(--forest);font-weight:600;cursor:pointer;" onclick="' + fnToggle + '">' +
+      (verTodo ? 'Ver solo el mes' : 'Ver todo') + '</span></div>';
+}
+
 function fechaCLaISO_(cl) { const p = cl.split('/'); return p[2] + '-' + p[1] + '-' + p[0]; }
 function fechaISOaCL_(iso) { const p = iso.split('-'); return p[2] + '/' + p[1] + '/' + p[0]; }
 
@@ -724,8 +816,11 @@ async function confirmarPagoEquipo_(nombre) {
 async function abrirResumenEquipo() {
   irA('screen-resumen-equipo');
   const hoy = new Date();
+  // Mes COMPLETO, no "hasta hoy": el filtro compara contra el fin del período trabajado, y
+  // un período puede cerrar después de hoy y pertenecer igual a este mes. Con el tope en
+  // hoy, el pago del viernes 14 por la semana que cierra el 16 no aparecería hasta el 16.
   const desde = fechaLocalISO(new Date(hoy.getFullYear(), hoy.getMonth(), 1));
-  const hasta = fechaLocalISO();
+  const hasta = fechaLocalISO(new Date(hoy.getFullYear(), hoy.getMonth() + 1, 0));
   await pintarResumenEquipo_(desde, hasta);
 }
 
@@ -755,15 +850,18 @@ async function abrirComunicadosEquipo() {
   cont.innerHTML = skeletonCards(2);
   const r = await llamarAPISilencioso('obtenerHistorialComunicados', {});
   if (!r.ok) { cont.innerHTML = '<p class="error-msg">' + r.error + '</p>'; return; }
-  let html = '';
-  (r.comunicados || []).forEach(c => {
+  const verTodoCom = !!equipoCache.verTodoComunicados;
+  const comunicados = (r.comunicados || []).filter(c => verTodoCom || esDelMesEnCursoEquipo_(c.fecha));
+  let html = barraPeriodoEquipo_(verTodoCom, 'alternarComunicadosEquipo_()');
+  comunicados.forEach(c => {
     html += '<div style="padding:10px 0;border-bottom:1px solid var(--border);">' +
       '<div style="display:flex;justify-content:space-between;font-size:12.5px;color:var(--ink-soft);"><span>A ' + c.para + '</span><span>' + c.fecha + '</span></div>' +
       '<p style="font-size:13.5px;margin:3px 0 0;">' + c.texto + '</p>' +
       '<p style="font-size:11.5px;color:var(--ink-soft);margin:4px 0 0;">' + c.leidos + ' de ' + c.totalDestinatarios + ' leído' + (c.totalDestinatarios === 1 ? '' : 's') + '</p>' +
     '</div>';
   });
-  if (!(r.comunicados || []).length) html = '<p style="font-size:12.5px;color:var(--ink-soft);">Todavía no has enviado comunicados.</p>';
+  if (!comunicados.length) html += '<p style="font-size:12.5px;color:var(--ink-soft);">' +
+    (verTodoCom ? 'Todavía no has enviado comunicados.' : 'Sin comunicados en ' + nombreMesEnCursoEquipo_() + '.') + '</p>';
   html += '<button class="btn-primary" style="margin-top:14px;" onclick="abrirComunicadoEquipo(null)">Nuevo comunicado</button>';
   cont.innerHTML = html;
 }
