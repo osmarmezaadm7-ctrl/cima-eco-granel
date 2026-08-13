@@ -815,27 +815,52 @@ async function confirmarPagoEquipo_(nombre) {
 // ============ 6. RESUMEN CONSOLIDADO ============
 async function abrirResumenEquipo() {
   irA('screen-resumen-equipo');
-  const hoy = new Date();
-  // Mes COMPLETO, no "hasta hoy": el filtro compara contra el fin del período trabajado, y
-  // un período puede cerrar después de hoy y pertenecer igual a este mes. Con el tope en
-  // hoy, el pago del viernes 14 por la semana que cierra el 16 no aparecería hasta el 16.
-  const desde = fechaLocalISO(new Date(hoy.getFullYear(), hoy.getMonth(), 1));
-  const hasta = fechaLocalISO(new Date(hoy.getFullYear(), hoy.getMonth() + 1, 0));
-  await pintarResumenEquipo_(desde, hasta);
+  await aplicarAtajoResumenEquipo_('mes');
 }
 
-async function pintarResumenEquipo_(desdeISO, hastaISO) {
+// Atajos de período (13/08/2026, con Osmar). Los tres van a mes o año COMPLETO, no "hasta
+// hoy": el filtro del backend compara contra el fin del período trabajado, y un período
+// puede cerrar después de hoy y pertenecer igual al mes en curso — con el tope en hoy, el
+// pago del viernes 14 por la semana que cierra el 16 no aparecería hasta el día 16.
+function rangoAtajoResumenEquipo_(atajo) {
+  const hoy = new Date();
+  const y = hoy.getFullYear(), m = hoy.getMonth();
+  if (atajo === 'anterior') return [new Date(y, m - 1, 1), new Date(y, m, 0)];
+  if (atajo === 'anio') return [new Date(y, 0, 1), new Date(y, 11, 31)];
+  return [new Date(y, m, 1), new Date(y, m + 1, 0)];
+}
+
+async function aplicarAtajoResumenEquipo_(atajo) {
+  const r = rangoAtajoResumenEquipo_(atajo);
+  await pintarResumenEquipo_(fechaLocalISO(r[0]), fechaLocalISO(r[1]), atajo);
+}
+
+const ATAJOS_RESUMEN_EQUIPO = [
+  { id: 'mes', label: 'Este mes' },
+  { id: 'anterior', label: 'Mes anterior' },
+  { id: 'anio', label: 'Este año' }
+];
+
+// atajo: 'mes' | 'anterior' | 'anio' | null. Va en null cuando las fechas se editan a mano;
+// en ese caso ningún botón queda marcado y se rotula "Período personalizado", para que un
+// botón encendido nunca muestre un rango que ya no corresponde.
+async function pintarResumenEquipo_(desdeISO, hastaISO, atajo) {
   const cont = document.getElementById('resumen-equipo-cont');
   cont.innerHTML = skeletonCards(2);
   const r = await llamarAPISilencioso('obtenerResumenEquipo', { desde: fechaISOaCL_(desdeISO), hasta: fechaISOaCL_(hastaISO) });
   if (!r.ok) { cont.innerHTML = '<p class="error-msg">' + r.error + '</p>'; return; }
-  let html = '<div style="display:flex;gap:10px;margin-bottom:14px;">' +
-      '<div style="flex:1;"><label>Desde</label><input type="date" id="re-desde" value="' + desdeISO + '" onchange="pintarResumenEquipo_(this.value,document.getElementById(\'re-hasta\').value)"></div>' +
-      '<div style="flex:1;"><label>Hasta</label><input type="date" id="re-hasta" value="' + hastaISO + '" onchange="pintarResumenEquipo_(document.getElementById(\'re-desde\').value,this.value)"></div>' +
+  let html = '<div class="pillbar">' +
+    ATAJOS_RESUMEN_EQUIPO.map(a => '<button class="' + (atajo === a.id ? 'sel' : '') + '" ' +
+      'onclick="aplicarAtajoResumenEquipo_(\'' + a.id + '\')">' + a.label + '</button>').join('') +
     '</div>';
+  html += '<div style="display:flex;gap:10px;margin-bottom:' + (atajo ? '14px' : '6px') + ';">' +
+      '<div style="flex:1;"><label>Desde</label><input type="date" id="re-desde" value="' + desdeISO + '" onchange="pintarResumenEquipo_(this.value,document.getElementById(\'re-hasta\').value,null)"></div>' +
+      '<div style="flex:1;"><label>Hasta</label><input type="date" id="re-hasta" value="' + hastaISO + '" onchange="pintarResumenEquipo_(document.getElementById(\'re-desde\').value,this.value,null)"></div>' +
+    '</div>';
+  if (!atajo) html += '<p style="font-size:11.5px;color:var(--ink-soft);margin:0 0 14px;">Período personalizado</p>';
   html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px;">' +
-    '<div class="card" style="text-align:center;"><p style="font-size:11.5px;color:var(--ink-soft);margin:0;">Total pagado</p><p style="font-size:20px;font-weight:700;margin:2px 0 0;">' + fmt(r.total) + '</p></div>' +
-    '<div class="card" style="text-align:center;"><p style="font-size:11.5px;color:var(--ink-soft);margin:0;">Pagos</p><p style="font-size:20px;font-weight:700;margin:2px 0 0;">' + r.cantidadPagos + '</p></div>' +
+    '<div class="card" style="text-align:center;"><p style="font-size:11.5px;color:var(--ink-soft);margin:0;">Total pagado</p><p class="mono" style="font-size:20px;font-weight:700;margin:2px 0 0;">' + fmt(r.total) + '</p></div>' +
+    '<div class="card" style="text-align:center;"><p style="font-size:11.5px;color:var(--ink-soft);margin:0;">Pagos</p><p class="mono" style="font-size:20px;font-weight:700;margin:2px 0 0;">' + r.cantidadPagos + '</p></div>' +
     '</div>';
   html += '<div style="font-size:11px;text-transform:uppercase;letter-spacing:.4px;color:var(--ink-soft);margin-bottom:6px;">Por persona</div>';
   (r.porPersona || []).forEach(p => { html += filaEquipo_(p.nombre, '<strong>' + fmt(p.total) + '</strong>'); });
