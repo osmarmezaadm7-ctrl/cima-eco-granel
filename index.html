@@ -1435,8 +1435,12 @@ function irA(id){
 }
 
 function fmt(n){ return '$'+Math.round(n||0).toLocaleString('es-CL'); }
-function fechaLocalISO(){
-  const d = new Date();
+// Acepta una fecha opcional (13/08/2026). Antes ignoraba el argumento y devolvía SIEMPRE
+// hoy: por eso el Resumen de Equipo abría con "desde" y "hasta" en la fecha actual y
+// mostraba 0, pese a que abrirResumenEquipo sí construía el día 1 del mes. Los demás
+// llamados no pasan argumento y siguen obteniendo hoy, igual que antes.
+function fechaLocalISO(fecha){
+  const d = fecha instanceof Date ? fecha : new Date();
   const y = d.getFullYear();
   const m = String(d.getMonth()+1).padStart(2,'0');
   const day = String(d.getDate()).padStart(2,'0');
