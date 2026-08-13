@@ -78,6 +78,7 @@ async function pagarAhoraDesdeRecordatorioEquipo_(nombre) {
   const r = await llamarAPISilencioso('obtenerFichaColaborador', { nombre: nombre });
   if (!r.ok) return;
   equipoCache.fichaActual = r.colaborador;
+  equipoCache.calculadoActual = r.calculado;
   abrirCierrePagoEquipo(nombre);
 }
 
@@ -89,6 +90,7 @@ async function abrirFichaEquipo(nombre) {
   const r = await llamarAPISilencioso('obtenerFichaColaborador', { nombre: nombre });
   if (!r.ok) { cont.innerHTML = '<p class="error-msg">' + r.error + '</p>'; return; }
   equipoCache.fichaActual = r.colaborador;
+  equipoCache.calculadoActual = r.calculado;
   equipoCache.fichaTabActual = 'datos';
   pintarFichaEquipo_(r.colaborador, r.calculado);
 }
@@ -100,8 +102,11 @@ function pintarFichaEquipo_(c, calc) {
   const proximoPagoTxt = rec ? fmt(rec.monto) : '—';
   const proximoPagoSub = rec ? rec.fechaVencimiento : c.diasDePago;
   const horasSemana = (c.jornada || []).reduce((s, b) => s + b.dias.length * num_(b.horas), 0);
-  const modalidadVal = c.unidadDescuento === 'hora' ? fmt(calc.valorHora) : fmt(calc.valorDia);
-  const modalidadSub = c.unidadDescuento === 'hora' ? 'Por hora' : 'Por día';
+  // 13/08/2026: el KPI pasó de "Modalidad" (que leía unidadDescuento, ya eliminado) a mostrar
+  // el valor hora derivado, que ahora es la única tasa del sistema. valorHoraMostrar viene
+  // redondeado del backend solo para pintar — nunca se usa para multiplicar.
+  const modalidadVal = fmt(calc.valorHoraMostrar != null ? calc.valorHoraMostrar : calc.valorHora);
+  const modalidadSub = c.basePeriodo === 'Fijo' ? 'Monto fijo' : 'Días trabajados';
   let html =
     '<div style="display:flex;align-items:center;gap:14px;margin-bottom:18px;">' +
       '<div class="avatar" style="width:52px;height:52px;font-size:17px;">' + iniciales + '</div>' +
@@ -173,6 +178,7 @@ function pintarTabDatosEquipo_(c, calc) {
   // mensual como dato secundario, porque no aparece en ninguna otra parte de la ficha.
   html += '<div style="font-size:11px;text-transform:uppercase;letter-spacing:.4px;color:var(--ink-soft);margin:16px 0 6px;">Pago</div>';
   html += '<div class="rowline"><span>Periodicidad</span><span>' + c.periodicidad + '</span></div>';
+  html += '<div class="rowline"><span>Base del período</span><span>' + (c.basePeriodo === 'Fijo' ? 'Monto fijo por ciclo' : 'Días trabajados') + '</span></div>';
   html += '<div class="rowline"><span>Corte</span><span>vence ' + (c.diasDePago || '—') + '</span></div>';
   if (c.periodicidad === 'Quincenal') {
     html += '<div class="rowline"><span>Total mensual</span><span class="mono">' + fmt(c.monto) + '</span></div>';
@@ -227,10 +233,15 @@ function pintarFormularioFicha_(c, esNuevo) {
     '<div style="flex:1;"><label>Fecha de pago</label><div id="fe-config-pago"></div></div>' +
     '</div>';
   html += '<div id="fe-desglose-monto" style="font-size:12.5px;color:var(--forest);background:var(--forest-soft);border-radius:8px;padding:8px 12px;margin-bottom:12px;"></div>';
-  html += '<label>Modalidad de pago</label><select id="fe-unidad" onchange="pintarJornadaEquipo_()">' +
-    '<option value="dia" ' + (val('unidadDescuento', 'dia') === 'dia' ? 'selected' : '') + '>Por día</option>' +
-    '<option value="hora" ' + (val('unidadDescuento', 'dia') === 'hora' ? 'selected' : '') + '>Por hora</option>' +
+  // 13/08/2026: reemplaza al antiguo "Modalidad de pago" (día/hora), que se eliminó porque
+  // esa elección ahora se hace al anotar cada movimiento, no en la ficha. Este campo define
+  // otra cosa: de dónde sale la BASE del período.
+  const baseActual = val('basePeriodo', val('periodicidad', 'Semanal') === 'Semanal' ? 'Jornada' : 'Fijo');
+  html += '<label>Base del período</label><select id="fe-base" onchange="pintarDesgloseMontoEquipo_()">' +
+    '<option value="Fijo" ' + (baseActual === 'Fijo' ? 'selected' : '') + '>Monto fijo por ciclo</option>' +
+    '<option value="Jornada" ' + (baseActual === 'Jornada' ? 'selected' : '') + '>Días trabajados</option>' +
     '</select>';
+  html += '<div id="fe-base-nota" style="font-size:11.5px;color:var(--ink-soft);margin:5px 0 0;line-height:1.4;"></div>';
   html += '<div style="font-size:11px;text-transform:uppercase;letter-spacing:.4px;color:var(--ink-soft);margin:12px 0 6px;">Jornada</div>';
   html += '<div id="fe-jornada-bloques"></div>';
   html += '<button type="button" class="btn-secondary" onclick="agregarBloqueJornadaEquipo_()">+ Agregar bloque de jornada</button>';
@@ -346,19 +357,22 @@ function semanasParaTasaEquipo_(periodicidad) { return periodicidad === 'Semanal
 function recalcularResumenJornadaEquipo_() {
   const resumen = document.getElementById('fe-jornada-resumen');
   if (!resumen) return;
-  const unidad = document.getElementById('fe-unidad') ? document.getElementById('fe-unidad').value : 'dia';
   const periodicidad = document.getElementById('fe-periodicidad') ? document.getElementById('fe-periodicidad').value : 'Semanal';
   const monto = num_(document.getElementById('fe-monto') ? document.getElementById('fe-monto').value : 0);
   const semanas = semanasParaTasaEquipo_(periodicidad);
-  const diasSemana = equipoCache.jornadaEdit.reduce((s, b) => s + b.dias.length, 0);
   const horasSemana = equipoCache.jornadaEdit.reduce((s, b) => s + b.dias.length * num_(b.horas), 0);
-  if (unidad === 'hora') {
-    const valorHora = (horasSemana * semanas) > 0 ? Math.round(monto / (horasSemana * semanas)) : 0;
-    resumen.textContent = horasSemana + ' h netas por semana · valor hora ' + fmt(valorHora);
-  } else {
-    const valorDia = (diasSemana * semanas) > 0 ? Math.round(monto / (diasSemana * semanas)) : 0;
-    resumen.textContent = diasSemana + ' día(s) por semana · valor día ' + fmt(valorDia);
-  }
+  // Misma fórmula que valoresCalculadosColaborador_ en Equipo.gs — si una cambia, la otra
+  // también. Acá la tasa se mantiene exacta y solo se redondea cada valor mostrado, igual
+  // que en el backend: redondear la tasa antes de multiplicar era el bug de los pesos sueltos.
+  const valorHora = (horasSemana * semanas) > 0 ? monto / (horasSemana * semanas) : 0;
+  let html = horasSemana + ' h netas por semana · valor hora ' + fmt(Math.round(valorHora));
+  equipoCache.jornadaEdit.forEach(b => {
+    if (!b.dias.length) return;
+    html += '<div style="display:flex;justify-content:space-between;padding:4px 0 0;">' +
+      '<span>' + b.dias.join(', ') + ' · ' + num_(b.horas) + ' h</span>' +
+      '<span class="mono">' + fmt(Math.round(valorHora * num_(b.horas))) + '</span></div>';
+  });
+  resumen.innerHTML = html;
 }
 
 function pintarDesgloseMontoEquipo_() {
@@ -369,6 +383,13 @@ function pintarDesgloseMontoEquipo_() {
   if (periodicidad === 'Quincenal') el.textContent = fmt(monto) + ' al mes → ' + fmt(monto / 2) + ' cada quincena';
   else if (periodicidad === 'Mensual') el.textContent = fmt(monto) + ' al mes, en un solo pago';
   else el.textContent = fmt(monto) + ' a la semana';
+  const nota = document.getElementById('fe-base-nota');
+  const selBase = document.getElementById('fe-base');
+  if (nota && selBase) {
+    nota.textContent = selBase.value === 'Fijo'
+      ? 'Cobra el monto completo del ciclo. Ausencias y extras lo ajustan.'
+      : 'Cobra según los días de jornada que caigan dentro del período.';
+  }
   recalcularResumenJornadaEquipo_();
 }
 
@@ -383,7 +404,7 @@ async function guardarFichaEquipo_(esNuevo, nombreOriginal) {
     monto: document.getElementById('fe-monto').value,
     periodicidad: document.getElementById('fe-periodicidad').value,
     diasDePago: '', configPago: equipoCache.configPagoEdit,
-    unidadDescuento: document.getElementById('fe-unidad').value,
+    basePeriodo: document.getElementById('fe-base').value,
     jornada: equipoCache.jornadaEdit
   };
   if (esNuevo) d.pin = document.getElementById('fe-pin').value.trim();
@@ -425,6 +446,7 @@ function abrirRegistrarMovimientoEquipo(nombre) {
   irA('screen-movimiento-equipo');
   equipoCache.tipoMovimientoActual = 'Ausencia';
   equipoCache.modoAusencia = 'completo';
+  equipoCache.modoExtra = 'completo';
   pintarFormularioMovimientoEquipo_(nombre);
 }
 
@@ -439,18 +461,28 @@ function pintarFormularioMovimientoEquipo_(nombre) {
   html += '</div>';
   html += '<button type="button" class="btn-secondary' + (tipo === 'Anticipo' ? ' selected' : '') + '" style="' + (tipo === 'Anticipo' ? 'background:var(--forest);color:#fff;border-color:var(--forest);' : '') + '" onclick="cambiarTipoMovimientoEquipo_(\'Anticipo\',\'' + nombre + '\')">Anticipo</button>';
 
-  html += '<label style="margin-top:14px;">Día' + (tipo === 'Licencia' || tipo === 'Vacaciones' || (tipo === 'Ausencia' && equipoCache.modoAusencia !== 'horas') ? ' (desde)' : '') + '</label><input type="date" id="me-fecha" value="' + fechaLocalISO() + '">';
+  const esRango = tipo === 'Licencia' || tipo === 'Vacaciones' || (tipo === 'Ausencia' && equipoCache.modoAusencia !== 'horas');
+  html += '<label style="margin-top:14px;">Día' + (esRango ? ' (desde)' : '') + '</label>' +
+    '<input type="date" id="me-fecha" value="' + fechaLocalISO() + '" onchange="refrescarPreviewMovimientoEquipo_()">';
+  // Nota de jornada bajo la fecha (13/08/2026): antes se elegía una fecha a ciegas y recién
+  // al guardar se descubría si el sistema la consideraba día laboral.
+  html += '<div id="me-nota-dia" style="font-size:11.5px;color:var(--ink-soft);margin-top:5px;line-height:1.4;"></div>';
 
-  if (tipo === 'Ausencia') {
-    const modo = equipoCache.modoAusencia || 'completo';
-    html += '<label>¿Cómo fue la ausencia?</label><div class="toggle-group">' +
-      '<button type="button" class="' + (modo === 'completo' ? 'selected' : '') + '" onclick="cambiarModoAusenciaEquipo_(\'completo\',\'' + nombre + '\')">Día(s) completo(s)</button>' +
-      '<button type="button" class="' + (modo === 'horas' ? 'selected' : '') + '" onclick="cambiarModoAusenciaEquipo_(\'horas\',\'' + nombre + '\')">Algunas horas</button>' +
+  // 13/08/2026: Ausencia y Extra comparten el mismo selector día/horas. Antes Extra no
+  // preguntaba nada: obligaba a escribir horas o pagaba día completo según unidadDescuento
+  // de la ficha, que ya no existe.
+  if (tipo === 'Ausencia' || tipo === 'Extra') {
+    const esAus = tipo === 'Ausencia';
+    const modo = (esAus ? equipoCache.modoAusencia : equipoCache.modoExtra) || 'completo';
+    const fn = esAus ? 'cambiarModoAusenciaEquipo_' : 'cambiarModoExtraEquipo_';
+    html += '<label>' + (esAus ? '¿Cuánto faltó?' : '¿Cuánto trabajó de más?') + '</label><div class="toggle-group">' +
+      '<button type="button" id="me-modo-completo" class="' + (modo === 'completo' ? 'selected' : '') + '" onclick="' + fn + '(\'completo\',\'' + nombre + '\')">' + (esAus ? 'Día(s) completo(s)' : 'Día completo') + '</button>' +
+      '<button type="button" class="' + (modo === 'horas' ? 'selected' : '') + '" onclick="' + fn + '(\'horas\',\'' + nombre + '\')">' + (esAus ? 'Algunas horas' : 'Horas específicas') + '</button>' +
     '</div>';
     if (modo === 'completo') {
-      html += '<label>Hasta</label><input type="date" id="me-fecha-hasta" value="' + fechaLocalISO() + '">';
+      if (esAus) html += '<label>Hasta</label><input type="date" id="me-fecha-hasta" value="' + fechaLocalISO() + '" onchange="refrescarPreviewMovimientoEquipo_()">';
     } else {
-      html += '<label>Horas que faltó</label><input type="number" id="me-horas-ausencia" placeholder="ej. 2">';
+      html += '<label>Horas</label><input type="number" id="me-horas" step="0.5" placeholder="ej. 2" oninput="refrescarPreviewMovimientoEquipo_()">';
     }
   }
   if (tipo === 'Licencia' || tipo === 'Vacaciones') {
@@ -459,29 +491,100 @@ function pintarFormularioMovimientoEquipo_(nombre) {
   if (tipo === 'Anticipo') {
     html += '<label>Monto del anticipo</label><input type="number" id="me-monto-anticipo">';
   }
-  const c = equipoCache.fichaActual;
-  if (tipo === 'Extra' && c && c.unidadDescuento === 'hora') {
-    html += '<label>Horas extra trabajadas ese día</label><input type="number" id="me-horas-extra">';
-  }
   html += '<label>Observación (opcional)</label><input type="text" id="me-observacion">';
+  // Monto en vivo con su fórmula al lado — el número aparecía recién después de confirmar,
+  // y ver "7 h × $3.411,37" es lo que permite cachar al instante si algo no cuadra.
+  html += '<div id="me-preview" style="display:none;"></div>';
   html += '<div id="me-exito" style="display:none;background:var(--forest-soft);color:var(--forest);border-radius:8px;padding:9px 12px;margin-bottom:8px;font-size:13px;font-weight:600;"></div>';
   html += '<div class="error-msg" id="me-error"></div>';
   html += '<button class="btn-primary" style="margin-top:8px;" onclick="guardarMovimientoEquipo_(\'' + nombre + '\')">Guardar</button>';
   html += '<div style="font-size:11px;text-transform:uppercase;letter-spacing:.4px;color:var(--ink-soft);margin:16px 0 6px;">Registrado este período</div>';
   html += '<div id="me-lista-periodo"></div>';
   cont.innerHTML = html;
+  refrescarPreviewMovimientoEquipo_();
   pintarMovimientosDelPeriodoEquipo_(nombre);
 }
 
 function cambiarTipoMovimientoEquipo_(tipo, nombre) {
   equipoCache.tipoMovimientoActual = tipo;
   if (tipo === 'Ausencia') equipoCache.modoAusencia = 'completo';
+  if (tipo === 'Extra') equipoCache.modoExtra = 'completo';
   pintarFormularioMovimientoEquipo_(nombre);
 }
 
 function cambiarModoAusenciaEquipo_(modo, nombre) {
   equipoCache.modoAusencia = modo;
   pintarFormularioMovimientoEquipo_(nombre);
+}
+
+function cambiarModoExtraEquipo_(modo, nombre) {
+  equipoCache.modoExtra = modo;
+  pintarFormularioMovimientoEquipo_(nombre);
+}
+
+// Espejo en pantalla del cálculo del backend. NO reemplaza la validación del servidor —
+// registrarMovimientoEquipo revalida todo; esto solo evita que Osmar descubra un problema
+// recién después de guardar. Misma fórmula que valorDiaColaborador_ en Equipo.gs.
+const DIAS_JS_A_ABREV_ = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
+
+function bloqueDelDiaEquipo_(jornada, fechaISO) {
+  if (!fechaISO) return null;
+  const p = fechaISO.split('-');
+  const f = new Date(Number(p[0]), Number(p[1]) - 1, Number(p[2]));
+  const abrev = DIAS_JS_A_ABREV_[f.getDay()];
+  return (jornada || []).find(b => (b.dias || []).indexOf(abrev) > -1) || null;
+}
+
+function nombreDiaEquipo_(fechaISO) {
+  const nombres = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
+  const p = fechaISO.split('-');
+  return nombres[new Date(Number(p[0]), Number(p[1]) - 1, Number(p[2])).getDay()];
+}
+
+function refrescarPreviewMovimientoEquipo_() {
+  const nota = document.getElementById('me-nota-dia');
+  const prev = document.getElementById('me-preview');
+  const fechaEl = document.getElementById('me-fecha');
+  if (!nota || !fechaEl) return;
+  const c = equipoCache.fichaActual, calc = equipoCache.calculadoActual;
+  const tipo = equipoCache.tipoMovimientoActual;
+  const fechaISO = fechaEl.value;
+  const bloque = c ? bloqueDelDiaEquipo_(c.jornada, fechaISO) : null;
+
+  if (!fechaISO || !c) { nota.textContent = ''; }
+  else if (bloque) {
+    nota.textContent = 'Es ' + nombreDiaEquipo_(fechaISO) + ' · jornada de ' + num_(bloque.horas) + ' h';
+  } else {
+    nota.textContent = 'Es ' + nombreDiaEquipo_(fechaISO) + ' · no está en su jornada';
+  }
+
+  const btnCompleto = document.getElementById('me-modo-completo');
+  if (btnCompleto && tipo === 'Extra') {
+    // Día completo no aplica si ese día no está en su jornada: no hay bloque de horas del
+    // que sacar cuánto es "un día", e inventar un día tipo sería adivinar.
+    btnCompleto.disabled = !bloque;
+    btnCompleto.style.opacity = bloque ? '' : '.4';
+    btnCompleto.style.textDecoration = bloque ? '' : 'line-through';
+    if (!bloque && (equipoCache.modoExtra || 'completo') === 'completo') {
+      nota.textContent += ' — indica cuántas horas trabajó';
+    }
+  }
+
+  if (!prev) return;
+  if (!calc || !calc.valorHora || (tipo !== 'Ausencia' && tipo !== 'Extra')) { prev.style.display = 'none'; return; }
+  const modo = (tipo === 'Ausencia' ? equipoCache.modoAusencia : equipoCache.modoExtra) || 'completo';
+  const horasEl = document.getElementById('me-horas');
+  let horas = 0;
+  if (modo === 'horas') horas = num_(horasEl ? horasEl.value : 0);
+  else if (bloque) horas = num_(bloque.horas);
+  if (!(horas > 0)) { prev.style.display = 'none'; return; }
+  const monto = Math.round(horas * calc.valorHora);
+  const esAus = tipo === 'Ausencia';
+  prev.style.display = 'block';
+  prev.innerHTML = '<div style="background:var(--forest);color:#fff;border-radius:14px;padding:14px 16px;margin-top:16px;">' +
+    '<div style="color:#CFE0D3;font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.2px;">' + (esAus ? 'Se descuenta' : 'Se suma') + '</div>' +
+    '<div class="mono" style="font-size:27px;font-weight:700;margin-top:3px;">' + (esAus ? '−' : '+') + fmt(monto) + '</div>' +
+    '<div style="font-size:12px;color:#CFE0D3;margin-top:4px;">' + horas + ' h × ' + fmt(Math.round(calc.valorHora)) + '</div></div>';
 }
 
 async function guardarMovimientoEquipo_(nombre) {
@@ -491,14 +594,18 @@ async function guardarMovimientoEquipo_(nombre) {
   const d = { colaborador: nombre, fecha: document.getElementById('me-fecha').value, tipo: tipo,
     observacion: document.getElementById('me-observacion').value.trim() };
   if (tipo === 'Licencia' || tipo === 'Vacaciones') d.fechaHasta = document.getElementById('me-fecha-hasta').value;
-  if (tipo === 'Ausencia') {
-    d.modoAusencia = equipoCache.modoAusencia || 'completo';
-    if (d.modoAusencia === 'completo') d.fechaHasta = document.getElementById('me-fecha-hasta').value;
-    else d.horas = document.getElementById('me-horas-ausencia').value;
+  if (tipo === 'Ausencia' || tipo === 'Extra') {
+    d.modo = (tipo === 'Ausencia' ? equipoCache.modoAusencia : equipoCache.modoExtra) || 'completo';
+    d.modoAusencia = d.modo;
+    if (d.modo === 'completo') {
+      const hastaEl = document.getElementById('me-fecha-hasta');
+      if (hastaEl) d.fechaHasta = hastaEl.value;
+    } else {
+      d.horas = document.getElementById('me-horas').value;
+    }
   }
   if (tipo === 'Anticipo') d.monto = document.getElementById('me-monto-anticipo').value;
-  const horasEl = document.getElementById('me-horas-extra');
-  if (horasEl) d.horas = horasEl.value;
+  const horasEl = document.getElementById('me-horas');
 
   const r = await llamarAPI('registrarMovimientoEquipo', { data: d });
   if (!r.ok) { err.textContent = r.error; return; }
@@ -506,6 +613,7 @@ async function guardarMovimientoEquipo_(nombre) {
   exito.textContent = '✓ ' + tipo + ' guardada' + (r.monto ? ' — ' + fmt(r.monto) : '');
   document.getElementById('me-observacion').value = '';
   if (horasEl) horasEl.value = '';
+  refrescarPreviewMovimientoEquipo_();
   const montoAnticipoEl = document.getElementById('me-monto-anticipo');
   if (montoAnticipoEl) montoAnticipoEl.value = '';
   pintarMovimientosDelPeriodoEquipo_(nombre);
@@ -550,6 +658,16 @@ async function pintarCierrePagoEquipo_(nombre, desdeISO, hastaISO) {
   const cierre = r.cierre;
   equipoCache.cierreActual = cierre;
   const movs = cierre.movimientos || [];
+  const sol = cierre.solape;
+  // Desglose de la base (13/08/2026): antes solo se veía un monto sin explicación, y esa
+  // opacidad es justamente lo que hizo invisible el bug de la base fija. Ahora se ve de
+  // dónde sale.
+  const baseDet = cierre.baseUnidad === 'dias'
+    ? cierre.baseUnidades + ' día(s) de jornada'
+    : cierre.baseUnidades + ' fecha(s) de pago × ' + fmt(cierre.baseValorUnidad);
+  // Con solape los montos se atenúan pero NO se esconden: así se entiende qué se habría
+  // pagado y por qué está mal, en vez de quedar frente a una pantalla vacía.
+  const dim = sol ? ' opacity:.45;' : '';
   const detalle = (tipo, color) => movs.filter(m => m.tipo === tipo).map(m =>
     '<div style="font-size:12px;color:var(--ink-soft);padding-left:10px;margin-top:3px;">· ' + m.fecha + (m.observacion ? ' — ' + m.observacion : '') + ' · <span style="color:' + color + ';">' + fmt(m.monto) + '</span></div>').join('');
   cont.innerHTML =
@@ -558,17 +676,29 @@ async function pintarCierrePagoEquipo_(nombre, desdeISO, hastaISO) {
       '<div style="flex:1;"><label>Desde</label><input type="date" id="ce-desde" value="' + desdeISO + '" onchange="recalcularCierrePagoEquipo_(\'' + nombre + '\')"></div>' +
       '<div style="flex:1;"><label>Hasta</label><input type="date" id="ce-hasta" value="' + hastaISO + '" onchange="recalcularCierrePagoEquipo_(\'' + nombre + '\')"></div>' +
     '</div>' +
-    '<div style="padding:9px 0;font-size:14px;"><span style="color:var(--ink-soft);">Base del período</span><span style="float:right;">' + fmt(cierre.base) + '</span></div>' +
-    '<div style="padding:9px 0;font-size:14px;border-top:1px solid var(--border);"><span style="color:var(--ink-soft);">Ausencias (' + movs.filter(m => m.tipo === 'Ausencia').length + ')</span><span style="float:right;color:var(--danger);">−' + fmt(cierre.ausencias) + '</span>' + detalle('Ausencia', 'var(--danger)') + '</div>' +
-    '<div style="padding:9px 0;font-size:14px;border-top:1px solid var(--border);"><span style="color:var(--ink-soft);">Extras (' + movs.filter(m => m.tipo === 'Extra').length + ')</span><span style="float:right;color:var(--success);">+' + fmt(cierre.extras) + '</span>' + detalle('Extra', 'var(--success)') + '</div>' +
-    '<div style="padding:9px 0;font-size:14px;border-top:1px solid var(--border);border-bottom:1px solid var(--border);"><span style="color:var(--ink-soft);">Anticipos (' + movs.filter(m => m.tipo === 'Anticipo').length + ')</span><span style="float:right;color:var(--danger);">−' + fmt(cierre.anticipos) + '</span>' + detalle('Anticipo', 'var(--danger)') + '</div>' +
+    (sol ? '<div style="background:var(--terracotta-soft);color:var(--danger);font-size:13px;line-height:1.45;border-radius:9px;padding:10px 12px;margin:14px 0 0;">' +
+        '<b>Este período ya fue pagado.</b><br>El ' + sol.desde + ' al ' + sol.hasta + ' se pagó ' + fmt(sol.total) + ' el ' + sol.fechaPago + '. Ajusta la fecha "desde" o usa el botón de abajo.</div>' : '') +
+    '<div style="padding:14px 0 9px;font-size:14px;' + dim + '"><span style="color:var(--ink-soft);">Base del período</span><span style="float:right;">' + fmt(cierre.base) + '</span>' +
+      '<div style="font-size:12px;color:var(--ink-soft);padding-left:10px;margin-top:3px;">' + baseDet + '</div></div>' +
+    '<div style="padding:9px 0;font-size:14px;border-top:1px solid var(--border);' + dim + '"><span style="color:var(--ink-soft);">Ausencias (' + movs.filter(m => m.tipo === 'Ausencia').length + ')</span><span style="float:right;color:var(--danger);">−' + fmt(cierre.ausencias) + '</span>' + detalle('Ausencia', 'var(--danger)') + '</div>' +
+    '<div style="padding:9px 0;font-size:14px;border-top:1px solid var(--border);' + dim + '"><span style="color:var(--ink-soft);">Extras (' + movs.filter(m => m.tipo === 'Extra').length + ')</span><span style="float:right;color:var(--success);">+' + fmt(cierre.extras) + '</span>' + detalle('Extra', 'var(--success)') + '</div>' +
+    '<div style="padding:9px 0;font-size:14px;border-top:1px solid var(--border);border-bottom:1px solid var(--border);' + dim + '"><span style="color:var(--ink-soft);">Anticipos (' + movs.filter(m => m.tipo === 'Anticipo').length + ')</span><span style="float:right;color:var(--danger);">−' + fmt(cierre.anticipos) + '</span>' + detalle('Anticipo', 'var(--danger)') + '</div>' +
     (movs.some(m => m.tipo === 'Licencia' || m.tipo === 'Vacaciones')
       ? '<div style="padding:9px 0;font-size:12.5px;color:var(--ink-soft);">Licencia médica / Vacaciones — informativo, no descuenta' + detalle('Licencia', 'var(--ink-soft)') + detalle('Vacaciones', 'var(--ink-soft)') + '</div>' : '') +
-    '<div style="display:flex;justify-content:space-between;padding:14px 0;font-size:17px;font-weight:700;"><span>A pagar</span><span>' + fmt(cierre.total) + '</span></div>' +
-    '<label>Medio de pago</label><select id="ce-medio"><option>Transferencia</option><option>Efectivo</option></select>' +
+    '<div style="display:flex;justify-content:space-between;padding:14px 0;font-size:17px;font-weight:700;' + dim + '"><span>A pagar</span><span>' + fmt(cierre.total) + '</span></div>' +
+    '<label style="' + dim + '">Medio de pago</label><select id="ce-medio" ' + (sol ? 'disabled style="opacity:.45;"' : '') + '><option>Transferencia</option><option>Efectivo</option></select>' +
     '<div class="error-msg" id="ce-error"></div>' +
-    '<button class="btn-primary" onclick="confirmarPagoEquipo_(\'' + nombre + '\')">Confirmar y registrar pago</button>' +
+    '<button class="btn-primary" ' + (sol ? 'disabled' : '') + ' onclick="confirmarPagoEquipo_(\'' + nombre + '\')">Confirmar y registrar pago</button>' +
+    (sol ? '<button class="btn-secondary" style="margin-top:8px;" onclick="ajustarAPeriodoPendienteEquipo_(\'' + nombre + '\')">Ajustar al período pendiente</button>' : '') +
     '<p style="font-size:12px;color:var(--ink-soft);text-align:center;margin-top:8px;">Queda guardado y visible para ' + nombre.split(' ')[0] + '</p>';
+}
+
+// Corrige las fechas de un toque en vez de obligar a calcular a mano dónde termina lo ya
+// pagado — usa la misma sugerencia del backend (arranca en UltimaFechaPagada + 1 día).
+async function ajustarAPeriodoPendienteEquipo_(nombre) {
+  const r = await llamarAPISilencioso('obtenerSugerenciaPeriodoPago', { colaborador: nombre });
+  if (!r || !r.ok) return;
+  await pintarCierrePagoEquipo_(nombre, fechaCLaISO_(r.desde), fechaCLaISO_(r.hasta));
 }
 
 async function recalcularCierrePagoEquipo_(nombre) {
