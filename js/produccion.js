@@ -289,29 +289,42 @@ async function descartarBorradorConteo(confirmado) {
 }
 
 // Bloque de referencia bajo el nombre del producto en la pantalla de Conteo. Muestra el
-// valor de arranque (lo último contado/guardado) y, si la fila se ajustó, un "deshacer"
-// que la devuelve a ese valor. Reemplaza al viejo refUltimoConteoHtml_ solo en el pintado
-// nuevo — el desktop de VerPrograma sigue usando aquel para su columna aparte.
+// valor de arranque (lo último contado/guardado) y un "deshacer" que devuelve la fila a ese
+// valor. Reemplaza al viejo refUltimoConteoHtml_ solo en el pintado nuevo — el desktop de
+// VerPrograma sigue usando aquel para su columna aparte.
+//
+// CAMBIO 26/08/2026 (con Osmar): antes esta referencia se mostraba SIEMPRE. Como el conteo
+// se precarga con el último valor guardado (precargarConteo_ deja conteoCantidades = arranque),
+// al abrir la pantalla cada fila mostraba el mismo número dos veces: en el texto gris de
+// referencia y dentro del campo que hay que editar. Eso no aportaba información y competía
+// con el nombre del producto, que es lo único que hay que leer para no equivocarse de fila.
+// Ahora la referencia aparece solo cuando la fila se ajustó, que es cuando dice algo que el
+// campo no dice: de qué valor venías, y el atajo para volver.
 function refArranqueHtml_(p, key, keyEsc) {
+  if (!conteoAjustado_(key)) return '';
   const arr = conteoValorArranque[key];
   let ref;
   if (esVeganCorner_()) {
     ref = arr ? 'Guardado: ' + arr : 'Sin stock previo';
   } else if (p.ultimoConteo) {
-    ref = 'Últ: ' + p.ultimoConteo.cantidad + ' · ' + p.ultimoConteo.fecha;
+    ref = 'Últ: ' + p.ultimoConteo.cantidad;
   } else {
     ref = 'Sin conteo previo';
   }
-  let html = '<span class="conteo-ref">' + ref;
-  if (conteoAjustado_(key)) {
-    html += ' <button type="button" class="conteo-deshacer" onclick="deshacerConteo_(\'' + keyEsc + '\')">deshacer</button>';
-  }
-  html += '</span>';
-  return html;
+  return '<span class="conteo-ref">' + ref +
+    ' <button type="button" class="conteo-deshacer" onclick="deshacerConteo_(\'' + keyEsc + '\')">deshacer</button></span>';
 }
 
 // NUEVO 20/07/2026 (con Osmar — "revisar el último conteo", Opción B): texto de
 // referencia neutro, sin alertas ni resaltado (decisión explícita de Osmar).
+// Envuelve refArranqueHtml_ para el pintado móvil: el salto de línea solo tiene sentido si
+// hay algo que mostrar debajo del nombre. Sin esto, una fila sin ajustar arrastraba un <br>
+// vacío y seguía ocupando dos líneas de alto (CAMBIO 26/08/2026, con Osmar).
+function refBloqueConteo_(p, key, keyEsc) {
+  const ref = refArranqueHtml_(p, key, keyEsc);
+  return ref ? '<br>' + ref : '';
+}
+
 function refUltimoConteoHtml_(p) {
   if (!p.ultimoConteo) return '<span style="font-size:11px;color:var(--ink-soft);">Sin conteo previo</span>';
   return '<span style="font-size:11px;color:var(--ink-soft);">Últ: ' + p.ultimoConteo.cantidad + ' · ' + p.ultimoConteo.fecha + '</span>';
@@ -323,7 +336,7 @@ function filaConteoDesktop_(p, key, val, keyEsc, incluirUltimo) {
     (incluirUltimo ? '<td style="padding:9px 6px;">' + refArranqueHtml_(p, key, keyEsc) + '</td>' : '') +
     '<td style="padding:6px;text-align:right;"><div class="conteo-stepper" style="display:inline-flex;">' +
       '<button type="button" onclick="cambiarCantidadConteo(\'' + keyEsc + '\',-1)">\u2212</button>' +
-      '<input type="number" min="0" value="' + val + '" oninput="escribirCantidadConteo(\'' + keyEsc + '\',this.value)">' +
+      '<input type="number" min="0" value="' + val + '" onfocus="this.select()" oninput="escribirCantidadConteo(\'' + keyEsc + '\',this.value)">' +
       '<button type="button" onclick="cambiarCantidadConteo(\'' + keyEsc + '\',1)">+</button>' +
     '</div></td></tr>';
 }
@@ -390,10 +403,10 @@ function pintarConteo() {
       const val = conteoCantidades[key] !== undefined ? conteoCantidades[key] : 0;
       const keyEsc = key.replace(/'/g, "\\'");
       html += '<div class="conteo-row' + (conteoAjustado_(key) ? ' ajustado' : '') + '" style="flex-wrap:wrap;">' +
-        '<span>' + p.nombre + '<br>' + refArranqueHtml_(p, key, keyEsc) + '</span>' +
+        '<span>' + p.nombre + refBloqueConteo_(p, key, keyEsc) + '</span>' +
         '<div class="conteo-stepper">' +
           '<button type="button" onclick="cambiarCantidadConteo(\'' + keyEsc + '\',-1)">\u2212</button>' +
-          '<input type="number" min="0" value="' + val + '" oninput="escribirCantidadConteo(\'' + keyEsc + '\',this.value)">' +
+          '<input type="number" min="0" value="' + val + '" onfocus="this.select()" oninput="escribirCantidadConteo(\'' + keyEsc + '\',this.value)">' +
           '<button type="button" onclick="cambiarCantidadConteo(\'' + keyEsc + '\',1)">+</button>' +
         '</div>' +
       '</div>';
@@ -432,10 +445,10 @@ function pintarConteo() {
       const val = conteoCantidades[key] !== undefined ? conteoCantidades[key] : 0;
       const keyEsc = key.replace(/'/g, "\\'");
       html += '<div class="conteo-row' + (conteoAjustado_(key) ? ' ajustado' : '') + '" style="flex-wrap:wrap;">' +
-        '<span>' + p.nombre + '<br>' + refArranqueHtml_(p, key, keyEsc) + '</span>' +
+        '<span>' + p.nombre + refBloqueConteo_(p, key, keyEsc) + '</span>' +
         '<div class="conteo-stepper">' +
           '<button type="button" onclick="cambiarCantidadConteo(\'' + keyEsc + '\',-1)">\u2212</button>' +
-          '<input type="number" min="0" value="' + val + '" oninput="escribirCantidadConteo(\'' + keyEsc + '\',this.value)">' +
+          '<input type="number" min="0" value="' + val + '" onfocus="this.select()" oninput="escribirCantidadConteo(\'' + keyEsc + '\',this.value)">' +
           '<button type="button" onclick="cambiarCantidadConteo(\'' + keyEsc + '\',1)">+</button>' +
         '</div>' +
       '</div>';
