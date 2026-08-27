@@ -1936,6 +1936,9 @@ async function cambiarCantidadBorradorPauta(id, val) {
     const d = desgloseEmpanadas[id];
     d.congeladas = Math.min(d.congeladas, it.cantidadBorrador);
     d.horneadas = Math.max(0, it.cantidadBorrador - d.congeladas);
+    // CAMBIO 26/08/2026 (con Osmar): el sub-reparto del freezer cuelga del total enviado,
+    // así que bajar la cantidad tiene que recortarlo — es el único caso donde corresponde.
+    d.delFreezer = Math.min(d.delFreezer || 0, it.cantidadBorrador);
     pintarPauta();
   }
   await llamarAPISilencioso('actualizarBorradorPauta', { data: { id: id, estadoBorrador: it.estadoBorrador, cantidadBorrador: it.cantidadBorrador } });
@@ -2358,38 +2361,50 @@ function textoAvisoDesglose_(d, total) {
 }
 
 // NUEVO 06/08/2026 (con Osmar — automatización freezer VC, salida). Sub-reparto DENTRO
-// del mismo bloque abierto del desglose, solo si hay horneadas (d.horneadas > 0) — de
-// esas, cuántas salieron del freezer que ya existía vs se produjeron frescas el mismo
-// día. Mismo patrón de auto-reparto que Horneadas/Congeladas de arriba (editar uno ajusta
-// el otro solo), pero con acento caramelo para distinguirlo como un dato de Vegan Corner,
-// no de la entrega a Cima. Colapsado en 0 por defecto — el caso normal es producción
-// fresca, no freezer. Vive en su propio contenedor (id fz-sub-<id>) para poder
-// refrescarlo solo cuando cambian las horneadas, sin repintar toda la Pauta.
+// del mismo bloque abierto del desglose: de lo que se envía, cuánto salió del freezer que
+// ya existía vs se produjo el mismo día. Mismo patrón de auto-reparto que
+// Horneadas/Congeladas de arriba (editar uno ajusta el otro solo), pero con acento caramelo
+// para distinguirlo como un dato de Vegan Corner, no de la entrega a Cima. Colapsado en 0
+// por defecto — el caso normal es producción del día, no freezer. Vive en su propio
+// contenedor (id fz-sub-<id>) para poder refrescarlo sin repintar toda la Pauta.
+//
+// CAMBIO 26/08/2026 (con Osmar): antes este sub-reparto colgaba de las horneadas — solo
+// aparecía si d.horneadas > 0 y el tope era d.horneadas. Eso modelaba un solo camino:
+// sacar del freezer, hornear y mandar horneadas. El caso real que faltaba es sacar del
+// freezer y mandar CONGELADAS a Cima, que no tenía dónde declararse: esas unidades se
+// contaban como producidas frescas ese día y nunca se descontaban de StockCongeladoVC,
+// dejando el freezer sobrestimado. Son dos preguntas independientes y ahora se tratan así:
+// en qué estado llega a Cima (horneada/congelada, arriba) y de dónde salió en Vegan Corner
+// (producida hoy/del freezer, acá). El sub-reparto cuelga del TOTAL que se envía.
 function bloqueFreezerPauta_(it, d) {
-  if (!d.horneadas) return '<div class="fz-sub" id="fz-sub-' + it.id + '"></div>';
-  const frescas = Math.max(0, d.horneadas - (d.delFreezer || 0));
+  const total = Number(totalItemPauta_(it)) || 0;
+  if (!total) return '<div class="fz-sub" id="fz-sub-' + it.id + '"></div>';
+  const delFreezer = Math.max(0, Math.min(total, d.delFreezer || 0));
+  const producidas = Math.max(0, total - delFreezer);
   return '<div class="fz-sub" id="fz-sub-' + it.id + '">' +
-    '<p class="fz-sub-label">De esas ' + d.horneadas + ' horneadas</p>' +
+    '<p class="fz-sub-label">De esas ' + total + ' que envías</p>' +
     '<div class="dg-campos">' +
-      '<div class="dg-campo"><label for="fz-f-' + it.id + '">Frescas hoy</label>' +
-        '<input type="number" min="0" max="' + d.horneadas + '" id="fz-f-' + it.id + '" value="' + frescas + '" oninput="cambiarDelFreezer_(\'' + it.id + '\',\'frescas\',this.value)"></div>' +
+      '<div class="dg-campo"><label for="fz-f-' + it.id + '">Producidas hoy</label>' +
+        '<input type="number" min="0" max="' + total + '" id="fz-f-' + it.id + '" value="' + producidas + '" oninput="cambiarDelFreezer_(\'' + it.id + '\',\'producidas\',this.value)"></div>' +
       '<div class="dg-campo"><label for="fz-z-' + it.id + '">Del freezer</label>' +
-        '<input type="number" min="0" max="' + d.horneadas + '" id="fz-z-' + it.id + '" value="' + (d.delFreezer || 0) + '" oninput="cambiarDelFreezer_(\'' + it.id + '\',\'delFreezer\',this.value)"></div>' +
+        '<input type="number" min="0" max="' + total + '" id="fz-z-' + it.id + '" value="' + delFreezer + '" oninput="cambiarDelFreezer_(\'' + it.id + '\',\'delFreezer\',this.value)"></div>' +
     '</div>' +
   '</div>';
 }
 
 // Mismo patrón que cambiarDesglose_: no repinta toda la Pauta, solo el par de campos.
+// El tope es el total entregado, no las horneadas (ver nota en bloqueFreezerPauta_).
 function cambiarDelFreezer_(id, campo, valor) {
   const it = cachePauta.pauta.find(x => x.id === id);
   if (!it) return;
   const d = asegurarDesglose_(it);
-  const n = Math.max(0, Math.min(d.horneadas, Number(valor) || 0));
-  if (campo === 'frescas') d.delFreezer = Math.max(0, d.horneadas - n);
-  else d.delFreezer = n;
+  const total = Number(totalItemPauta_(it)) || 0;
+  const n = Math.max(0, Math.min(total, Number(valor) || 0));
+  if (campo === 'delFreezer') d.delFreezer = n;
+  else d.delFreezer = Math.max(0, total - n);
   const inpF = document.getElementById('fz-f-' + id);
   const inpZ = document.getElementById('fz-z-' + id);
-  if (inpF) inpF.value = Math.max(0, d.horneadas - d.delFreezer);
+  if (inpF) inpF.value = Math.max(0, total - d.delFreezer);
   if (inpZ) inpZ.value = d.delFreezer;
 }
 
@@ -2451,12 +2466,12 @@ function cambiarDesglose_(id, campo, valor) {
     const inpH = document.getElementById('dg-h-' + id);
     if (inpH) inpH.value = d.horneadas;
   }
-  // NUEVO 06/08/2026 (con Osmar — freezer VC): el sub-reparto Frescas/Del freezer vive
-  // dentro de las horneadas, así que si las horneadas cambian (por cualquiera de los dos
-  // caminos de arriba), delFreezer no puede quedar por encima del nuevo total — se
-  // clampea y se refresca el sub-bloque completo (es chico, no vale la pena parchear
-  // campo por campo como el resto de esta función).
-  d.delFreezer = Math.min(d.delFreezer || 0, d.horneadas);
+  // NUEVO 06/08/2026 (con Osmar — freezer VC): el sub-reparto Producidas hoy/Del freezer
+  // se refresca acá porque su etiqueta y sus topes dependen del total que se envía.
+  // CAMBIO 26/08/2026 (con Osmar): el clamp era contra d.horneadas — mover las horneadas
+  // hacia abajo recortaba en silencio lo declarado como del freezer, aunque el total no
+  // hubiera cambiado. Ahora el único límite es el total (ver bloqueFreezerPauta_).
+  d.delFreezer = Math.min(d.delFreezer || 0, total);
   const fzSub = document.getElementById('fz-sub-' + id);
   if (fzSub) fzSub.outerHTML = bloqueFreezerPauta_(it, d);
   const el = document.getElementById('dg-aviso-' + id);
@@ -2489,15 +2504,41 @@ async function confirmarProduccion() {
     document.getElementById('resumen-pauta-error').textContent = 'La pauta quedó incompleta — cuéntanos por qué antes de confirmar.';
     return;
   }
-  const r = await llamarAPI('confirmarPauta', { data: { responsable: sesion.nombre, agregadosIds: pautaAgregadosSesion, observacion: pautaObservacionBorrador, desglose: desgloseEmpanadas } });
+  // NUEVO 26/08/2026 (con Osmar): lo que se confirma pasa a ser lo que la pantalla muestra,
+  // no solo lo que alcanzó a guardarse en la hoja. Marcar Hecho y editar la cantidad se
+  // persisten con llamarAPISilencioso, que nunca lanza: devuelve {ok:false} y nadie lo
+  // mira, así que el check quedaba verde aunque el guardado se hubiera perdido (red, cold
+  // start del contenedor, o marcar un producto recién agregado antes de que el servidor
+  // escribiera su fila — el caso más frecuente, porque agregar es optimista). Al confirmar,
+  // el servidor leía la hoja, no veía el 'Hecho', y ese producto se iba a faltantes sin que
+  // nadie se enterara: 8 de 56 confirmaciones entre julio y agosto terminaron así, con
+  // faltantes y sin observación, que es la huella exacta del desfase (el cliente obliga a
+  // escribir observación cuando SABE que hay faltantes). El servidor une las dos fuentes,
+  // no las reemplaza — ver confirmarPauta en Produccion.gs.
+  const marcados = {};
+  cachePauta.pauta.forEach(it => {
+    if (it.estadoBorrador !== 'Hecho') return;
+    marcados[it.id] = (it.cantidadBorrador === null || it.cantidadBorrador === undefined) ? '' : Number(it.cantidadBorrador);
+  });
+  const r = await llamarAPI('confirmarPauta', { data: { responsable: sesion.nombre, agregadosIds: pautaAgregadosSesion, observacion: pautaObservacionBorrador, desglose: desgloseEmpanadas, marcados: marcados } });
   if (!r.ok) { document.getElementById('resumen-pauta-error').textContent = r.error || 'Error al confirmar producción'; return; }
+
+  // Un id marcado en pantalla que el servidor no encontró en la hoja es un producto que se
+  // agregó pero cuya fila nunca llegó a escribirse. Antes desaparecía en silencio; se
+  // nombra acá para que quede claro qué hay que volver a agregar.
+  const perdidos = (r.noEncontrados || []).map(id => {
+    const it = cachePauta.pauta.find(x => x.id === id);
+    return it ? it.producto : id;
+  });
 
   desgloseEmpanadas = {}; desgloseAbierto = null;
   cachePauta = null; pautaAgregadosSesion = []; pautaObservacionBorrador = '';
   document.getElementById('confirm-title').textContent = 'Producción confirmada';
   document.getElementById('confirm-msg').textContent = r.completados.length + ' producto' + (r.completados.length === 1 ? '' : 's') + ' completado' + (r.completados.length === 1 ? '' : 's') +
     (r.faltantes.length ? ', ' + r.faltantes.length + ' quedaron pendientes para la próxima.' : '.');
-  document.getElementById('confirm-detalle').innerHTML = '';
+  document.getElementById('confirm-detalle').innerHTML = perdidos.length
+    ? '<p class="dg-aviso">No se pudo guardar ' + perdidos.join(', ') + ' — hay que agregarlo de nuevo a la pauta.</p>'
+    : '';
   ocultarBotonOtro();
   irA('screen-confirm');
 }
